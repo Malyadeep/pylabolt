@@ -2,6 +2,7 @@ import numpy as np
 import numba
 
 
+@numba.njit
 def secondOrder(f, Nx, Ny, w, c, u, v, rho, cs):
     cs_2 = 1/(cs*cs)
     cs_4 = cs_2/(cs*cs)
@@ -14,6 +15,7 @@ def secondOrder(f, Nx, Ny, w, c, u, v, rho, cs):
                                              0.5*t2*cs_2)
 
 
+@numba.njit
 def firstOrder(f, Nx, Ny, w, c, u, v, rho, cs):
     cs_2 = 1/(cs*cs)
     for j in range(Ny):
