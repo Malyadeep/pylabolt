@@ -1,37 +1,35 @@
-import numpy as np
-import numba
+import os
+import collisionModels
+import streaming
 
 
 class collisionStreaming:
-    def __init__(self, deltaX, deltaT, c, tau, f):
-        self.omega = 1/tau
-        self.deltaX = deltaX
-        self.deltaT = deltaT
-        self.dtdx = deltaT/deltaX
+    def __init__(self, latticeDict, c, collisionDict):
+        try:
+            self.deltaX = latticeDict['deltaX']
+            self.deltaT = latticeDict['deltaT']
+            if collisionDict['model'] == 'BGK':
+                self.collisionFunc = collisionModels.BGK
+            else:
+                print("ERROR! Unsupported collision model : " +
+                      collisionDict['model'])
+        except KeyError as e:
+            print("ERROR! Keyword: " + str(e) + " missing in 'latticeDict'")
+            os._exit()
+        try:
+            self.tau = collisionDict['tau']
+        except KeyError as e:
+            print("ERROR! Keyword: " + str(e) + " missing in 'collisionDict'")
+            os._exit()
+        self.dtdx = self.deltaT/self.deltaX
         self.c = c
-        self.tau = tau
-        self.f_new = np.copy(f)
+        self.preFactor = self.deltaT/self.tau
 
-    @numba.njit
-    def BGK(self, f, f_new, f_eq, nodeType):
-        for i in range(f.shape[0]):
-            for j in range(f.shape[1]):
-                if nodeType[i, j] != 's':
-                    for k in range(f.shape[2]):
-                        f[i, j, k] = f_new[i, j, k] + self.deltaT * \
-                            self.omega * (f_eq[i, j, k] - f[i, j, k])
+    def collide(self, f, f_new, f_eq, nodeType):
+        self.collisionFunc(f, f_new, f_eq, nodeType, self.preFactor)
 
-    @numba.njit
-    def stream(self, f, f_new, nodeType):
-        for i in range(f.shape[0]):
-            for j in range(f.shape[1]):
-                if nodeType[i, j] != 's':
-                    for k in range(1, f.shape[2]):
-                        i_old = (i - int(self.c[k, 0]*self.dtdx)
-                                 + f.shape[0]) % f.shape[0]
-                        j_old = (j - int(self.c[k, 1]*self.dtdx)
-                                 + f.shape[1]) % f.shape[1]
-                        f_new[i, j, k] = f[i_old, j_old, k]
+    def propagate(self, f, f_new, nodeType):
+        streaming.stream(f, f_new, nodeType, self.dtdx, self.c)
 
 
 if __name__ == '__main__':
