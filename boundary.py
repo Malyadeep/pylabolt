@@ -85,13 +85,6 @@ class boundary:
                 self.boundaryIndices.append([tempIndex_i, tempIndex_f])
         self.boundaryIndices = np.array(self.boundaryIndices)
 
-    def details(self):
-        print(self.points)
-        print(self.boundaryType)
-        print(self.boundaryFunc)
-        print(self.boundaryValues)
-        print(self.boundaryIndices)
-
     def setBoundary(self, f, f_new):
         for itr in range(self.noOfBoundaries):
             self.boundaryFunc[itr](f, f_new, self.boundaryValues[itr],
