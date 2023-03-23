@@ -38,7 +38,8 @@ class element:
             tempU = np.sum(np.dot(lattice.c[:, 0], self.f))
             tempV = np.sum(np.dot(lattice.c[:, 1], self.f))
         self.u[0] = tempU/self.rho
-        self.v[1] = tempV/self.rho
+        self.u[1] = tempV/self.rho
 
     def computeEquilibrium(self, equilibriumFunc):
-        equilibriumFunc(self.f_eq, self.u, self.rho)
+        if not self.nodeType == 'o':
+            equilibriumFunc(self.f_eq, self.u, self.rho)
