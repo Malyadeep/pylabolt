@@ -1,27 +1,38 @@
 import numba
+import numpy as np
+
+spec = [
+    ('cs_2', numba.float64),
+    ('cs_4', numba.float64),
+    ('Nx', numba.float64),
+    ('Ny', numba.float64),
+    ('w', numba.float64[:]),
+    ('c', numba.float64[:, :])
+]
 
 
-@numba.njit
-def secondOrder(f, Nx, Ny, w, c, u, v, rho, cs):
-    cs_2 = 1/(cs*cs)
-    cs_4 = cs_2/(cs*cs)
-    for j in range(Ny):
-        for i in range(Nx):
-            t2 = u[i, j]*u[i, j] + v[i, j]*v[i, j]
-            for k in range(w.shape[0]):
-                t1 = c[0, k]*u[i, j] + c[1, k]*v[i, j]
-                f[i, j, k] = w[k]*rho[i, j]*(1 + t1*cs_2 + 0.5*t1*t1*cs_4 -
-                                             0.5*t2*cs_2)
+@numba.experimental.jitclass(spec)
+class equilibrium:
+    def __init__(self, mesh, lattice):
+        self.cs_2 = 1/(lattice.cs*lattice.cs)
+        self.cs_4 = self.cs_2/(lattice.cs*lattice.cs)
+        self.Nx = mesh.Nx
+        self.Ny = mesh.Ny
+        self.c = lattice.c
+        self.w = lattice.w
 
+    def secondOrder(self, f_eq, u, rho):
+        t2 = np.dot(u, u)
+        for k in range(f_eq.shape[0]):
+            t1 = np.dot(self.c[k, :], u)
+            f_eq[k] = self.w[k] * rho * (1 + t1 * self.cs_2 +
+                                         0.5 * t1 * t1 * self.cs_4 -
+                                         0.5 * t2 * self.cs_2)
 
-@numba.njit
-def firstOrder(f, Nx, Ny, w, c, u, v, rho, cs):
-    cs_2 = 1/(cs*cs)
-    for j in range(Ny):
-        for i in range(Nx):
-            for k in range(w.shape[0]):
-                t1 = c[0, k]*u[i, j] + c[1, k]*v[i, j]
-                f[i, j, k] = w[k]*rho[i, j]*(1 + t1*cs_2)
+    def firstOrder(self, f_eq, u, rho):
+        for k in range(f_eq.shape[0]):
+            t1 = np.dot(self.c[k, :], u)
+            f_eq[k] = self.w[k] * rho * (1 + t1 * self.cs_2)
 
 
 if __name__ == '__main__':
