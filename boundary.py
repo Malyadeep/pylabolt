@@ -54,9 +54,9 @@ class boundary:
                                   "'fixedScalar'")
                             os._exit(0)
                     elif self.boundaryDict[item][data] == 'bounceBack':
-                        value = 0.0
+                        value = np.float(0.0)
                     elif self.boundaryDict[item][data] == 'periodic':
-                        value = 0.0
+                        value = np.float(0.0)
                     else:
                         print("ERROR! " + self.boundaryDict[item][data] +
                               " is not a valid boundary condition!")
@@ -75,19 +75,22 @@ class boundary:
                     os._exit(0)
         self.noOfBoundaries = len(self.boundaryFunc)
 
-    def initializeBoundary(self, delX):
+    def calculateBoundaryIndices(self, delX):
         for name in self.nameList:
             pointArray = np.array(self.points[name])
-            for i in range(pointArray.shape[0]):
-                tempIndex_i = np.rint(pointArray[i, 0]/delX).astype(int)
-                tempIndex_f = np.rint(pointArray[i, 1]/delX).\
+            for k in range(pointArray.shape[0]):
+                tempIndex_i = np.rint(pointArray[k, 0]/delX).astype(int)
+                tempIndex_f = np.rint(pointArray[k, 1]/delX).\
                     astype(int) + 1
                 self.boundaryIndices.append([tempIndex_i, tempIndex_f])
         self.boundaryIndices = np.array(self.boundaryIndices)
 
-    def setBoundary(self, f, f_new):
+    def details(self):
+        print(self.boundaryValues)
+
+    def setBoundary(self, elements):
         for itr in range(self.noOfBoundaries):
-            self.boundaryFunc[itr](f, f_new, self.boundaryValues[itr],
+            self.boundaryFunc[itr](elements, self.boundaryValues[itr],
                                    self.boundaryIndices[itr])
 
 
