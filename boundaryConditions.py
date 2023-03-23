@@ -2,7 +2,7 @@ import numba
 
 
 @numba.njit
-def fixedVector(f, f_new, value, ind):
+def fixedVector(elements, value, ind):
     print('\n')
     print('fixedVector BC invoked')
     print(value)
@@ -12,7 +12,7 @@ def fixedVector(f, f_new, value, ind):
 
 
 @numba.njit
-def fixedScalar(f, f_new, value, ind):
+def fixedScalar(elements, value, ind):
     print('\n')
     print('fixedScalar BC invoked')
     print(value)
@@ -22,7 +22,7 @@ def fixedScalar(f, f_new, value, ind):
 
 
 @numba.njit
-def bounceBack(f, f_new, value, ind):
+def bounceBack(elements, value, ind):
     print('\n')
     print('bounceBack BC invoked')
     print(value)
@@ -32,10 +32,5 @@ def bounceBack(f, f_new, value, ind):
 
 
 @numba.njit
-def periodic(f, f_new, value, ind):
-    print('\n')
-    print('Periodic BC invoked')
-    print(value)
-    print(ind)
-    print('\n')
+def periodic(elements, value, ind):
     pass
