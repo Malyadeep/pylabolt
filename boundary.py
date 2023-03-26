@@ -86,9 +86,18 @@ class boundary:
         self.boundaryIndices = np.array(self.boundaryIndices)
 
     def details(self):
+        print(self.nameList)
+        print(self.boundaryType)
         print(self.boundaryValues)
+        print(self.boundaryIndices.shape)
+        print(self.points)
+
+    def initializeBoundaryElements(self, elements):
+        for itr in range(self.noOfBoundaries):
+            self.boundaryFunc[itr](elements, self.boundaryValues[itr],
+                                   self.boundaryIndices[itr], True)
 
     def setBoundary(self, elements):
         for itr in range(self.noOfBoundaries):
             self.boundaryFunc[itr](elements, self.boundaryValues[itr],
-                                   self.boundaryIndices[itr])
+                                   self.boundaryIndices[itr], False)
