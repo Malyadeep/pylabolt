@@ -92,7 +92,3 @@ class boundary:
         for itr in range(self.noOfBoundaries):
             self.boundaryFunc[itr](elements, self.boundaryValues[itr],
                                    self.boundaryIndices[itr])
-
-
-if __name__ == '__main__':
-    print('Module to read and applying boundary conditions')
