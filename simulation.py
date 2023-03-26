@@ -1,3 +1,9 @@
+controlDict = {
+    'startTime': 0,
+    'endTime': 100,
+    'saveInterval': 10
+}
+
 boundaryDict = {
     'top': {
         'type': 'fixedScalar',
@@ -16,10 +22,19 @@ boundaryDict = {
 collisionDict = {
     'model': 'BGK',
     'tau': 1,
+    'equilibrium': 'secondOrder'
 }
 
 latticeDict = {
     'latticeType': 'D2Q9',
     'deltaT': 1,
     'deltaX': 1
+}
+
+meshDict = {
+    'grid': [201, 101],
+    'boundingBox': [[0, 0], [2, 1]]
+}
+
+obstacle = {
 }
