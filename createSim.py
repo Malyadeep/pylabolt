@@ -5,7 +5,7 @@ import mesh
 import lattice
 import boundary
 import equilibrium
-import schemeConfig
+import schemeLB
 
 
 class simulation:
@@ -27,8 +27,8 @@ class simulation:
         self.mesh = mesh.mesh(meshDict, obstacle)
         self.lattice = lattice.lattice(latticeDict)
         self.equilibrium = equilibrium.equilibrium(self.mesh, self.lattice)
-        self.collisionScheme = schemeConfig.collisionScheme(self.lattice,
-                                                            collisionDict)
+        self.collisionScheme = schemeLB.collisionScheme(self.lattice,
+                                                        collisionDict)
         self.elements = self.mesh.createElements()
 
         # Initialize boundary object
