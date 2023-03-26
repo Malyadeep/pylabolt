@@ -33,7 +33,3 @@ class equilibrium:
         for k in range(f_eq.shape[0]):
             t1 = np.dot(self.c[k, :], u)
             f_eq[k] = self.w[k] * rho * (1 + t1 * self.cs_2)
-
-
-if __name__ == '__main__':
-    print('equilibrium distribution function')
