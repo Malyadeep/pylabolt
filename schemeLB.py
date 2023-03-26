@@ -13,6 +13,7 @@ class collisionScheme:
             else:
                 print("ERROR! Unsupported collision model : " +
                       collisionDict['model'])
+            self.collisionModel = collisionDict['model']
             if collisionDict['equilibrium'] == 'firstOrder':
                 self.equilibriumFunc = equilibrium.firstOrder
             if collisionDict['equilibrium'] == 'secondOrder':
@@ -20,6 +21,7 @@ class collisionScheme:
             else:
                 print("ERROR! Unsupported equilibrium model : " +
                       collisionDict['equilibrium'])
+            self.equilibriumModel = collisionDict['equilibrium']
         except KeyError as e:
             print("ERROR! Keyword: " + str(e) + " missing in 'latticeDict'")
             os._exit(1)
