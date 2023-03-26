@@ -1,7 +1,18 @@
 controlDict = {
     'startTime': 0,
     'endTime': 100,
-    'saveInterval': 10
+    'stdOutputInterval': 5,
+    'saveInterval': 10,
+    'saveStateInterval': 100,
+    'relTolU': 1e-6,
+    'relTolV': 1e-6,
+    'relTolRho': 1e-6,
+}
+
+internalFields = {
+    'u': 0,
+    'v': 0,
+    'rho': 1
 }
 
 boundaryDict = {
