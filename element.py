@@ -16,12 +16,14 @@ spec = [
 
 @numba.experimental.jitclass(spec)
 class element:
-    def __init__(self, mesh, lattice, id):
+    def __init__(self, mesh, lattice, id, U_initial, rho_initial):
         self.id = id
         self.x = mesh.delX * int(id % mesh.Nx)
         self.y = mesh.delX * int(id / mesh.Nx)
-        self.u = np.zeros(lattice.dim, dtype=np.float64)
-        self.rho = 1.
+        self.u = U_initial
+        self.u_old = np.zeros(lattice.dim, dtype=np.float64)
+        self.rho = rho_initial
+        self.rho_old = 0.
         self.f = np.zeros(lattice.noOfDirections, dtype=np.float64)
         self.f_eq = np.zeros_like(self.f)
         self.f_new = np.zeros_like(self.f)
@@ -37,8 +39,8 @@ class element:
         for k in range(self.f.shape[0]):
             tempU = np.sum(np.dot(lattice.c[:, 0], self.f))
             tempV = np.sum(np.dot(lattice.c[:, 1], self.f))
-        self.u[0] = tempU/self.rho
-        self.u[1] = tempV/self.rho
+        self.u[0] = tempU/(self.rho + 1e-9)
+        self.u[1] = tempV/(self.rho + 1e-9)
 
     def computeEquilibrium(self, equilibriumFunc):
         if not self.nodeType == 'o':
