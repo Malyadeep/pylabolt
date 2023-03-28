@@ -17,8 +17,8 @@ internalFields = {
 
 boundaryDict = {
     'top': {
-        'type': 'fixedScalar',
-        'value': 0.0,
+        'type': 'fixedU',
+        'value': [0.1, 0],
         'points_0': [[0, 0], [2, 0]]
     },
 
