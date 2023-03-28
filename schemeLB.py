@@ -42,7 +42,7 @@ def stream(elements, lattice, mesh):
         for j in range(Ny):
             ind = int(i * Nx + j)
             if elements[ind].nodeType != 'o':
-                for k in range(1, lattice.c.shape[1]):
+                for k in range(1, lattice.c.shape[0]):
                     i_old = (i - int(lattice.c[k, 0]*dtdx)
                              + Nx) % Nx
                     j_old = (j - int(lattice.c[k, 1]*dtdx)
