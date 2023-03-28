@@ -2,35 +2,20 @@ import numba
 
 
 @numba.njit
-def fixedVector(elements, value, ind, initial):
-    print('\n')
-    print('fixedVector BC invoked')
-    print(value)
-    print(ind)
-    print('\n')
+def fixedU(elements, elementList):
     pass
 
 
 @numba.njit
-def fixedScalar(elements, value, ind, initial):
-    print('\n')
-    print('fixedScalar BC invoked')
-    print(value)
-    print(ind)
-    print('\n')
+def fixedPressure(elements, elementList):
     pass
 
 
 @numba.njit
-def bounceBack(elements, value, ind, initial):
-    print('\n')
-    print('bounceBack BC invoked')
-    print(value)
-    print(ind)
-    print('\n')
+def bounceBack(elements, elementList):
     pass
 
 
 @numba.njit
-def periodic(elements, value, ind, initial):
+def periodic(elements, elementList):
     pass
