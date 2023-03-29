@@ -36,4 +36,4 @@ class lattice:
 
 def createLattice(latticeDict):
     lat = latticeDict['latticeType']
-    return lat
+    return lattice(lat)
