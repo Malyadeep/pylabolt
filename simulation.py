@@ -1,6 +1,6 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 100,
+    'endTime': 1,
     'stdOutputInterval': 5,
     'saveInterval': 10,
     'saveStateInterval': 100,
