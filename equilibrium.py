@@ -4,10 +4,10 @@ import numpy as np
 spec = [
     ('cs_2', numba.float64),
     ('cs_4', numba.float64),
-    ('Nx', numba.float64),
-    ('Ny', numba.float64),
+    ('Nx', numba.int64),
+    ('Ny', numba.int64),
     ('w', numba.float64[:]),
-    ('c', numba.float64[:, :])
+    ('c', numba.int64[:, :])
 ]
 
 
