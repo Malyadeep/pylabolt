@@ -3,7 +3,7 @@ import numba
 
 spec = [
     ('c', numba.int64[:, :]),
-    ('invList', numba.int64[:])
+    ('invList', numba.int64)
     ('cs', numba.float64),
     ('latticeType', numba.types.string),
     ('w', numba.float64[:]),
