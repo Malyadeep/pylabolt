@@ -47,10 +47,10 @@ class simulation:
             print('ERROR! Keyword ' + str(e) + ' missing in internalFields')
 
         print('Reading mesh info and creating mesh...', flush=True)
-        self.mesh = mesh.mesh(meshDict, obstacle)
+        self.mesh = mesh.createMesh(meshDict, obstacle)
         print('Reading mesh info and creating mesh done!\n', flush=True)
         print('Setting lattice structure...', flush=True)
-        self.lattice = lattice.lattice(latticeDict)
+        self.lattice = lattice.createLattice(latticeDict)
         print('Setting lattice structure done!\n', flush=True)
         print('Setting collision scheme and equilibrium model...',
               flush=True)
@@ -61,8 +61,8 @@ class simulation:
         print('Setting collision scheme and equilibrium model done!\n',
               flush=True)
         print('Initializing elements...', flush=True)
-        self.elements = self.mesh.createElements(self.U_initial,
-                                                 self.rho_initial)
+        self.elements = mesh.createElements(self.lattice, self.mesh,
+                                            self.U_initial, self.rho_initial)
         print('Initializing elements done!\n')
 
         # Initialize boundary object
