@@ -78,7 +78,6 @@ class simulation:
         self.equilibriumFunc = self.collisionScheme.equilibriumFunc
         self.collisionFunc = self.collisionScheme.collisionFunc
         self.setBoundaryFunc = self.boundary.setBoundary
-        self.propagation = self.schemeConfig.stream
 
     def writeControlLog(self):
         controlFile = open('log_control', 'w')
