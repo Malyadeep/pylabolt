@@ -7,8 +7,8 @@ spec = [
     ('cs', numba.float64),
     ('latticeType', numba.types.string),
     ('w', numba.float64[:]),
-    ('deltaX', numba.float64[:]),
-    ('deltaT', numba.float64[:]),
+    ('deltaX', numba.float64),
+    ('deltaT', numba.float64),
 ]
 
 
