@@ -27,11 +27,11 @@ def createMesh(meshDict, obstacle):
     delX1 = (boundingBox[1, 0] - boundingBox[0, 0])/(Nx - 1)
     delX2 = (boundingBox[1, 1] - boundingBox[0, 1])/(Ny - 1)
     if delX1 == delX2:
-        mesh = mesh(Nx, Ny, delX1)
+        meshObj = mesh(Nx, Ny, delX1)
     else:
         print("Error: Only Square lattices are supported")
         os._exit(1)
-    return mesh
+    return meshObj
 
 
 def createElements(lattice, mesh, U_initial, rho_initial):
