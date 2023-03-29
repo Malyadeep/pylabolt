@@ -157,7 +157,8 @@ class boundary:
         print(self.boundaryIndices.shape)
         print(self.points)
 
-    def setBoundary(self, elements):
+    def setBoundary(self, elements, lattice, mesh):
         for itr in range(self.noOfBoundaries):
-            self.boundaryFunc[itr](elements, self.elementList[itr],
-                                   self.boundaryValues[itr])
+            args = (elements, self.elementList[itr],
+                    self.boundaryValues[itr], lattice, mesh)
+            self.boundaryFunc[itr](*args)
