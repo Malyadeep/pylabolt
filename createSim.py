@@ -56,7 +56,8 @@ class simulation:
               flush=True)
         self.equilibrium = equilibrium.equilibrium(self.mesh, self.lattice)
         self.collisionScheme = schemeLB.collisionScheme(self.lattice,
-                                                        collisionDict)
+                                                        collisionDict,
+                                                        self.equilibrium)
         self.schemeLog()
         print('Setting collision scheme and equilibrium model done!\n',
               flush=True)
