@@ -3,6 +3,8 @@ import numba
 
 spec = [
     ('id', numba.int64),
+    ('id_x', numba.int64),
+    ('id_y', numba.int64),
     ('x', numba.float64),
     ('y', numba.float64),
     ('u', numba.float64[:]),
@@ -20,8 +22,9 @@ spec = [
 class element:
     def __init__(self, mesh, lattice, id, U_initial, rho_initial):
         self.id = id
-        self.x = mesh.delX * int(id % mesh.Nx)
-        self.y = mesh.delX * int(id / mesh.Nx)
+        self.id_x, self.id_y = int(id % mesh.Nx), int(id / mesh.Nx)
+        self.x = mesh.delX * self.id_x
+        self.y = mesh.delX * self.id_y
         self.u = U_initial
         self.rho = rho_initial
         self.f = np.zeros(lattice.noOfDirections, dtype=np.float64)
