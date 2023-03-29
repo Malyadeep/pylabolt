@@ -37,9 +37,7 @@ collisionDict = {
 }
 
 latticeDict = {
-    'latticeType': 'D2Q9',
-    'deltaT': 1,
-    'deltaX': 1
+    'latticeType': 'D2Q9'
 }
 
 meshDict = {

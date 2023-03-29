@@ -25,7 +25,6 @@ def getDirections(i, j, c, Nx, Ny, invList):
 def initializeBoundaryElements(elements, mesh, lattice,
                                boundaryType, boundaryIndices,
                                boundaryValues):
-    dtdx = lattice.dtdx
     Nx = mesh.Nx
     Ny = mesh.Ny
     c = lattice.c
@@ -47,7 +46,7 @@ def initializeBoundaryElements(elements, mesh, lattice,
                         element.v = boundaryValues[1]
                     elif boundaryType == 'fixedPressure':
                         element.rho = boundaryValues * cs_2
-                    args = (i, j, c * dtdx, Nx, Ny, invList)
+                    args = (i, j, c, Nx, Ny, invList)
                     tempOut, tempInv = getDirections(*args)
                     args = (tempOut, tempInv)
                     element.setDirections(*args)
