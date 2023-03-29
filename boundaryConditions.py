@@ -4,9 +4,9 @@ import numpy as np
 
 @numba.njit
 def fixedU(elements, elementList, boundaryValue, lattice, mesh):
-    c = lattice.c * lattice.dtdx
+    c = lattice.c
     w = lattice.w
-    cs_2 = 1/(lattice.cs_2 * lattice.cs_2)
+    cs_2 = 1/(lattice.cs * lattice.cs)
     for ind in elementList:
         invList = elements[ind].invDirections
         outList = elements[ind].outDirections
@@ -20,11 +20,11 @@ def fixedU(elements, elementList, boundaryValue, lattice, mesh):
 
 @numba.njit
 def fixedPressure(elements, elementList, boundaryValue, lattice, mesh):
-    c = lattice.c * lattice.dtdx
+    c = lattice.c
     Nx = mesh.Nx
     w = lattice.w
-    cs_2 = 1/(lattice.cs_2 * lattice.cs_2)
-    cs_4 = cs_2/(lattice.cs_2 * lattice.cs_2)
+    cs_2 = 1/(lattice.cs * lattice.cs)
+    cs_4 = cs_2 * cs_2
     for ind in elementList:
         invList = elements[ind].invDirections
         outList = elements[ind].outDirections
