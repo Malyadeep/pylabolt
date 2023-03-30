@@ -6,8 +6,8 @@ from schemeLB import stream
 
 
 @numba.njit
-def equilibriumRelaxation(mesh, elements,
-                          collisionFunc, preFactor, equilibriumFunc,
+def equilibriumRelaxation(mesh, elements, collisionFunc,
+                          preFactor, equilibriumFunc,
                           eqilibriumArgs):
     for ind in range(mesh.Nx * mesh.Ny):
         equilibriumFunc(elements[ind].f_eq, elements[ind].u,
@@ -53,7 +53,6 @@ def solver(simulation):
     resRho = 1e6
     u_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny, 2),
                      dtype=np.float64)
-    print(np.max(u_old))
     rho_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny),
                        dtype=np.float64)
     for timeStep in range(simulation.startTime, simulation.endTime,
@@ -61,9 +60,9 @@ def solver(simulation):
         resU, resV, resRho = computeFields(simulation.elements,
                                            simulation.mesh, simulation.lattice,
                                            u_old, rho_old)
-        # if (resU < simulation.relTolU and resV < simulation.relTolV and
-        #         resRho < simulation.relTolRho):
-        #     break
+        if (resU < simulation.relTolU and resV < simulation.relTolV and
+                resRho < simulation.relTolRho):
+            break
         if timeStep % simulation.stdOutputInterval == 0:
             print('timeStep = ' + str(timeStep), flush=True)
             print('resU = ' + str(resU), flush=True)

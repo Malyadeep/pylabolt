@@ -136,7 +136,10 @@ class simulation:
 @numba.njit
 def initializePopulations(elements, mesh, equilibriumFunc, equilibriumArgs):
     for ind in range(mesh.Nx * mesh.Ny):
+        if ind == 100:
+            print(elements[ind].u[0])
+            print(elements[ind].rho)
         equilibriumFunc(elements[ind].f_eq, elements[ind].u, elements[ind].rho,
                         *equilibriumArgs)
-        elements[ind].f[:] = elements[ind].f_eq[:]
-        elements[ind].f[:] = elements[ind].f_new[:]
+        elements[ind].f = elements[ind].f_eq[:]
+        elements[ind].f_new = elements[ind].f_eq[:]
