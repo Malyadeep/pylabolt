@@ -1,13 +1,18 @@
 import numba
 import os
 import collisionModels
+import equilibriumModels
 
 
 class collisionScheme:
-    def __init__(self, lattice, collisionDict, equilibrium):
+    def __init__(self, lattice, collisionDict):
         try:
             self.deltaX = lattice.deltaX
             self.deltaT = lattice.deltaT
+            self.cs_2 = 1/(lattice.cs*lattice.cs)
+            self.cs_4 = self.cs_2/(lattice.cs*lattice.cs)
+            self.c = lattice.c
+            self.w = lattice.w
             if collisionDict['model'] == 'BGK':
                 self.collisionFunc = collisionModels.BGK
             else:
@@ -15,9 +20,12 @@ class collisionScheme:
                       collisionDict['model'])
             self.collisionModel = collisionDict['model']
             if collisionDict['equilibrium'] == 'firstOrder':
-                self.equilibriumFunc = equilibrium.firstOrder
+                self.equilibriumFunc = equilibriumModels.firstOrder
+                self.equilibriumArgs = (self.cs_2, self.c, self.w)
             if collisionDict['equilibrium'] == 'secondOrder':
-                self.equilibriumFunc = equilibrium.secondOrder
+                self.equilibriumFunc = equilibriumModels.secondOrder
+                self.equilibriumArgs = (self.cs_2, self.cs_4,
+                                        self.c, self.w)
             else:
                 print("ERROR! Unsupported equilibrium model : " +
                       collisionDict['equilibrium'])
@@ -39,11 +47,11 @@ def stream(elements, lattice, mesh):
     Ny = mesh.Ny
     for i in range(Nx):
         for j in range(Ny):
-            ind = int(i * Nx + j)
+            ind = int(i * Ny + j)
             if elements[ind].nodeType != 'o':
                 for k in range(1, lattice.c.shape[0]):
                     i_old = (i - int(lattice.c[k, 0])
                              + Nx) % Nx
                     j_old = (j - int(lattice.c[k, 1])
                              + Ny) % Ny
-                    elements[ind].f_new[k] = elements[i_old * Nx + j_old].f[k]
+                    elements[ind].f_new[k] = elements[i_old * Ny + j_old].f[k]

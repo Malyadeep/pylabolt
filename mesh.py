@@ -2,6 +2,7 @@ import numpy as np
 import numba
 import os
 from element import element
+from numba.typed import List
 
 spec = [
 
@@ -38,7 +39,7 @@ def createElements(lattice, mesh, U_initial, rho_initial):
     elements = []
     for i in range(mesh.Nx):
         for j in range(mesh.Ny):
-            ind = int(i*mesh.Nx + j)
+            ind = int(i * mesh.Ny + j)
             elements.append(element(mesh, lattice, ind,
                                     U_initial, rho_initial))
-    return elements
+    return List(elements)

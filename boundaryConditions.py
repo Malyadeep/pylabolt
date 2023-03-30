@@ -3,7 +3,8 @@ import numpy as np
 
 
 @numba.njit
-def fixedU(elements, elementList, boundaryValue, lattice, mesh):
+def fixedU(elements, elementList, boundaryVector,
+           boundaryScalar, lattice, mesh):
     c = lattice.c
     w = lattice.w
     cs_2 = 1/(lattice.cs * lattice.cs)
@@ -13,13 +14,15 @@ def fixedU(elements, elementList, boundaryValue, lattice, mesh):
         rhoWall = np.sum(elements[ind].f)
         for dir in range(invList.shape[0]):
             preFactor = 2 * w[outList[dir]] * rhoWall *\
-                (np.dot(c[outList[dir], :], boundaryValue)) * cs_2
+                ((c[outList[dir], 0] * boundaryVector[0] +
+                  c[outList[dir], 1] * boundaryVector[1])) * cs_2
             elements[ind].f_new[invList[dir]] = \
                 elements[ind].f[outList[dir]] - preFactor
 
 
 @numba.njit
-def fixedPressure(elements, elementList, boundaryValue, lattice, mesh):
+def fixedPressure(elements, elementList, boundaryVector,
+                  boundaryScalar, lattice, mesh):
     c = lattice.c
     Nx = mesh.Nx
     w = lattice.w
@@ -38,16 +41,17 @@ def fixedPressure(elements, elementList, boundaryValue, lattice, mesh):
         u_wall = elements[ind].u + 0.5 * (elements[ind].u - elements[ind_nb].u)
         u_wall_2 = np.dot(u_wall, u_wall)
         for dir in range(invList.shape[0]):
-            preFactor = 2 * w[outList[dir]] * boundaryValue * cs_2 *\
-                (1. + (np.dot(c[outList[dir], :], u_wall) *
-                 np.dot(c[outList[dir], :], u_wall)) * 0.5 * cs_4 +
-                 u_wall_2 * 0.5 * cs_2)
+            c_dot_u = (c[outList[dir], 0] * u_wall[0] +
+                       c[outList[dir], 1] * u_wall[1])
+            preFactor = 2 * w[outList[dir]] * boundaryScalar *\
+                (1. + c_dot_u * c_dot_u * 0.5 * cs_4 - u_wall_2 * 0.5 * cs_2)
             elements[ind].f_new[invList[dir]] = \
                 - elements[ind].f[outList[dir]] + preFactor
 
 
 @numba.njit
-def bounceBack(elements, elementList, boundaryValue, lattice, mesh):
+def bounceBack(elements, elementList, boundaryVector,
+               boundaryScalar, lattice, mesh):
     for ind in elementList:
         invList = elements[ind].invDirections
         outList = elements[ind].outDirections
@@ -57,5 +61,6 @@ def bounceBack(elements, elementList, boundaryValue, lattice, mesh):
 
 
 @numba.njit
-def periodic(elements, elementList, boundaryValue, lattice, mesh):
+def periodic(elements, elementList, boundaryVector,
+             boundaryScalar, lattice, mesh):
     pass

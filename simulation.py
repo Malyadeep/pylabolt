@@ -1,8 +1,8 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 1,
-    'stdOutputInterval': 5,
-    'saveInterval': 10,
+    'endTime': 5,
+    'stdOutputInterval': 1,
+    'saveInterval': 1,
     'saveStateInterval': 100,
     'relTolU': 1e-6,
     'relTolV': 1e-6,
@@ -19,20 +19,20 @@ boundaryDict = {
     'top': {
         'type': 'fixedU',
         'value': [0.1, 0],
-        'points_0': [[0, 0], [2, 0]]
+        'points_0': [[0, 1], [2, 1]]
     },
 
     'walls': {
         'type': 'bounceBack',
         'points_0': [[0, 0], [0, 1]],
-        'points_1': [[0, 1], [2, 1]],
+        'points_1': [[0, 0], [2, 0]],
         'points_2': [[2, 0], [2, 1]],
     }
 }
 
 collisionDict = {
     'model': 'BGK',
-    'tau': 1,
+    'tau': 0.8,
     'equilibrium': 'secondOrder'
 }
 

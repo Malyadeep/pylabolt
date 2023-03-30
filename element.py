@@ -12,7 +12,7 @@ spec = [
     ('f', numba.float64[:]),
     ('f_eq', numba.float64[:]),
     ('f_new', numba.float64[:]),
-    ('nodeType', numba.uint8),
+    ('nodeType', numba.types.string),
     ('outDirections', numba.int32[:]),
     ('invDirections', numba.int32[:])
 ]
@@ -22,9 +22,10 @@ spec = [
 class element:
     def __init__(self, mesh, lattice, id, U_initial, rho_initial):
         self.id = id
-        self.id_x, self.id_y = int(id % mesh.Nx), int(id / mesh.Nx)
+        self.id_x, self.id_y = int(id / mesh.Ny), int(id % mesh.Ny)
         self.x = mesh.delX * self.id_x
         self.y = mesh.delX * self.id_y
+        self.u = np.zeros(2, dtype=np.float64)
         self.u = U_initial
         self.rho = rho_initial
         self.f = np.zeros(lattice.noOfDirections, dtype=np.float64)
@@ -34,9 +35,10 @@ class element:
 
     def computeFields(self, lattice):
         self.rho = np.sum(self.f)
+        tempU, tempV = 0, 0
         for k in range(self.f.shape[0]):
-            tempU = np.sum(np.dot(lattice.c[:, 0], self.f))
-            tempV = np.sum(np.dot(lattice.c[:, 1], self.f))
+            tempU += lattice.c[k, 0] * self.f[k]
+            tempV += lattice.c[k, 1] * self.f[k]
         self.u[0] = tempU/(self.rho + 1e-9)
         self.u[1] = tempV/(self.rho + 1e-9)
 
