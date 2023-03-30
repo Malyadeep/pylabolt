@@ -2,6 +2,7 @@ import numpy as np
 import os
 import boundaryConditions
 import numba
+from numba.typed import List
 
 
 @numba.njit
@@ -24,40 +25,43 @@ def getDirections(i, j, c, Nx, Ny, invList):
 @numba.njit
 def initializeBoundaryElements(elements, mesh, lattice,
                                boundaryType, boundaryIndices,
-                               boundaryValues):
+                               boundaryVector, boundaryScalar):
     Nx = mesh.Nx
     Ny = mesh.Ny
     c = lattice.c
     invList = lattice.invList
     cs_2 = 1/(lattice.cs*lattice.cs)
     elementList = []
-    for element in elements:
-        tempList = []
-        for i in range(boundaryIndices[0, 0],
-                       boundaryIndices[1, 0]):
-            for j in range(boundaryIndices[0, 1],
-                           boundaryIndices[1, 1]):
-                currentId = int(i * Nx + j)
-                if element.id == currentId:
-                    tempList.append(element.id)
-                    element.nodeType = 'b'
+    indX_i, indX_f = boundaryIndices[0, 0], boundaryIndices[1, 0]
+    indY_i, indY_f = boundaryIndices[0, 1], boundaryIndices[1, 1]
+    tempList = []
+    for ind in range(Nx * Ny):
+        for i in range(indX_i, indX_f):
+            for j in range(indY_i, indY_f):
+                if indY_f - indY_i == 1:
+                    currentId = int(i * Ny + j)
+                elif indX_f - indX_i == 1:
+                    currentId = int(i + j * Nx)
+                if elements[ind].id == currentId:
+                    tempList.append(elements[ind].id)
+                    elements[ind].nodeType = 'b'
                     if boundaryType == 'fixedU':
-                        element.u = boundaryValues[0]
-                        element.v = boundaryValues[1]
+                        elements[ind].u = boundaryVector
                     elif boundaryType == 'fixedPressure':
-                        element.rho = boundaryValues * cs_2
+                        elements[ind].rho = boundaryScalar * cs_2
                     args = (i, j, c, Nx, Ny, invList)
                     tempOut, tempInv = getDirections(*args)
                     args = (tempOut, tempInv)
-                    element.setDirections(*args)
-        elementList.append(np.array(tempList))
-    return tempList
+                    elements[ind].setDirections(*args)
+    elementList.append(np.array(tempList))
+    return elementList[0]
 
 
 class boundary:
     def __init__(self, boundaryDict):
         self.boundaryDict = boundaryDict
-        self.boundaryValues = []
+        self.boundaryVector = []
+        self.boundaryScalar = []
         self.boundaryType = []
         self.boundaryFunc = []
         self.points = {}
@@ -83,8 +87,9 @@ class boundary:
                                   "'fixedU'")
                             os._exit(1)
                         if isinstance(self.boundaryDict[item]['value'], list):
-                            value = np.array(self.boundaryDict[item]['value'],
-                                             dtype=np.float64)
+                            vectorValue = np.array(self.boundaryDict[item]
+                                                   ['value'], dtype=np.float64)
+                            scalarValue = 0.0
                         else:
                             print("ERROR!")
                             print("For 'fixedU' value must be a list of"
@@ -94,8 +99,9 @@ class boundary:
                         try:
                             if isinstance(self.boundaryDict[item]['value'],
                                           float):
-                                value = np.float64(self.boundaryDict[item]
-                                                   ['value'])
+                                vectorValue = np.zeros(2, dtype=np.float64)
+                                scalarValue = np.float64(self.boundaryDict
+                                                         [item]['value'])
                             else:
                                 print("ERROR!")
                                 print("For 'fixedPressure' value must be a " +
@@ -107,9 +113,11 @@ class boundary:
                                   "'fixedPressure'")
                             os._exit(0)
                     elif self.boundaryDict[item][data] == 'bounceBack':
-                        value = np.float64(0.0)
+                        vectorValue = np.zeros(2, dtype=np.float64)
+                        scalarValue = np.float64(0.0)
                     elif self.boundaryDict[item][data] == 'periodic':
-                        value = np.float64(0.0)
+                        vectorValue = np.zeros(2, dtype=np.float64)
+                        scalarValue = np.float64(0.0)
                     else:
                         print("ERROR! " + self.boundaryDict[item][data] +
                               " is not a valid boundary condition!")
@@ -123,7 +131,8 @@ class boundary:
                     self.boundaryFunc.append(getattr(boundaryConditions,
                                                      self.boundaryDict[item]
                                                      ['type']))
-                    self.boundaryValues.append(value)
+                    self.boundaryVector.append(vectorValue)
+                    self.boundaryScalar.append(scalarValue)
                 self.points[item] = tempPoints
                 if flag is False:
                     print("ERROR! 'type' keyword not defined")
@@ -134,30 +143,31 @@ class boundary:
         for name in self.nameList:
             pointArray = np.array(self.points[name])
             for k in range(pointArray.shape[0]):
-                tempIndex_i = np.rint(pointArray[k, 0]/lattice.delX).\
+                tempIndex_i = np.rint(pointArray[k, 0]/mesh.delX).\
                     astype(int)
-                tempIndex_f = np.rint(pointArray[k, 1]/lattice.delX).\
+                tempIndex_f = np.rint(pointArray[k, 1]/mesh.delX).\
                     astype(int) + 1
                 self.boundaryIndices.append([tempIndex_i, tempIndex_f])
         self.boundaryIndices = np.array(self.boundaryIndices)
-        args = (elements, self.noOfBoundaries, self.boundaryIndices,
-                self.boundaryValues, mesh, lattice)
         for itr in range(self.noOfBoundaries):
-            args = (elements, mesh, lattice,
+            args = (List(elements), mesh, lattice,
                     self.boundaryType[itr], self.boundaryIndices[itr],
-                    self.boundaryValues[itr])
+                    self.boundaryVector[itr], self.boundaryScalar[itr])
             tempList = initializeBoundaryElements(*args)
             self.elementList.append(tempList)
 
     def details(self):
         print(self.nameList)
         print(self.boundaryType)
-        print(self.boundaryValues)
-        print(self.boundaryIndices.shape)
+        print(self.boundaryVector)
+        print(self.boundaryScalar)
+        print(self.boundaryIndices)
         print(self.points)
+        print(self.elementList)
 
     def setBoundary(self, elements, lattice, mesh):
         for itr in range(self.noOfBoundaries):
             args = (elements, self.elementList[itr],
-                    self.boundaryValues[itr], lattice, mesh)
+                    self.boundaryVector[itr],
+                    self.boundaryVector[itr], lattice, mesh)
             self.boundaryFunc[itr](*args)
