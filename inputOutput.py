@@ -7,14 +7,14 @@ def writeFields(timeStep, elements):
         os.makedirs('output')
     if not os.path.isdir('output/' + str(timeStep)):
         os.makedirs('output/' + str(timeStep))
-        writeFile = open('output/' + str(timeStep) + '/fields.dat', 'w')
-        for element in elements:
-            writeFile.write(str(element.id).ljust(10) + '\t' +
-                            str(element.x).ljust(10) + '\t' +
-                            str(element.y).ljust(10) + '\t' +
-                            str(element.rho).ljust(10) + '\t' +
-                            str(element.u[0]).ljust(10) + '\t' +
-                            str(element.u[1]).ljust(10) + '\n')
+    writeFile = open('output/' + str(timeStep) + '/fields.dat', 'w')
+    for element in elements:
+        writeFile.write(str(round(element.id, 10)).ljust(12) + '\t' +
+                        str(round(element.x, 10)).ljust(12) + '\t' +
+                        str(round(element.y, 10)).ljust(12) + '\t' +
+                        str(round(element.rho, 10)).ljust(12) + '\t' +
+                        str(round(element.u[0], 10)).ljust(12) + '\t' +
+                        str(round(element.u[1], 10)).ljust(12) + '\n')
     writeFile.close()
 
 
@@ -22,7 +22,8 @@ def saveState(timeStep, simulation):
     if not os.path.isdir('states'):
         os.makedirs('states')
     fileName = 'states/' + str(timeStep) + '.pkl'
-    pickle.dump(simulation, fileName, protocol=pickle.HIGHEST_PROTOCOL)
+    stateFile = open(fileName, 'w')
+    pickle.dump(simulation, stateFile, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def loadState(timeStep):

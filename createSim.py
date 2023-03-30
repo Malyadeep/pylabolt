@@ -6,7 +6,6 @@ import numba
 import mesh
 import lattice
 import boundary
-import equilibrium
 import schemeLB
 
 
@@ -54,10 +53,8 @@ class simulation:
         print('Setting lattice structure done!\n', flush=True)
         print('Setting collision scheme and equilibrium model...',
               flush=True)
-        self.equilibrium = equilibrium.equilibrium(self.mesh, self.lattice)
         self.collisionScheme = schemeLB.collisionScheme(self.lattice,
-                                                        collisionDict,
-                                                        self.equilibrium)
+                                                        collisionDict)
         self.schemeLog()
         print('Setting collision scheme and equilibrium model done!\n',
               flush=True)
@@ -70,13 +67,15 @@ class simulation:
         print('Reading boundary conditions...')
         self.boundary = boundary.boundary(boundaryDict)
         self.boundary.readBoundaryDict()
-        self.boundary.calculateBoundaryIndices(self.mesh.delX)
-        self.boundary.initializeBoundaryElements(self.elements)
+        self.boundary.initializeBoundary(self.lattice, self.mesh,
+                                         self.elements)
+        # self.boundary.details()
         self.writeDomainLog()
         print('Reading boundary conditions done...\n')
 
         # initialize functions
         self.equilibriumFunc = self.collisionScheme.equilibriumFunc
+        self.equilibriumArgs = self.collisionScheme.equilibriumArgs
         self.collisionFunc = self.collisionScheme.collisionFunc
         self.setBoundaryFunc = self.boundary.setBoundary
 
@@ -135,8 +134,9 @@ class simulation:
 
 
 @numba.njit
-def initializePopulations(elements, mesh, equilibriumFunc):
+def initializePopulations(elements, mesh, equilibriumFunc, equilibriumArgs):
     for ind in range(mesh.Nx * mesh.Ny):
-        elements[ind].computeEquilibrium(equilibriumFunc)
-        elements[ind].f[:] = elements.f_eq[:]
-        elements[ind].f[:] = elements.f_new[:]
+        equilibriumFunc(elements[ind].f_eq, elements[ind].u, elements[ind].rho,
+                        *equilibriumArgs)
+        elements[ind].f[:] = elements[ind].f_eq[:]
+        elements[ind].f[:] = elements[ind].f_new[:]
