@@ -7,6 +7,7 @@ import mesh
 import lattice
 import boundary
 import schemeLB
+from fields import fields
 
 
 class simulation:
@@ -58,19 +59,17 @@ class simulation:
         self.schemeLog()
         print('Setting collision scheme and equilibrium model done!\n',
               flush=True)
-        print('Initializing elements...', flush=True)
-        self.elements = mesh.createElements(self.lattice, self.mesh,
-                                            self.U_initial, self.rho_initial)
-        print('Initializing elements done!\n')
-
-        # Initialize boundary object
+        print('Initializing fields...', flush=True)
+        self.fields = fields(self.mesh, self.lattice,
+                             self.U_initial, self.rho_initial)
+        print('Initializing fields done!\n')
         print('Reading boundary conditions...')
         self.boundary = boundary.boundary(boundaryDict)
         self.boundary.readBoundaryDict()
         self.boundary.initializeBoundary(self.lattice, self.mesh,
-                                         self.elements)
+                                         self.fields)
         # self.boundary.details()
-        self.writeDomainLog()
+        self.writeDomainLog(meshDict)
         print('Reading boundary conditions done...\n')
 
         # initialize functions
@@ -95,9 +94,15 @@ class simulation:
         controlFile.write('\trelTolRho = ' + str(self.relTolRho) + '\n')
         controlFile.close()
 
-    def writeDomainLog(self):
+    def writeDomainLog(self, meshDict):
         meshFile = open('log_domain', 'w')
         meshFile.write('Domain Information...\n')
+        meshFile.write('\tBounding box : ' + str(meshDict['boundingBox'])
+                       + '\n')
+        meshFile.write('\tGrid points in x-direction ' + str(self.mesh.Nx)
+                       + '\n')
+        meshFile.write('\tGrid points in y-direction ' + str(self.mesh.Ny)
+                       + '\n')
         meshFile.write('\nBoundary information...\n')
         for itr, name in enumerate(self.boundary.nameList):
             meshFile.write('\n\tboundary name : ' + str(name) + '\n')
@@ -110,7 +115,7 @@ class simulation:
                                str(pointArray[k, 1]) + '\n')
                 temp = self.boundary.boundaryIndices[k + itr, 1] -\
                     self.boundary.boundaryIndices[k + itr, 0]
-                meshFile.write('\tno.of elements : ' +
+                meshFile.write('\tno.of fields : ' +
                                str(temp[0] * temp[1]) + '\n')
         meshFile.close()
 
@@ -134,12 +139,10 @@ class simulation:
 
 
 @numba.njit
-def initializePopulations(elements, mesh, equilibriumFunc, equilibriumArgs):
+def initializePopulations(fields, mesh, equilibriumFunc, equilibriumArgs):
     for ind in range(mesh.Nx * mesh.Ny):
-        if ind == 100:
-            print(elements[ind].u[0])
-            print(elements[ind].rho)
-        equilibriumFunc(elements[ind].f_eq, elements[ind].u, elements[ind].rho,
+        equilibriumFunc(fields.f_eq[ind, :], fields.u[ind, :], fields.rho[ind],
                         *equilibriumArgs)
-        elements[ind].f = elements[ind].f_eq[:]
-        elements[ind].f_new = elements[ind].f_eq[:]
+        for k in range(fields.f.shape[1]):
+            fields.f[ind, k] = fields.f_eq[ind, k]
+            fields.f_new[ind, k] = fields.f_eq[ind, k]

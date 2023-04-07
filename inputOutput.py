@@ -2,19 +2,19 @@ import os
 import pickle
 
 
-def writeFields(timeStep, elements):
+def writeFields(timeStep, fields):
     if not os.path.isdir('output'):
         os.makedirs('output')
     if not os.path.isdir('output/' + str(timeStep)):
         os.makedirs('output/' + str(timeStep))
     writeFile = open('output/' + str(timeStep) + '/fields.dat', 'w')
-    for element in elements:
-        writeFile.write(str(round(element.id, 10)).ljust(12) + '\t' +
-                        str(round(element.x, 10)).ljust(12) + '\t' +
-                        str(round(element.y, 10)).ljust(12) + '\t' +
-                        str(round(element.rho, 10)).ljust(12) + '\t' +
-                        str(round(element.u[0], 10)).ljust(12) + '\t' +
-                        str(round(element.u[1], 10)).ljust(12) + '\n')
+    for ind in range(fields.u.shape[0]):
+        writeFile.write(str(round(ind, 10)).ljust(12) + '\t' +
+                        str(round(fields.x[ind], 10)).ljust(12) + '\t' +
+                        str(round(fields.y[ind], 10)).ljust(12) + '\t' +
+                        str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
+                        str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
+                        str(round(fields.u[ind, 1], 10)).ljust(12) + '\n')
     writeFile.close()
 
 

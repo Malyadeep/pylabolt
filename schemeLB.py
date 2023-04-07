@@ -22,13 +22,14 @@ class collisionScheme:
             if collisionDict['equilibrium'] == 'firstOrder':
                 self.equilibriumFunc = equilibriumModels.firstOrder
                 self.equilibriumArgs = (self.cs_2, self.c, self.w)
-            if collisionDict['equilibrium'] == 'secondOrder':
+            elif collisionDict['equilibrium'] == 'secondOrder':
                 self.equilibriumFunc = equilibriumModels.secondOrder
                 self.equilibriumArgs = (self.cs_2, self.cs_4,
                                         self.c, self.w)
             else:
                 print("ERROR! Unsupported equilibrium model : " +
                       collisionDict['equilibrium'])
+                os._exit(1)
             self.equilibriumModel = collisionDict['equilibrium']
         except KeyError as e:
             print("ERROR! Keyword: " + str(e) + " missing in 'latticeDict'")
@@ -42,16 +43,16 @@ class collisionScheme:
 
 
 @numba.njit
-def stream(elements, lattice, mesh):
+def stream(fields, lattice, mesh):
     Nx = mesh.Nx
     Ny = mesh.Ny
     for i in range(Nx):
         for j in range(Ny):
             ind = int(i * Ny + j)
-            if elements[ind].nodeType != 'o':
-                for k in range(1, lattice.c.shape[0]):
+            if fields.nodeType[ind] != 3:
+                for k in range(lattice.noOfDirections):
                     i_old = (i - int(lattice.c[k, 0])
                              + Nx) % Nx
                     j_old = (j - int(lattice.c[k, 1])
                              + Ny) % Ny
-                    elements[ind].f_new[k] = elements[i_old * Ny + j_old].f[k]
+                    fields.f_new[ind, k] = fields.f[i_old * Ny + j_old, k]

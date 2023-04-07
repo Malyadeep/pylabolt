@@ -13,7 +13,7 @@ def main():
     #         inputOutput.saveState(simulation.startTime, simulation)
     #     else:
     #         simulation = temp
-    createSim.initializePopulations(simulation.elements,
+    createSim.initializePopulations(simulation.fields,
                                     simulation.mesh,
                                     simulation.equilibriumFunc,
                                     simulation.equilibriumArgs)

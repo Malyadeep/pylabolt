@@ -1,16 +1,12 @@
 import numpy as np
 import numba
 import os
-from element import element
-from numba.typed import List
+
 
 spec = [
-
     ('delX', numba.float64),
     ('Nx', numba.int64),
     ('Ny', numba.int64),
-
-
 ]
 
 
@@ -33,13 +29,3 @@ def createMesh(meshDict, obstacle):
         print("Error: Only Square lattices are supported")
         os._exit(1)
     return meshObj
-
-
-def createElements(lattice, mesh, U_initial, rho_initial):
-    elements = []
-    for i in range(mesh.Nx):
-        for j in range(mesh.Ny):
-            ind = int(i * mesh.Ny + j)
-            elements.append(element(mesh, lattice, ind,
-                                    U_initial, rho_initial))
-    return List(elements)
