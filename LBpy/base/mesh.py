@@ -1,16 +1,7 @@
 import numpy as np
-import numba
 import os
 
 
-spec = [
-    ('delX', numba.float64),
-    ('Nx', numba.int64),
-    ('Ny', numba.int64),
-]
-
-
-@numba.experimental.jitclass(spec)
 class mesh:
     def __init__(self, Nx, Ny, delX):
         self.Nx = Nx

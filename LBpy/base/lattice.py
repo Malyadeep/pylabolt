@@ -1,19 +1,6 @@
 import numpy as np
-import numba
-
-spec = [
-    ('c', numba.float64[:, :]),
-    ('invList', numba.int64[:]),
-    ('cs', numba.float64),
-    ('latticeType', numba.types.string),
-    ('w', numba.float64[:]),
-    ('deltaX', numba.int64),
-    ('deltaT', numba.int64),
-    ('noOfDirections', numba.int64)
-]
 
 
-@numba.experimental.jitclass(spec)
 class lattice:
     def __init__(self, lat):
         self.latticeType = lat

@@ -6,47 +6,48 @@ from LBpy.base.schemeLB import stream
 
 
 @numba.njit
-def equilibriumRelaxation(mesh, fields, collisionFunc,
-                          preFactor, equilibriumFunc,
+def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho,
+                          collisionFunc, equilibriumFunc, preFactor,
                           eqilibriumArgs):
-    for ind in range(mesh.Nx * mesh.Ny):
-        equilibriumFunc(fields.f_eq[ind, :], fields.u[ind, :],
-                        fields.rho[ind], *eqilibriumArgs)
+    for ind in range(Nx * Ny):
+        equilibriumFunc(f_eq[ind, :], u[ind, :],
+                        rho[ind], *eqilibriumArgs)
 
-        collisionFunc(fields.f[ind, :], fields.f_new[ind, :],
-                      fields.f_eq[ind, :], preFactor)
+        collisionFunc(f[ind, :], f_new[ind, :],
+                      f_eq[ind, :], preFactor)
 
 
 @numba.njit
-def computeFields(fields, mesh, lattice, u_old, rho_old):
+def computeFields(Nx, Ny, f_new, u, rho, c,
+                  noOfDirections, u_old, rho_old):
     u_sq, u_err_sq = 0, 0
     v_sq, v_err_sq = 0, 0
     rho_sq, rho_err_sq = 0, 0
-    for ind in range(mesh.Nx * mesh.Ny):
+    for ind in range(Nx * Ny):
         rhoSum = 0
         uSum = 0
         vSum = 0
-        for k in range(lattice.noOfDirections):
-            rhoSum += fields.f_new[ind, k]
-            uSum += lattice.c[k, 0] * fields.f_new[ind, k]
-            vSum += lattice.c[k, 1] * fields.f_new[ind, k]
-        fields.rho[ind] = rhoSum
-        fields.u[ind, 0] = uSum/(fields.rho[ind] + 1e-9)
-        fields.u[ind, 1] = vSum/(fields.rho[ind] + 1e-9)
+        for k in range(noOfDirections):
+            rhoSum += f_new[ind, k]
+            uSum += c[k, 0] * f_new[ind, k]
+            vSum += c[k, 1] * f_new[ind, k]
+        rho[ind] = rhoSum
+        u[ind, 0] = uSum/(rho[ind] + 1e-9)
+        u[ind, 1] = vSum/(rho[ind] + 1e-9)
 
         # Residue calculation
-        u_err_sq += (fields.u[ind, 0] - u_old[ind, 0]) * \
-            (fields.u[ind, 0] - u_old[ind, 0])
+        u_err_sq += (u[ind, 0] - u_old[ind, 0]) * \
+            (u[ind, 0] - u_old[ind, 0])
         u_sq += u_old[ind, 0] * u_old[ind, 0]
-        v_err_sq += (fields.u[ind, 1] - u_old[ind, 1]) * \
-            (fields.u[ind, 1] - u_old[ind, 1])
+        v_err_sq += (u[ind, 1] - u_old[ind, 1]) * \
+            (u[ind, 1] - u_old[ind, 1])
         v_sq += u_old[ind, 1] * u_old[ind, 1]
-        rho_err_sq += (fields.rho[ind] - rho_old[ind]) * \
-            (fields.rho[ind] - rho_old[ind])
+        rho_err_sq += (rho[ind] - rho_old[ind]) * \
+            (rho[ind] - rho_old[ind])
         rho_sq += rho_old[ind] * rho_old[ind]
-        u_old[ind, 0] = fields.u[ind, 0]
-        u_old[ind, 1] = fields.u[ind, 1]
-        rho_old[ind] = fields.rho[ind]
+        u_old[ind, 0] = u[ind, 0]
+        u_old[ind, 1] = u[ind, 1]
+        rho_old[ind] = rho[ind]
     resU = np.sqrt(u_err_sq/(u_sq + 1e-8))
     resV = np.sqrt(v_err_sq/(v_sq + 1e-8))
     resRho = np.sqrt(rho_err_sq/(rho_sq + 1e-8))
@@ -62,8 +63,7 @@ def solver(simulation):
                        dtype=np.float64)
     for timeStep in range(simulation.startTime, simulation.endTime,
                           simulation.lattice.deltaT):
-        resU, resV, resRho = computeFields(simulation.fields,
-                                           simulation.mesh, simulation.lattice,
+        resU, resV, resRho = computeFields(*simulation.computeFieldsArgs,
                                            u_old, rho_old)
         if timeStep % simulation.stdOutputInterval == 0:
             print('timeStep = ' + str(timeStep), flush=True)
@@ -82,13 +82,9 @@ def solver(simulation):
             writeFields(timeStep, simulation.fields)
             break
 
-        equilibriumRelaxation(simulation.mesh, simulation.fields,
-                              simulation.collisionFunc,
-                              simulation.collisionScheme.preFactor,
-                              simulation.equilibriumFunc,
-                              simulation.equilibriumArgs
-                              )
-        stream(simulation.fields, simulation.lattice,
-               simulation.mesh)
+        equilibriumRelaxation(*simulation.collisionArgs)
+
+        stream(*simulation.streamArgs)
+
         simulation.setBoundaryFunc(simulation.fields, simulation.lattice,
                                    simulation.mesh)

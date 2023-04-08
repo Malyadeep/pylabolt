@@ -24,14 +24,9 @@ def getDirections(i, j, c, Nx, Ny, invDirections):
 
 
 @numba.njit
-def initializeBoundaryElements(fields, mesh, lattice,
+def initializeBoundaryElements(Nx, Ny, invList, c,
                                boundaryType, boundaryIndices,
                                boundaryVector, boundaryScalar):
-    Nx = mesh.Nx
-    Ny = mesh.Ny
-    c = lattice.c
-    inv = lattice.invList
-    cs_2 = 1/(lattice.cs*lattice.cs)
     faceList = []
     invDirections = []
     outDirections = []
@@ -42,13 +37,8 @@ def initializeBoundaryElements(fields, mesh, lattice,
             for j in range(indY_i, indY_f):
                 currentId = int(i * Ny + j)
                 if currentId == ind:
-                    args = (i, j, c, Nx, Ny, inv)
+                    args = (i, j, c, Nx, Ny, invList)
                     tempOut, tempInv = getDirections(*args)
-                    if boundaryType == 'fixedU':
-                        fields.u[ind, 0] = boundaryVector[0]
-                        fields.u[ind, 1] = boundaryVector[1]
-                    elif boundaryType == 'fixedPressure':
-                        fields.rho[ind] = boundaryScalar * cs_2
                     outDirections.append(tempOut)
                     invDirections.append(tempInv)
                     faceList.append(ind)
@@ -141,7 +131,7 @@ class boundary:
                     os._exit(0)
         self.noOfBoundaries = len(self.boundaryFunc)
 
-    def initializeBoundary(self, lattice, mesh, elements):
+    def initializeBoundary(self, lattice, mesh, fields):
         for name in self.nameList:
             pointArray = np.array(self.points[name])
             for k in range(pointArray.shape[0]):
@@ -152,7 +142,7 @@ class boundary:
                 self.boundaryIndices.append([tempIndex_i, tempIndex_f])
         self.boundaryIndices = np.array(self.boundaryIndices)
         for itr in range(self.noOfBoundaries):
-            args = (elements, mesh, lattice,
+            args = (mesh.Nx, mesh.Ny, lattice.invList, lattice.c,
                     self.boundaryType[itr], self.boundaryIndices[itr],
                     self.boundaryVector[itr], self.boundaryScalar[itr])
             tempFaceList, tempOutDirections, tempInvDirections = \
@@ -176,7 +166,9 @@ class boundary:
         for itr in range(self.noOfBoundaries):
             # print(self.boundaryType[itr])
             # print(self.faceList[itr])
-            args = (fields, self.faceList[itr], self.outDirections[itr],
+            args = (fields.f, fields.f_new, fields.rho, fields.u,
+                    self.faceList[itr], self.outDirections[itr],
                     self.invDirections[itr], self.boundaryVector[itr],
-                    self.boundaryScalar[itr], lattice, mesh)
+                    self.boundaryScalar[itr], lattice.c, lattice.w,
+                    lattice.cs, mesh.Nx, mesh.Ny)
             self.boundaryFunc[itr](*args)

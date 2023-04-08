@@ -1,19 +1,6 @@
 import numpy as np
-import numba
-
-spec = [
-    ('x', numba.float64[:]),
-    ('y', numba.float64[:]),
-    ('u', numba.float64[:, :]),
-    ('rho', numba.float64[:]),
-    ('f', numba.float64[:, :]),
-    ('f_eq', numba.float64[:, :]),
-    ('f_new', numba.float64[:, :]),
-    ('nodeType', numba.int32[:]),
-]
 
 
-@numba.experimental.jitclass(spec)
 class fields:
     def __init__(self, mesh, lattice, U_initial, rho_initial):
         self.f = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),

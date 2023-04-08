@@ -7,6 +7,18 @@ import numba
 from LBpy.base import mesh, lattice, boundary, schemeLB, fields
 
 
+@numba.njit
+def initializePopulations(Nx, Ny, f_eq, f, f_new, u, rho,
+                          noOfDirections, equilibriumFunc,
+                          equilibriumArgs):
+    for ind in range(Nx * Ny):
+        equilibriumFunc(f_eq[ind, :], u[ind, :], rho[ind],
+                        *equilibriumArgs)
+        for k in range(noOfDirections):
+            f[ind, k] = f_eq[ind, k]
+            f_new[ind, k] = f_eq[ind, k]
+
+
 class simulation:
     def __init__(self):
         print('Reading simulation parameters...\n', flush=True)
@@ -78,6 +90,33 @@ class simulation:
         self.collisionFunc = self.collisionScheme.collisionFunc
         self.setBoundaryFunc = self.boundary.setBoundary
 
+        # Prepare function arguments
+        self.collisionArgs = (
+            self.mesh.Nx, self.mesh.Ny, self.fields.f_eq,
+            self.fields.f, self.fields.f_new, self.fields.u, self.fields.rho,
+            self.collisionFunc, self.equilibriumFunc,
+            self.collisionScheme.preFactor,
+            self.collisionScheme.equilibriumArgs
+        )
+
+        self.streamArgs = (
+            self.mesh.Nx, self.mesh.Ny, self.fields.f, self.fields.f_new,
+            self.lattice.c, self.lattice.noOfDirections, self.fields.nodeType
+        )
+
+        self.computeFieldsArgs = (
+            self.mesh.Nx, self.mesh.Ny, self.fields.f_new,
+            self.fields.u, self.fields.rho,
+            self.lattice.c, self.lattice.noOfDirections
+        )
+
+        initializePopulations(
+            self.mesh.Nx, self.mesh.Ny, self.fields.f_eq, self.fields.f,
+            self.fields.f_new, self.fields.u, self.fields.rho,
+            self.lattice.noOfDirections, self.equilibriumFunc,
+            self.equilibriumArgs
+        )
+
     def writeControlLog(self):
         controlFile = open('log_control', 'w')
         controlFile.write('Control parameters...\n')
@@ -136,13 +175,3 @@ class simulation:
         schemeFile.write('\tdeltaT in lattice units : ' +
                          str(self.lattice.deltaT) + '\n')
         schemeFile.close()
-
-
-@numba.njit
-def initializePopulations(fields, mesh, equilibriumFunc, equilibriumArgs):
-    for ind in range(mesh.Nx * mesh.Ny):
-        equilibriumFunc(fields.f_eq[ind, :], fields.u[ind, :], fields.rho[ind],
-                        *equilibriumArgs)
-        for k in range(fields.f.shape[1]):
-            fields.f[ind, k] = fields.f_eq[ind, k]
-            fields.f_new[ind, k] = fields.f_eq[ind, k]

@@ -42,16 +42,14 @@ class collisionScheme:
 
 
 @numba.njit
-def stream(fields, lattice, mesh):
-    Nx = mesh.Nx
-    Ny = mesh.Ny
+def stream(Nx, Ny, f, f_new, c, noOfDirections, nodeType):
     for i in range(Nx):
         for j in range(Ny):
             ind = int(i * Ny + j)
-            for k in range(lattice.noOfDirections):
-                i_old = (i - int(lattice.c[k, 0])
+            for k in range(noOfDirections):
+                i_old = (i - int(c[k, 0])
                          + Nx) % Nx
-                j_old = (j - int(lattice.c[k, 1])
+                j_old = (j - int(c[k, 1])
                          + Ny) % Ny
-                if fields.nodeType[i_old * Ny + j_old] != 3:
-                    fields.f_new[ind, k] = fields.f[i_old * Ny + j_old, k]
+                if nodeType[i_old * Ny + j_old] != 3:
+                    f_new[ind, k] = f[i_old * Ny + j_old, k]

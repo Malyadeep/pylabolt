@@ -15,10 +15,10 @@ def main():
     #         simulation = temp
     # elif simulation.startTime == 0:
     #     inputOutput.saveState(simulation.startTime, simulation)
-    createSim.initializePopulations(simulation.fields,
-                                    simulation.mesh,
-                                    simulation.equilibriumFunc,
-                                    simulation.equilibriumArgs)
+    # createSim.initializePopulations(simulation.fields,
+    #                                 simulation.mesh,
+    #                                 simulation.equilibriumFunc,
+    #                                 simulation.equilibriumArgs)
 
     start = time.perf_counter()
     solver(simulation)
