@@ -1,6 +1,6 @@
-# import inputOutput
 import time
 
+# from LBpy.utils.inputOutput import loadState, saveState
 import LBpy.base.createSim as createSim
 from LBpy.base.baseAlgorithm import solver
 
@@ -13,6 +13,8 @@ def main():
     #         inputOutput.saveState(simulation.startTime, simulation)
     #     else:
     #         simulation = temp
+    # elif simulation.startTime == 0:
+    #     inputOutput.saveState(simulation.startTime, simulation)
     createSim.initializePopulations(simulation.fields,
                                     simulation.mesh,
                                     simulation.equilibriumFunc,
@@ -22,4 +24,3 @@ def main():
     solver(simulation)
     runTime = time.perf_counter() - start
     print('Simulation completed : Runtime = ' + str(runTime) + '\n')
-
