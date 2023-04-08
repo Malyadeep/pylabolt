@@ -1,8 +1,8 @@
 import numba
 import numpy as np
 
-import inputOutput
-from schemeLB import stream
+from LBpy.utils.inputOutput import writeFields
+from LBpy.base.schemeLB import stream
 
 
 @numba.njit
@@ -71,7 +71,7 @@ def solver(simulation):
             print('resV = ' + str(resV), flush=True)
             print('resRho = ' + str(resRho) + '\n\n', flush=True)
         if timeStep % simulation.saveInterval == 0:
-            inputOutput.writeFields(timeStep, simulation.fields)
+            writeFields(timeStep, simulation.fields)
         if (resU < simulation.relTolU and resV < simulation.relTolV and
                 resRho < simulation.relTolRho):
             print('Convergence Criteria matched!!', flush=True)
@@ -79,7 +79,7 @@ def solver(simulation):
             print('resU = ' + str(resU), flush=True)
             print('resV = ' + str(resV), flush=True)
             print('resRho = ' + str(resRho) + '\n\n', flush=True)
-            inputOutput.writeFields(timeStep, simulation.fields)
+            writeFields(timeStep, simulation.fields)
             break
 
         equilibriumRelaxation(simulation.mesh, simulation.fields,

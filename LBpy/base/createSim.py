@@ -3,11 +3,7 @@ import numpy as np
 import numba
 
 
-import mesh
-import lattice
-import boundary
-import schemeLB
-from fields import fields
+from LBpy.base import mesh, lattice, boundary, schemeLB, fields
 
 
 class simulation:
@@ -47,7 +43,7 @@ class simulation:
             print('ERROR! Keyword ' + str(e) + ' missing in internalFields')
 
         print('Reading mesh info and creating mesh...', flush=True)
-        self.mesh = mesh.createMesh(meshDict, obstacle)
+        self.mesh = mesh.createMesh(meshDict)
         print('Reading mesh info and creating mesh done!\n', flush=True)
         print('Setting lattice structure...', flush=True)
         self.lattice = lattice.createLattice(latticeDict)
@@ -60,8 +56,9 @@ class simulation:
         print('Setting collision scheme and equilibrium model done!\n',
               flush=True)
         print('Initializing fields...', flush=True)
-        self.fields = fields(self.mesh, self.lattice,
-                             self.U_initial, self.rho_initial)
+        self.fields = fields.fields(self.mesh, self.lattice,
+                                    self.U_initial, self.rho_initial)
+        fields.setObstacle(obstacle, fields)
         print('Initializing fields done!\n')
         print('Reading boundary conditions...')
         self.boundary = boundary.boundary(boundaryDict)

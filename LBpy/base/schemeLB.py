@@ -1,7 +1,6 @@
 import numba
 import os
-import collisionModels
-import equilibriumModels
+from LBpy.base.models import collisionModels, equilibriumModels
 
 
 class collisionScheme:
@@ -49,10 +48,10 @@ def stream(fields, lattice, mesh):
     for i in range(Nx):
         for j in range(Ny):
             ind = int(i * Ny + j)
-            if fields.nodeType[ind] != 3:
-                for k in range(lattice.noOfDirections):
-                    i_old = (i - int(lattice.c[k, 0])
-                             + Nx) % Nx
-                    j_old = (j - int(lattice.c[k, 1])
-                             + Ny) % Ny
+            for k in range(lattice.noOfDirections):
+                i_old = (i - int(lattice.c[k, 0])
+                         + Nx) % Nx
+                j_old = (j - int(lattice.c[k, 1])
+                         + Ny) % Ny
+                if fields.nodeType[i_old * Ny + j_old] != 3:
                     fields.f_new[ind, k] = fields.f[i_old * Ny + j_old, k]

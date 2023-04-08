@@ -34,3 +34,7 @@ class fields:
             self.y[ind] = int(ind % mesh.Ny) * mesh.delX
         self.nodeType = np.full((mesh.Nx * mesh.Ny), fill_value=1,
                                 dtype=np.int32)
+
+
+def setObstacle(obstacle, fields):
+    pass

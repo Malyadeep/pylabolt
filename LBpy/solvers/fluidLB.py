@@ -1,8 +1,8 @@
 # import inputOutput
 import time
 
-import createSim
-from baseAlgorithm import solver
+import LBpy.base.createSim as createSim
+from LBpy.base.baseAlgorithm import solver
 
 
 def main():
@@ -23,6 +23,3 @@ def main():
     runTime = time.perf_counter() - start
     print('Simulation completed : Runtime = ' + str(runTime) + '\n')
 
-
-if __name__ == '__main__':
-    main()

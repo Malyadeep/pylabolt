@@ -1,8 +1,9 @@
 import numpy as np
 import os
-import boundaryConditions
 import numba
 from numba.typed import List
+
+from LBpy.base import boundaryConditions
 
 
 @numba.njit
@@ -173,6 +174,8 @@ class boundary:
 
     def setBoundary(self, fields, lattice, mesh):
         for itr in range(self.noOfBoundaries):
+            # print(self.boundaryType[itr])
+            # print(self.faceList[itr])
             args = (fields, self.faceList[itr], self.outDirections[itr],
                     self.invDirections[itr], self.boundaryVector[itr],
                     self.boundaryScalar[itr], lattice, mesh)

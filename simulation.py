@@ -22,10 +22,15 @@ boundaryDict = {
         'points_1': [[1, 0], [1, 1]],
         'points_2': [[0, 0], [1, 0]]
     },
-    'top': {
+    # 'outlet': {
+    #     'type': 'fixedPressure',
+    #     'value': 0.333333333,
+    #     'points_0': [[10, 0], [10, 1]]
+    # },
+    'inlet': {
         'type': 'fixedU',
         'value': [0.1, 0],
-        'points_0': [[0, 1], [1, 1]]
+        'points_1': [[0, 1], [1, 1]]
     }
 }
 
