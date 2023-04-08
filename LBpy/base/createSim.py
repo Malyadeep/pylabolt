@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import numba
 
@@ -10,6 +11,8 @@ class simulation:
     def __init__(self):
         print('Reading simulation parameters...\n', flush=True)
         try:
+            workingDir = os.getcwd()
+            sys.path.append(workingDir)
             from simulation import (controlDict, boundaryDict, collisionDict,
                                     latticeDict, meshDict, obstacle,
                                     internalFields)
