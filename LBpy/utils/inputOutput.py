@@ -21,9 +21,11 @@ def writeFields(timeStep, fields):
 def saveState(timeStep, simulation):
     if not os.path.isdir('states'):
         os.makedirs('states')
-    fileName = 'states/' + str(timeStep) + '.pkl'
-    stateFile = open(fileName, 'w')
-    pickle.dump(simulation, stateFile, protocol=pickle.HIGHEST_PROTOCOL)
+    if not os.path.isdir('states/' + str(timeStep)):
+        os.makedirs('states/' + str(timeStep))
+    fieldsFile = open('states/' + str(timeStep) + '/fields.pkl', 'wb')
+    pickle.dump(simulation.fields, fieldsFile,
+                protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def loadState(timeStep):
@@ -31,9 +33,9 @@ def loadState(timeStep):
         print('ERROR! no previous states present!')
     else:
         try:
-            fileName = 'states/' + str(timeStep) + '.pkl'
-            simulation = pickle.load(fileName)
-            return simulation
+            fileName = 'states/' + str(timeStep) + '/fields.pkl'
+            fields = pickle.load(fileName)
+            return fields
         except Exception:
             print('No saved states at time ' + str(timeStep) + ' present')
             print('creating new initial state')

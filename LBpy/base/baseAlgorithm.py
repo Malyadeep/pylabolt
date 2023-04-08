@@ -1,7 +1,7 @@
 import numba
 import numpy as np
 
-from LBpy.utils.inputOutput import writeFields
+from LBpy.utils.inputOutput import writeFields, saveState
 from LBpy.base.schemeLB import stream
 
 
@@ -72,6 +72,9 @@ def solver(simulation):
             print('resRho = ' + str(resRho) + '\n\n', flush=True)
         if timeStep % simulation.saveInterval == 0:
             writeFields(timeStep, simulation.fields)
+        if simulation.saveStateInterval is not None:
+            if timeStep % simulation.saveStateInterval == 0:
+                saveState(timeStep, simulation)
         if (resU < simulation.relTolU and resV < simulation.relTolV and
                 resRho < simulation.relTolRho):
             print('Convergence Criteria matched!!', flush=True)
