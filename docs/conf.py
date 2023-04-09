@@ -6,11 +6,6 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-import os
-import sys
-sys.path.insert(0, os.path.abspath('..'))
-
-
 project = 'LBpy'
 copyright = '2023, Malyadeep Bhattacharya, Mithun M Nair'
 author = 'Malyadeep Bhattacharya, Mithun M Nair'
