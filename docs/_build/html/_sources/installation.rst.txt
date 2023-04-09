@@ -8,4 +8,4 @@ A single phase 2D lattice Boltzmann solver
 Installation
 ==============
 
-Install like this
+Install like this pip
