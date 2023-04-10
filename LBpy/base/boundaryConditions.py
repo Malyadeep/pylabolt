@@ -6,16 +6,14 @@ import numpy as np
 def fixedU(f, f_new, rho, u, faceList, outDirections, invDirections,
            boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
     cs_2 = 1/(cs * cs)
-    for itr, ind in enumerate(faceList):
-        invDir = invDirections[itr]
-        outDir = outDirections[itr]
+    for ind in faceList:
         rhoWall = rho[ind]
-        for dir in range(invDir.shape[0]):
-            preFactor = 2 * w[outDir[dir]] * rhoWall *\
-                ((c[outDir[dir], 0] * boundaryVector[0] +
-                  c[outDir[dir], 1] * boundaryVector[1])) * cs_2
-            f_new[ind, invDir[dir]] = \
-                f[ind, outDir[dir]] - preFactor
+        for dir in range(invDirections.shape[0]):
+            preFactor = 2 * w[outDirections[dir]] * rhoWall *\
+                ((c[outDirections[dir], 0] * boundaryVector[0] +
+                  c[outDirections[dir], 1] * boundaryVector[1])) * cs_2
+            f_new[ind, invDirections[dir]] = \
+                f[ind, outDirections[dir]] - preFactor
 
 
 @numba.njit
@@ -23,11 +21,9 @@ def fixedPressure(f, f_new, rho, u, faceList, outDirections, invDirections,
                   boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
     cs_2 = 1/(cs * cs)
     cs_4 = cs_2 * cs_2
-    for itr, ind in enumerate(faceList):
+    for ind in faceList:
         i, j = int(ind / Ny), int(ind % Ny)
-        invDir = invDirections[itr]
-        outDir = outDirections[itr]
-        for direction in invDir:
+        for direction in invDirections:
             c_mag = int(np.ceil((c[direction, 0] * c[direction, 0]
                         + c[direction, 1] * c[direction, 1])))
             if c_mag == 1:
@@ -38,24 +34,22 @@ def fixedPressure(f, f_new, rho, u, faceList, outDirections, invDirections,
         u_nb = u[ind, :] + 0.5 * (u[ind, :] -
                                   u[ind_nb, :])
         u_nb_2 = u_nb[0] * u_nb[0] + u_nb[1] * u_nb[1]
-        for dir in range(invDir.shape[0]):
-            c_dot_u = (c[outDir[dir], 0] * u_nb[0] +
-                       c[outDir[dir], 1] * u_nb[1])
-            preFactor = 2 * w[outDir[dir]] * boundaryScalar * cs_2 *\
+        for dir in range(invDirections.shape[0]):
+            c_dot_u = (c[outDirections[dir], 0] * u_nb[0] +
+                       c[outDirections[dir], 1] * u_nb[1])
+            preFactor = 2 * w[outDirections[dir]] * boundaryScalar * cs_2 *\
                 (1. + c_dot_u * c_dot_u * 0.5 * cs_4 - u_nb_2 * 0.5 * cs_2)
-            f_new[ind, invDir[dir]] = \
-                - f[ind, outDir[dir]] + preFactor
+            f_new[ind, invDirections[dir]] = \
+                - f[ind, outDirections[dir]] + preFactor
 
 
 @numba.njit
 def bounceBack(f, f_new, rho, u, faceList, outDirections, invDirections,
                boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
-    for itr, ind in enumerate(faceList):
-        invDir = invDirections[itr]
-        outDir = outDirections[itr]
-        for dir in range(invDir.shape[0]):
-            f_new[ind, invDir[dir]] = \
-                f[ind, outDir[dir]]
+    for ind in faceList:
+        for dir in range(invDirections.shape[0]):
+            f_new[ind, invDirections[dir]] = \
+                f[ind, outDirections[dir]]
 
 
 @numba.njit

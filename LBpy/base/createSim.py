@@ -80,7 +80,6 @@ class simulation:
         self.boundary.readBoundaryDict()
         self.boundary.initializeBoundary(self.lattice, self.mesh,
                                          self.fields)
-        # self.boundary.details()
         self.writeDomainLog(meshDict)
         print('Reading boundary conditions done...\n')
 

@@ -1,50 +1,49 @@
 import numpy as np
 import os
 import numba
-from numba.typed import List
 
 from LBpy.base import boundaryConditions
 
 
 @numba.njit
-def getDirections(i, j, c, Nx, Ny, invDirections):
-    elementOut = []
-    elementInv = []
-    for k in range(1, c.shape[0]):
-        i_next = (i + int(c[k, 0]))
-        j_next = (j + int(c[k, 1]))
-        condEnd = (np.array([i_next, j_next]) == np.array([Nx, Ny]))
-        condStart = (np.array([i_next, j_next]) < np.array([0, 0]))
-        if (condStart[0] or condStart[1] or
-                condEnd[0] or condEnd[1]):
-            elementOut.append(k)
-            elementInv.append(invDirections[k])
-    return np.array(elementOut, dtype=np.int32),\
-        np.array(elementInv, dtype=np.int32)
-
-
-@numba.njit
-def initializeBoundaryElements(Nx, Ny, invList, c,
-                               boundaryType, boundaryIndices,
-                               boundaryVector, boundaryScalar):
+def initializeBoundaryElements(Nx, Ny, invList, noOfDirections,
+                               boundaryIndices):
     faceList = []
-    invDirections = []
-    outDirections = []
     indX_i, indX_f = boundaryIndices[0, 0], boundaryIndices[1, 0]
     indY_i, indY_f = boundaryIndices[0, 1], boundaryIndices[1, 1]
+    diffX = indX_f - indX_i
+    diffY = indY_f - indY_i
+    if diffY == 1:
+        if indY_i == 0:
+            if noOfDirections == 9:
+                outDirections = np.array([7, 4, 8], dtype=np.int32)
+                invDirections = np.array([invList[7], invList[4], invList[8]],
+                                         dtype=np.int32)
+        elif indY_i == Ny - 1:
+            if noOfDirections == 9:
+                outDirections = np.array([6, 2, 5], dtype=np.int32)
+                invDirections = np.array([invList[6], invList[2], invList[5]],
+                                         dtype=np.int32)
+    if diffX == 1:
+        if indX_i == 0:
+            if noOfDirections == 9:
+                outDirections = np.array([6, 3, 7], dtype=np.int32)
+                invDirections = np.array([invList[6], invList[3], invList[7]],
+                                         dtype=np.int32)
+        elif indX_i == Nx - 1:
+            if noOfDirections == 9:
+                outDirections = np.array([1, 5, 8], dtype=np.int32)
+                invDirections = np.array([invList[1], invList[5], invList[8]],
+                                         dtype=np.int32)
     for ind in range(Nx * Ny):
         for i in range(indX_i, indX_f):
             for j in range(indY_i, indY_f):
                 currentId = int(i * Ny + j)
                 if currentId == ind:
-                    args = (i, j, c, Nx, Ny, invList)
-                    tempOut, tempInv = getDirections(*args)
-                    outDirections.append(tempOut)
-                    invDirections.append(tempInv)
                     faceList.append(ind)
     return np.array(faceList, dtype=np.int32),\
-        List(outDirections),\
-        List(invDirections)
+        outDirections,\
+        invDirections
 
 
 class boundary:
@@ -142,9 +141,8 @@ class boundary:
                 self.boundaryIndices.append([tempIndex_i, tempIndex_f])
         self.boundaryIndices = np.array(self.boundaryIndices)
         for itr in range(self.noOfBoundaries):
-            args = (mesh.Nx, mesh.Ny, lattice.invList, lattice.c,
-                    self.boundaryType[itr], self.boundaryIndices[itr],
-                    self.boundaryVector[itr], self.boundaryScalar[itr])
+            args = (mesh.Nx, mesh.Ny, lattice.invList, lattice.noOfDirections,
+                    self.boundaryIndices[itr])
             tempFaceList, tempOutDirections, tempInvDirections = \
                 initializeBoundaryElements(*args)
             self.faceList.append(tempFaceList)
@@ -164,8 +162,6 @@ class boundary:
 
     def setBoundary(self, fields, lattice, mesh):
         for itr in range(self.noOfBoundaries):
-            # print(self.boundaryType[itr])
-            # print(self.faceList[itr])
             args = (fields.f, fields.f_new, fields.rho, fields.u,
                     self.faceList[itr], self.outDirections[itr],
                     self.invDirections[itr], self.boundaryVector[itr],

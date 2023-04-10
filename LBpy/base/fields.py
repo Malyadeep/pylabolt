@@ -19,8 +19,8 @@ class fields:
             self.u[ind, 1] = U_initial[1]
             self.x[ind] = int(ind / mesh.Ny) * mesh.delX
             self.y[ind] = int(ind % mesh.Ny) * mesh.delX
-        self.nodeType = np.full((mesh.Nx * mesh.Ny), fill_value=1,
-                                dtype=np.int32)
+        self.nodeType = np.full((mesh.Nx * mesh.Ny), fill_value='f',
+                                dtype='<U4')
 
 
 def setObstacle(obstacle, fields):

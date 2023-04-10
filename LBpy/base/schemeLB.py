@@ -51,5 +51,5 @@ def stream(Nx, Ny, f, f_new, c, noOfDirections, nodeType):
                          + Nx) % Nx
                 j_old = (j - int(c[k, 1])
                          + Ny) % Ny
-                if nodeType[i_old * Ny + j_old] != 3:
+                if nodeType[i_old * Ny + j_old] != 's':
                     f_new[ind, k] = f[i_old * Ny + j_old, k]
