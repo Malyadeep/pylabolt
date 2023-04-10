@@ -6,48 +6,50 @@ from LBpy.base.schemeLB import stream
 
 
 @numba.njit
-def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho,
+def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
                           collisionFunc, equilibriumFunc, preFactor,
                           eqilibriumArgs):
     for ind in range(Nx * Ny):
-        equilibriumFunc(f_eq[ind, :], u[ind, :],
-                        rho[ind], *eqilibriumArgs)
+        if solid[ind] != 1:
+            equilibriumFunc(f_eq[ind, :], u[ind, :],
+                            rho[ind], *eqilibriumArgs)
 
-        collisionFunc(f[ind, :], f_new[ind, :],
-                      f_eq[ind, :], preFactor)
+            collisionFunc(f[ind, :], f_new[ind, :],
+                          f_eq[ind, :], preFactor)
 
 
 @numba.njit
-def computeFields(Nx, Ny, f_new, u, rho, c,
+def computeFields(Nx, Ny, f_new, u, rho, solid, c,
                   noOfDirections, u_old, rho_old):
     u_sq, u_err_sq = 0, 0
     v_sq, v_err_sq = 0, 0
     rho_sq, rho_err_sq = 0, 0
     for ind in range(Nx * Ny):
-        rhoSum = 0
-        uSum = 0
-        vSum = 0
-        for k in range(noOfDirections):
-            rhoSum += f_new[ind, k]
-            uSum += c[k, 0] * f_new[ind, k]
-            vSum += c[k, 1] * f_new[ind, k]
-        rho[ind] = rhoSum
-        u[ind, 0] = uSum/(rho[ind] + 1e-9)
-        u[ind, 1] = vSum/(rho[ind] + 1e-9)
+        if solid[ind] != 1:
+            rhoSum = 0
+            uSum = 0
+            vSum = 0
+            for k in range(noOfDirections):
+                rhoSum += f_new[ind, k]
+                uSum += c[k, 0] * f_new[ind, k]
+                vSum += c[k, 1] * f_new[ind, k]
+            rho[ind] = rhoSum
+            u[ind, 0] = uSum/(rho[ind] + 1e-9)
+            u[ind, 1] = vSum/(rho[ind] + 1e-9)
 
-        # Residue calculation
-        u_err_sq += (u[ind, 0] - u_old[ind, 0]) * \
-            (u[ind, 0] - u_old[ind, 0])
-        u_sq += u_old[ind, 0] * u_old[ind, 0]
-        v_err_sq += (u[ind, 1] - u_old[ind, 1]) * \
-            (u[ind, 1] - u_old[ind, 1])
-        v_sq += u_old[ind, 1] * u_old[ind, 1]
-        rho_err_sq += (rho[ind] - rho_old[ind]) * \
-            (rho[ind] - rho_old[ind])
-        rho_sq += rho_old[ind] * rho_old[ind]
-        u_old[ind, 0] = u[ind, 0]
-        u_old[ind, 1] = u[ind, 1]
-        rho_old[ind] = rho[ind]
+            # Residue calculation
+            u_err_sq += (u[ind, 0] - u_old[ind, 0]) * \
+                (u[ind, 0] - u_old[ind, 0])
+            u_sq += u_old[ind, 0] * u_old[ind, 0]
+            v_err_sq += (u[ind, 1] - u_old[ind, 1]) * \
+                (u[ind, 1] - u_old[ind, 1])
+            v_sq += u_old[ind, 1] * u_old[ind, 1]
+            rho_err_sq += (rho[ind] - rho_old[ind]) * \
+                (rho[ind] - rho_old[ind])
+            rho_sq += rho_old[ind] * rho_old[ind]
+            u_old[ind, 0] = u[ind, 0]
+            u_old[ind, 1] = u[ind, 1]
+            rho_old[ind] = rho[ind]
     resU = np.sqrt(u_err_sq/(u_sq + 1e-8))
     resV = np.sqrt(v_err_sq/(v_sq + 1e-8))
     resRho = np.sqrt(rho_err_sq/(rho_sq + 1e-8))

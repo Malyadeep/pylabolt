@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 
 class fields:
@@ -19,9 +20,61 @@ class fields:
             self.u[ind, 1] = U_initial[1]
             self.x[ind] = int(ind / mesh.Ny) * mesh.delX
             self.y[ind] = int(ind % mesh.Ny) * mesh.delX
-        self.nodeType = np.full((mesh.Nx * mesh.Ny), fill_value='f',
-                                dtype='<U4')
+        self.solid = np.full((mesh.Nx * mesh.Ny), fill_value=0,
+                             dtype=np.int32)
 
 
-def setObstacle(obstacle, fields):
-    pass
+def circle(center, radius, fields, mesh):
+    center_idx = np.int32(np.divide(center, mesh.delX))
+    radius_idx = int(radius/mesh.delX)
+    for i in range(mesh.Nx):
+        for j in range(mesh.Ny):
+            if ((i - center_idx[0])*(i - center_idx[0]) +
+                    (j - center_idx[1])*(j - center_idx[1]) <=
+                    radius_idx*radius_idx):
+                ind = i * mesh.Ny + j
+                fields.solid[ind] = 1
+
+
+def rectangle(boundingBox, fields, mesh):
+    boundingBox_idx = np.int32(np.divide(boundingBox, mesh.delX))
+    for i in range(mesh.Nx):
+        for j in range(mesh.Ny):
+            if (i >= boundingBox_idx[0, 0] and i <= boundingBox_idx[1, 0]
+                    and j >= boundingBox_idx[0, 1] and
+                    j <= boundingBox_idx[1, 1]):
+                ind = i * mesh.Ny + j
+                fields.solid[ind] = 1
+
+
+def setObstacle(obstacle, fields, mesh):
+    try:
+        if len(obstacle.keys()) == 0:
+            return
+        obstacleType = obstacle['type']
+        if obstacleType == 'circle':
+            center = obstacle['center']
+            radius = obstacle['radius']
+            if isinstance(center, list) and isinstance(radius, float):
+                center = np.array(center, dtype=np.float64)
+                radius = np.float64(radius)
+            else:
+                print("ERROR!")
+                print("For 'circle' type obstacle center must be a list and"
+                      + " radius must be a float")
+                os._exit(1)
+            circle(center, radius, fields, mesh)
+        elif obstacleType == 'rectangle':
+            boundingBox = obstacle['boundingBox']
+            if isinstance(boundingBox, list):
+                boundingBox = np.array(boundingBox, dtype=np.float64)
+            else:
+                print("ERROR!")
+                print("For 'rectangle' type obstacle bounding box must be"
+                      + " a list")
+                os._exit(1)
+            rectangle(boundingBox, fields, mesh)
+    except KeyError as e:
+        print("ERROR!")
+        print(str(e) + " keyword missing in 'obstacle' dictionary")
+        os._exit(1)

@@ -42,7 +42,7 @@ class collisionScheme:
 
 
 @numba.njit
-def stream(Nx, Ny, f, f_new, c, noOfDirections, nodeType):
+def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid):
     for i in range(Nx):
         for j in range(Ny):
             ind = int(i * Ny + j)
@@ -51,5 +51,7 @@ def stream(Nx, Ny, f, f_new, c, noOfDirections, nodeType):
                          + Nx) % Nx
                 j_old = (j - int(c[k, 1])
                          + Ny) % Ny
-                if nodeType[i_old * Ny + j_old] != 's':
+                if solid[i_old * Ny + j_old] != 1:
                     f_new[ind, k] = f[i_old * Ny + j_old, k]
+                elif solid[i_old * Ny + j_old] == 1:
+                    f_new[ind, k] = f[ind, invList[k]]

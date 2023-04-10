@@ -109,6 +109,9 @@ class boundary:
                     elif self.boundaryDict[item][data] == 'periodic':
                         vectorValue = np.zeros(2, dtype=np.float64)
                         scalarValue = np.float64(0.0)
+                    elif self.boundaryDict[item][data] == 'zeroGradient':
+                        vectorValue = np.zeros(2, dtype=np.float64)
+                        scalarValue = np.float64(0.0)
                     else:
                         print("ERROR! " + self.boundaryDict[item][data] +
                               " is not a valid boundary condition!")

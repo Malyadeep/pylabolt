@@ -1,6 +1,6 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 100000,
+    'endTime': 1,
     'stdOutputInterval': 100,
     'saveInterval': 100,
     'saveStateInterval': 100,
@@ -17,20 +17,19 @@ internalFields = {
 
 boundaryDict = {
     'walls': {
-        'type': 'bounceBack',
-        'points_0': [[0, 0], [0, 1]],
-        'points_1': [[1, 0], [1, 1]],
-        'points_2': [[0, 0], [1, 0]]
+        'type': 'zeroGradient',
+        'points_2': [[10, 0], [10, 1]]
     },
-    # 'outlet': {
-    #     'type': 'fixedPressure',
-    #     'value': 0.333333333,
-    #     'points_0': [[10, 0], [10, 1]]
-    # },
+    'periodic': {
+        'type': 'periodic',
+        'value': 0.,
+        'points_0': [[0, 0], [10, 0]],
+        'points_1': [[0, 0], [10, 1]]
+    },
     'inlet': {
         'type': 'fixedU',
         'value': [0.1, 0],
-        'points_1': [[0, 1], [1, 1]]
+        'points_1': [[0, 0], [0, 1]]
     }
 }
 
@@ -45,9 +44,12 @@ latticeDict = {
 }
 
 meshDict = {
-    'grid': [101, 101],
-    'boundingBox': [[0, 0], [1, 1]]
+    'grid': [1001, 101],
+    'boundingBox': [[0, 0], [10, 1]]
 }
 
 obstacle = {
+    'type': 'circle',
+    'center': [2, 0.5],
+    'radius': 0.15
 }

@@ -14,7 +14,8 @@ def writeFields(timeStep, fields):
                         str(round(fields.y[ind], 10)).ljust(12) + '\t' +
                         str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
                         str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
-                        str(round(fields.u[ind, 1], 10)).ljust(12) + '\n')
+                        str(round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
+                        str(round(fields.solid[ind], 10)).ljust(12) + '\n')
     writeFile.close()
 
 

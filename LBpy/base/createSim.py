@@ -73,7 +73,7 @@ class simulation:
         print('Initializing fields...', flush=True)
         self.fields = fields.fields(self.mesh, self.lattice,
                                     self.U_initial, self.rho_initial)
-        fields.setObstacle(obstacle, fields)
+        fields.setObstacle(obstacle, self.fields, self.mesh)
         print('Initializing fields done!\n')
         print('Reading boundary conditions...')
         self.boundary = boundary.boundary(boundaryDict)
@@ -93,19 +93,20 @@ class simulation:
         self.collisionArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq,
             self.fields.f, self.fields.f_new, self.fields.u, self.fields.rho,
-            self.collisionFunc, self.equilibriumFunc,
+            self.fields.solid, self.collisionFunc, self.equilibriumFunc,
             self.collisionScheme.preFactor,
             self.collisionScheme.equilibriumArgs
         )
 
         self.streamArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f, self.fields.f_new,
-            self.lattice.c, self.lattice.noOfDirections, self.fields.nodeType
+            self.lattice.c, self.lattice.noOfDirections,
+            self.lattice.invList, self.fields.solid
         )
 
         self.computeFieldsArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f_new,
-            self.fields.u, self.fields.rho,
+            self.fields.u, self.fields.rho, self.fields.solid,
             self.lattice.c, self.lattice.noOfDirections
         )
 
