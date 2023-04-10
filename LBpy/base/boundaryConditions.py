@@ -53,6 +53,23 @@ def bounceBack(f, f_new, rho, u, faceList, outDirections, invDirections,
 
 
 @numba.njit
+def zeroGradient(f, f_new, rho, u, faceList, outDirections, invDirections,
+                 boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
+    for ind in faceList:
+        i, j = int(ind / Ny), int(ind % Ny)
+        for direction in invDirections:
+            c_mag = int(np.ceil((c[direction, 0] * c[direction, 0]
+                        + c[direction, 1] * c[direction, 1])))
+            if c_mag == 1:
+                i_nb = int(i + c[direction, 0])
+                j_nb = int(j + c[direction, 1])
+                ind_nb = int(i_nb * Ny + j_nb)
+                break
+        for k in range(f.shape[1]):
+            f[ind, k] = f[ind_nb, k]
+
+
+@numba.njit
 def periodic(f, f_new, rho, u, faceList, outDirections, invDirections,
              boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
     pass
