@@ -1,9 +1,9 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 1,
+    'endTime': 50000,
     'stdOutputInterval': 100,
     'saveInterval': 100,
-    'saveStateInterval': 100,
+    'saveStateInterval': None,
     'relTolU': 1e-9,
     'relTolV': 1e-9,
     'relTolRho': 1e-7,
@@ -24,7 +24,7 @@ boundaryDict = {
         'type': 'periodic',
         'value': 0.,
         'points_0': [[0, 0], [10, 0]],
-        'points_1': [[0, 0], [10, 1]]
+        'points_1': [[0, 1], [10, 1]]
     },
     'inlet': {
         'type': 'fixedU',
@@ -35,7 +35,7 @@ boundaryDict = {
 
 collisionDict = {
     'model': 'BGK',
-    'tau': 0.8,
+    'tau': 0.65,
     'equilibrium': 'secondOrder'
 }
 
@@ -51,5 +51,5 @@ meshDict = {
 obstacle = {
     'type': 'circle',
     'center': [2, 0.5],
-    'radius': 0.15
+    'radius': 0.25
 }
