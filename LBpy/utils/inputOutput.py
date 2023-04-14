@@ -41,3 +41,7 @@ def loadState(timeStep):
             print('No saved states at time ' + str(timeStep) + ' present')
             print('creating new initial state')
             return None
+
+
+def copyFields_cuda():
+    pass

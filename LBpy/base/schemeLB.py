@@ -1,10 +1,9 @@
-import numba
 import os
 from LBpy.base.models import collisionModels, equilibriumModels
 
 
 class collisionScheme:
-    def __init__(self, lattice, collisionDict):
+    def __init__(self, lattice, collisionDict, parallelization):
         try:
             self.deltaX = lattice.deltaX
             self.deltaT = lattice.deltaT
@@ -13,18 +12,28 @@ class collisionScheme:
             self.c = lattice.c
             self.w = lattice.w
             if collisionDict['model'] == 'BGK':
-                self.collisionFunc = collisionModels.BGK
+                if parallelization == 'cuda':
+                    self.collisionType = 1      # Stands for BGK
+                else:
+                    self.collisionFunc = collisionModels.BGK
+
             else:
                 print("ERROR! Unsupported collision model : " +
                       collisionDict['model'])
             self.collisionModel = collisionDict['model']
             if collisionDict['equilibrium'] == 'firstOrder':
-                self.equilibriumFunc = equilibriumModels.firstOrder
-                self.equilibriumArgs = (self.cs_2, self.c, self.w)
+                if parallelization == 'cuda':
+                    self.equilibriumType = 1     # Stands for first order
+                else:
+                    self.equilibriumFunc = equilibriumModels.firstOrder
+                    self.equilibriumArgs = (self.cs_2, self.c, self.w)
             elif collisionDict['equilibrium'] == 'secondOrder':
-                self.equilibriumFunc = equilibriumModels.secondOrder
-                self.equilibriumArgs = (self.cs_2, self.cs_4,
-                                        self.c, self.w)
+                if parallelization == 'cuda':
+                    self.equilibriumType = 2      # Stands for second order
+                else:
+                    self.equilibriumFunc = equilibriumModels.secondOrder
+                    self.equilibriumArgs = (self.cs_2, self.cs_4,
+                                            self.c, self.w)
             else:
                 print("ERROR! Unsupported equilibrium model : " +
                       collisionDict['equilibrium'])
@@ -39,19 +48,3 @@ class collisionScheme:
             print("ERROR! Keyword: " + str(e) + " missing in 'collisionDict'")
             os._exit(1)
         self.preFactor = self.deltaT/self.tau
-
-
-@numba.njit
-def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid):
-    for i in range(Nx):
-        for j in range(Ny):
-            ind = int(i * Ny + j)
-            for k in range(noOfDirections):
-                i_old = (i - int(c[k, 0])
-                         + Nx) % Nx
-                j_old = (j - int(c[k, 1])
-                         + Ny) % Ny
-                if solid[i_old * Ny + j_old] != 1:
-                    f_new[ind, k] = f[i_old * Ny + j_old, k]
-                elif solid[i_old * Ny + j_old] == 1:
-                    f_new[ind, k] = f[ind, invList[k]]

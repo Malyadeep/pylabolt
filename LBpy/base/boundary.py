@@ -61,6 +61,13 @@ class boundary:
         self.invDirections = []
         self.outDirections = []
 
+        # Cuda device data
+        self.boundaryIndices_device = []
+        self.faceList_device = []
+        self.invDirections_device = []
+        self.outDirections_device = []
+        self.noOfBoundaries_device = np.zeros(1, np.int32)
+
     def readBoundaryDict(self):
         for item in self.nameList:
             dataList = list(self.boundaryDict[item].keys())
@@ -163,7 +170,23 @@ class boundary:
         print(self.outDirections)
         print(self.invDirections)
 
+    def setupBoundary_cpu(self, parallel):
+        for itr in range(self.noOfBoundaries):
+            self.boundaryFunc[itr] = numba.njit(self.boundaryFunc[itr],
+                                                parallel=parallel,
+                                                cache=False,
+                                                nogil=True)
+
     def setBoundary(self, fields, lattice, mesh):
+        for itr in range(self.noOfBoundaries):
+            args = (fields.f, fields.f_new, fields.rho, fields.u,
+                    self.faceList[itr], self.outDirections[itr],
+                    self.invDirections[itr], self.boundaryVector[itr],
+                    self.boundaryScalar[itr], lattice.c, lattice.w,
+                    lattice.cs, mesh.Nx, mesh.Ny)
+            self.boundaryFunc[itr](*args)
+
+    def setBoundary_cuda(self, fields, lattice, mesh):
         for itr in range(self.noOfBoundaries):
             args = (fields.f, fields.f_new, fields.rho, fields.u,
                     self.faceList[itr], self.outDirections[itr],

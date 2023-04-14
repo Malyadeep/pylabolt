@@ -20,7 +20,7 @@ def initializePopulations(Nx, Ny, f_eq, f, f_new, u, rho,
 
 
 class simulation:
-    def __init__(self):
+    def __init__(self, parallelization):
         print('Reading simulation parameters...\n', flush=True)
         try:
             workingDir = os.getcwd()
@@ -66,7 +66,8 @@ class simulation:
         print('Setting collision scheme and equilibrium model...',
               flush=True)
         self.collisionScheme = schemeLB.collisionScheme(self.lattice,
-                                                        collisionDict)
+                                                        collisionDict,
+                                                        parallelization)
         self.schemeLog()
         print('Setting collision scheme and equilibrium model done!\n',
               flush=True)
