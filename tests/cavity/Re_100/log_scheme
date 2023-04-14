@@ -1,0 +1,9 @@
+Scheme Information...
+	collision scheme : BGK
+	relaxation time : 0.8
+	collision scheme : secondOrder
+
+Lattice Information...
+	Lattice : D2Q9
+	deltaX in lattice units : 1
+	deltaT in lattice units : 1
