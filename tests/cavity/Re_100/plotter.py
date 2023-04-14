@@ -35,6 +35,7 @@ plt.xlabel('U')
 plt.ylabel('Y')
 plt.title('Velocity Profile at X=0.5')
 plt.legend(['LBpy','Ghia(1982)'])
+plt.savefig('Validation_UY.png')
 
 
 plt.figure(2)
@@ -68,4 +69,5 @@ plt.xlabel('X')
 plt.ylabel('V')
 plt.title('Velocity Profile at Y=0.5')
 plt.legend(['LBpy','Ghia(1982)'])
+plt.savefig('Validation_XV.png')
 plt.show()
