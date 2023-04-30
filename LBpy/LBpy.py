@@ -27,7 +27,11 @@ def main():
     if args.cuda is True and args.parallel is True:
         raise RuntimeError("ERROR! set a single backend for parallelization!")
         os._exit(1)
+<<<<<<< HEAD
+    elif args.parallel is False and args.cuda is False:
+=======
     elif args.parallel is False:
+>>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         parallelization = None
 
     if args.solver == 'fluidLB':

@@ -43,5 +43,16 @@ def loadState(timeStep):
             return None
 
 
+<<<<<<< HEAD
+def copyFields_cuda(device, fields, flag):
+    if flag == 'standard':
+        device.u.copy_to_host(fields.u)
+        device.rho.copy_to_host(fields.rho)
+    elif flag == 'all':
+        device.f.copy_to_host(fields.f)
+        device.f_new.copy_to_host(fields.f_new)
+        device.f_eq.copy_to_host(fields.f_eq)
+=======
 def copyFields_cuda():
+>>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
     pass

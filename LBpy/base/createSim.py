@@ -44,6 +44,13 @@ class simulation:
             self.relTolU = controlDict['relTolU']
             self.relTolV = controlDict['relTolV']
             self.relTolRho = controlDict['relTolRho']
+            self.precisionType = controlDict['precision']
+            if self.precisionType == 'single':
+                self.precision = np.float32
+            elif self.precisionType == 'double':
+                self.precision = np.float64
+            else:
+                raise RuntimeError("Incorrect precision specified!")
         except KeyError as e:
             print('ERROR! Keyword ' + str(e) + ' missing in controlDict')
         self.writeControlLog()
@@ -52,7 +59,7 @@ class simulation:
             self.u_initial = internalFields['u']
             self.v_initial = internalFields['v']
             self.U_initial = np.array([self.u_initial, self.v_initial],
-                                      dtype=np.float64)
+                                      dtype=self.precision)
             self.rho_initial = np.float64(internalFields['rho'])
         except KeyError as e:
             print('ERROR! Keyword ' + str(e) + ' missing in internalFields')
@@ -61,7 +68,7 @@ class simulation:
         self.mesh = mesh.createMesh(meshDict)
         print('Reading mesh info and creating mesh done!\n', flush=True)
         print('Setting lattice structure...', flush=True)
-        self.lattice = lattice.createLattice(latticeDict)
+        self.lattice = lattice.createLattice(latticeDict, self.precision)
         print('Setting lattice structure done!\n', flush=True)
         print('Setting collision scheme and equilibrium model...',
               flush=True)
@@ -73,7 +80,8 @@ class simulation:
               flush=True)
         print('Initializing fields...', flush=True)
         self.fields = fields.fields(self.mesh, self.lattice,
-                                    self.U_initial, self.rho_initial)
+                                    self.U_initial, self.rho_initial,
+                                    self.precision)
         fields.setObstacle(obstacle, self.fields, self.mesh)
         print('Initializing fields done!\n')
         print('Reading boundary conditions...')
@@ -81,6 +89,7 @@ class simulation:
         self.boundary.readBoundaryDict()
         self.boundary.initializeBoundary(self.lattice, self.mesh,
                                          self.fields)
+        # self.boundary.details()
         self.writeDomainLog(meshDict)
         print('Reading boundary conditions done...\n')
 

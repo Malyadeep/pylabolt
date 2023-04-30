@@ -1,8 +1,10 @@
 import numpy as np
 import os
 import numba
+from numba import cuda
 
 from LBpy.base import boundaryConditions
+from LBpy.base.cuda import boundaryConditions_cuda
 
 
 @numba.njit
@@ -62,6 +64,11 @@ class boundary:
         self.outDirections = []
 
         # Cuda device data
+<<<<<<< HEAD
+        self.boundaryVector_device = []
+        self.boundaryScalar_device = []
+=======
+>>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         self.boundaryIndices_device = []
         self.faceList_device = []
         self.invDirections_device = []
@@ -129,16 +136,13 @@ class boundary:
                     tempPoints.append(self.boundaryDict[item][data])
                     self.boundaryType.append(self.boundaryDict[item]
                                              ['type'])
-                    self.boundaryFunc.append(getattr(boundaryConditions,
-                                                     self.boundaryDict[item]
-                                                     ['type']))
                     self.boundaryVector.append(vectorValue)
                     self.boundaryScalar.append(scalarValue)
                 self.points[item] = tempPoints
                 if flag is False:
                     print("ERROR! 'type' keyword not defined")
                     os._exit(0)
-        self.noOfBoundaries = len(self.boundaryFunc)
+        self.noOfBoundaries = len(self.boundaryType)
 
     def initializeBoundary(self, lattice, mesh, fields):
         for name in self.nameList:
@@ -172,6 +176,11 @@ class boundary:
 
     def setupBoundary_cpu(self, parallel):
         for itr in range(self.noOfBoundaries):
+<<<<<<< HEAD
+            self.boundaryFunc.append(getattr(boundaryConditions,
+                                             self.boundaryType[itr]))
+=======
+>>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
             self.boundaryFunc[itr] = numba.njit(self.boundaryFunc[itr],
                                                 parallel=parallel,
                                                 cache=False,
@@ -186,6 +195,40 @@ class boundary:
                     lattice.cs, mesh.Nx, mesh.Ny)
             self.boundaryFunc[itr](*args)
 
+<<<<<<< HEAD
+    def setupBoundary_cuda(self):
+        self.boundaryScalar_device = cuda.to_device(
+            self.boundaryScalar
+        )
+        for itr in range(self.noOfBoundaries):
+            self.boundaryIndices_device.append(cuda.to_device(
+                self.boundaryIndices[itr]
+            ))
+            self.faceList_device.append(cuda.to_device(
+                self.faceList[itr]
+            ))
+            self.invDirections_device.append(cuda.to_device(
+                self.invDirections[itr]
+            ))
+            self.outDirections_device.append(cuda.to_device(
+                self.outDirections[itr]
+            ))
+            self.boundaryVector_device.append(cuda.to_device(
+                self.boundaryVector[itr]
+            ))
+            self.boundaryFunc.append(getattr(boundaryConditions_cuda,
+                                             self.boundaryType[itr]))
+
+    def setBoundary_cuda(self, n_threads, blocks, device):
+        for itr in range(self.noOfBoundaries):
+            args = (device.f, device.f_new, device.rho, device.u,
+                    self.faceList_device[itr], self.outDirections_device[itr],
+                    self.invDirections_device[itr],
+                    self.boundaryVector_device[itr],
+                    self.boundaryScalar_device[itr], device.c, device.w,
+                    device.cs[0], device.Nx[0], device.Ny[0])
+            self.boundaryFunc[itr][blocks, n_threads](*args)
+=======
     def setBoundary_cuda(self, fields, lattice, mesh):
         for itr in range(self.noOfBoundaries):
             args = (fields.f, fields.f_new, fields.rho, fields.u,
@@ -194,3 +237,4 @@ class boundary:
                     self.boundaryScalar[itr], lattice.c, lattice.w,
                     lattice.cs, mesh.Nx, mesh.Ny)
             self.boundaryFunc[itr](*args)
+>>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7

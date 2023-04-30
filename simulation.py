@@ -1,12 +1,13 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 50000,
+    'endTime': 10000,
     'stdOutputInterval': 100,
-    'saveInterval': 100,
+    'saveInterval': 9999,
     'saveStateInterval': None,
     'relTolU': 1e-9,
     'relTolV': 1e-9,
     'relTolRho': 1e-7,
+    'precision': 'single'
 }
 
 internalFields = {
@@ -17,25 +18,21 @@ internalFields = {
 
 boundaryDict = {
     'walls': {
-        'type': 'zeroGradient',
-        'points_2': [[10, 0], [10, 1]]
+        'type': 'bounceBack',
+        'points_2': [[1, 0], [1, 1]],
+        'points_0': [[0, 0], [1, 0]],
+        'points_1': [[0, 0], [0, 1]]
     },
-    'periodic': {
-        'type': 'periodic',
-        'value': 0.,
-        'points_0': [[0, 0], [10, 0]],
-        'points_1': [[0, 1], [10, 1]]
-    },
-    'inlet': {
+    'lid': {
         'type': 'fixedU',
         'value': [0.1, 0],
-        'points_1': [[0, 0], [0, 1]]
+        'points_1': [[0, 1], [1, 1]]
     }
 }
 
 collisionDict = {
     'model': 'BGK',
-    'tau': 0.65,
+    'tau': 0.8,
     'equilibrium': 'secondOrder'
 }
 
@@ -44,12 +41,12 @@ latticeDict = {
 }
 
 meshDict = {
-    'grid': [1001, 101],
-    'boundingBox': [[0, 0], [10, 1]]
+    'grid': [100, 100],
+    'boundingBox': [[0, 0], [1, 1]]
 }
 
 obstacle = {
-    'type': 'circle',
-    'center': [2, 0.5],
-    'radius': 0.25
+    # 'type': 'circle',
+    # 'center': [2, 0.5],
+    # 'radius': 0.25
 }
