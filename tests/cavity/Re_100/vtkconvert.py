@@ -6,7 +6,7 @@ from vtkmodules.vtkCommonCore import vtkDoubleArray
 from vtkmodules.vtkCommonDataModel import vtkRectilinearGrid
 
 
-def main():
+def vtkConverter():
     data = np.loadtxt('fields.dat')
     nx = len(np.unique(data[:,1]))
     ny = len(np.unique(data[:,2]))
@@ -30,24 +30,34 @@ def main():
     zArray = vtkDoubleArray()
     zArray.InsertNextValue(0.0)
     
+
     velArray = vtkDoubleArray()
     velArray.SetName('Velocity')
     velArray.SetNumberOfComponents(3)
-    for i in range(nx):
-        for j in range(ny):
-    	    velArray.InsertNextTuple3(data[j*nx+i,4], data[j*nx+i,5], 0)
+    for j in range(ny):
+        for i in range(nx):
+    	    velArray.InsertNextTuple3(data[j+i*ny,4],data[j+i*ny,5],0)
+
+
 
     rhoArray = vtkDoubleArray()
     rhoArray.SetName('Density')
-    for i in range(nx):
-        for j in range(ny):
-    	    rhoArray.InsertNextValue(data[j*nx+i,3])
+    for j in range(ny):
+        for i in range(nx):
+    	    rhoArray.InsertNextValue(data[j+i*ny,3])
+
+    solArray = vtkDoubleArray()
+    solArray.SetName('obs')
+    for j in range(ny):
+        for i in range(nx):
+    	    solArray.InsertNextValue(data[j+i*ny,6])
 
     grid.SetXCoordinates(xArray)
     grid.SetYCoordinates(yArray)
     grid.SetZCoordinates(zArray)
-    grid.GetPointData().SetVectors(velArray)
-    grid.GetPointData().SetScalars(rhoArray)
+    grid.GetPointData().AddArray(velArray)
+    grid.GetPointData().AddArray(rhoArray)
+    grid.GetPointData().AddArray(solArray)
     print('There are', grid.GetNumberOfPoints(), 'points.')
     print('There are', grid.GetNumberOfCells(), 'cells.')
 
@@ -59,5 +69,5 @@ def main():
     writer.Write()
 
 if __name__ == '__main__':
-    main()
+    vtkConverter()
 
