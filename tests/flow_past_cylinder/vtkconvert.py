@@ -37,10 +37,17 @@ def main():
         for j in range(ny):
     	    velArray.InsertNextTuple3(data[j*nx+i,4], data[j*nx+i,5], 0)
 
+    rhoArray = vtkDoubleArray()
+    rhoArray.SetName('Density')
+    for i in range(nx):
+        for j in range(ny):
+    	    rhoArray.InsertNextValue(data[j*nx+i,3])
+
     grid.SetXCoordinates(xArray)
     grid.SetYCoordinates(yArray)
     grid.SetZCoordinates(zArray)
     grid.GetPointData().SetVectors(velArray)
+    grid.GetPointData().SetScalars(rhoArray)
     print('There are', grid.GetNumberOfPoints(), 'points.')
     print('There are', grid.GetNumberOfCells(), 'cells.')
 
