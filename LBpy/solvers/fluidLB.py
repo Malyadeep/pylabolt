@@ -20,20 +20,12 @@ def main(parallelization, n_threads):
 
     base = baseAlgorithm()
     parallel = parallelSetup(parallelization, n_threads, base, simulation)
-<<<<<<< HEAD
     if parallel.mode != 'cuda':
         base.jitWarmUp(simulation)
 
     if parallel.mode == 'cuda':
         start = time.perf_counter()
         base.solver_cuda(simulation, parallel)
-=======
-    base.jitWarmUp(simulation)
-
-    if parallel.mode == 'cuda':
-        start = time.perf_counter()
-        base.solver_cuda(simulation, parallel.device, parallel)
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         runTime = time.perf_counter() - start
     else:
         start = time.perf_counter()

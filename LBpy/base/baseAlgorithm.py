@@ -130,12 +130,8 @@ class baseAlgorithm:
             simulation.setBoundaryFunc(simulation.fields, simulation.lattice,
                                        simulation.mesh)
 
-<<<<<<< HEAD
     def solver_cuda(self, simulation, parallel):
         print('solver_cuda')
-=======
-    def solver_cuda(simulation, parallel):
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         resU, resV = 1e6, 1e6
         resRho = 1e6
         u_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny, 2),
@@ -157,22 +153,14 @@ class baseAlgorithm:
         residueArgs = (
             u_sq_device, u_err_sq_device, rho_sq_device, rho_err_sq_device,
         )
-<<<<<<< HEAD
-=======
-
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         for timeStep in range(simulation.startTime, simulation.endTime,
                               simulation.lattice.deltaT):
             computeFields_cuda[parallel.blocks,
                                parallel.n_threads](*parallel.device.
                                                    computeFieldsArgs,
                                                    u_old_device,
-<<<<<<< HEAD
                                                    rho_old_device,
                                                    *residueArgs)
-=======
-                                                   rho_old_device)
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
             resU, resV, resRho = computeResiduals_cuda(*residueArgs)
             if timeStep % simulation.stdOutputInterval == 0:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
@@ -181,7 +169,6 @@ class baseAlgorithm:
                       ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
                       '\n', flush=True)
             if timeStep % simulation.saveInterval == 0:
-<<<<<<< HEAD
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')
                 writeFields(timeStep, simulation.fields)
@@ -189,11 +176,6 @@ class baseAlgorithm:
                 if timeStep % simulation.saveStateInterval == 0:
                     copyFields_cuda(parallel.device, simulation.fields,
                                     flag='all')
-=======
-                writeFields(timeStep, simulation.fields)
-            if simulation.saveStateInterval is not None:
-                if timeStep % simulation.saveStateInterval == 0:
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
                     saveState(timeStep, simulation)
             if (resU < simulation.relTolU and resV < simulation.relTolV and
                     resRho < simulation.relTolRho):
@@ -203,17 +185,10 @@ class baseAlgorithm:
                       ' | resV = ' + str(round(resV, 10)).ljust(12) +
                       ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
                       '\n', flush=True)
-<<<<<<< HEAD
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')
                 writeFields(timeStep, simulation.fields)
                 break
-=======
-                copyFields_cuda(parallel.device, simulation)
-                writeFields(timeStep, simulation.fields)
-                break
-
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
             equilibriumRelaxation_cuda[parallel.blocks,
                                        parallel.n_threads](*parallel.device.
                                                            collisionArgs)
@@ -221,11 +196,6 @@ class baseAlgorithm:
             stream_cuda[parallel.blocks,
                         parallel.n_threads](*parallel.device.streamArgs)
 
-<<<<<<< HEAD
             simulation.boundary.setBoundary_cuda(parallel.n_threads,
                                                  parallel.blocks,
                                                  parallel.device)
-=======
-            simulation.setBoundaryFunc_cuda(parallel.n_threads,
-                                            parallel.blocks, parallel.device)
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7

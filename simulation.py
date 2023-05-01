@@ -1,13 +1,13 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 10000,
+    'endTime': 30000,
     'stdOutputInterval': 100,
     'saveInterval': 9999,
     'saveStateInterval': None,
     'relTolU': 1e-9,
     'relTolV': 1e-9,
     'relTolRho': 1e-7,
-    'precision': 'single'
+    'precision': 'double'
 }
 
 internalFields = {

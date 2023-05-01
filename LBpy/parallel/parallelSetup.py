@@ -20,7 +20,6 @@ class parallelSetup:
     def setupCuda(self, simulation):
         self.blocks = int(np.ceil(simulation.mesh.Nx * simulation.mesh.Ny /
                                   self.n_threads))
-<<<<<<< HEAD
         device = deviceData(simulation.mesh, simulation.lattice,
                             simulation.precision)
 
@@ -29,29 +28,15 @@ class parallelSetup:
                                    dtype=np.int32))
         device.Ny = cuda.to_device(np.array([simulation.mesh.Ny],
                                    dtype=np.int32))
-=======
-        device = deviceData(simulation.mesh, simulation.lattice)
-
-        # Copy grid data
-        device.Nx = cuda.to_device(np.array([simulation.mesh.Nx],
-                                   dtype=np.float32))
-        device.Ny = cuda.to_device(np.array([simulation.mesh.Ny],
-                                   dtype=np.float32))
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
 
         # Copy lattice data
         device.noOfDirections = cuda.to_device(np.array([simulation.lattice.
                                                noOfDirections],
-<<<<<<< HEAD
                                                dtype=np.int32))
-=======
-                                               dtype=np.float32))
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         device.c = cuda.to_device(simulation.lattice.c)
         device.w = cuda.to_device(simulation.lattice.w)
         device.invList = cuda.to_device(simulation.lattice.invList)
         device.cs = cuda.to_device(np.array([simulation.lattice.
-<<<<<<< HEAD
                                             cs], dtype=simulation.precision))
         device.cs_2 = cuda.to_device(np.array([simulation.collisionScheme.
                                                cs_2], dtype=simulation.
@@ -64,16 +49,6 @@ class parallelSetup:
         device.preFactor = cuda.to_device(np.array([simulation.collisionScheme.
                                           preFactor], dtype=simulation.
                                           precision))
-=======
-                                            cs], dtype=np.float32))
-        device.cs_2 = cuda.to_device(np.array([simulation.collisionScheme.
-                                               cs_2], dtype=np.float32))
-        device.cs_4 = cuda.to_device(np.array([simulation.collisionScheme.
-                                               cs_4], dtype=np.float32))
-
-        # Copy scheme data
-        device.preFactor = cuda.to_device(simulation.collisionScheme.preFactor)
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         device.collisionType = cuda.to_device(np.array([simulation.
                                               collisionScheme.collisionType],
                                               dtype=np.int32))
@@ -99,12 +74,8 @@ class parallelSetup:
         device.collisionArgs = (
             device.Nx[0], device.Ny[0], device.f_eq, device.f, device.f_new,
             device.u, device.rho, device.solid, device.preFactor[0],
-<<<<<<< HEAD
             device.cs_2[0], device.cs_4[0], device.c, device.w,
             device.equilibriumType[0], device.collisionType[0]
-=======
-            device.equilibriumArgs
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         )
         device.streamArgs = (
             device.Nx[0], device.Ny[0], device.f, device.f_new, device.c,
@@ -114,19 +85,12 @@ class parallelSetup:
             device.Nx[0], device.Ny[0], device.f_new, device.u, device.rho,
             device.solid, device.c, device.noOfDirections[0]
         )
-<<<<<<< HEAD
         simulation.boundary.setupBoundary_cuda()
         return device
 
     def setupParallel(self, baseAlgorithm, simulation, parallel):
         if parallel is True:
             numba.set_num_threads(self.n_threads)
-=======
-        return device
-
-    def setupParallel(self, baseAlgorithm, simulation, parallel):
-        numba.set_num_threads(self.n_threads)
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         baseAlgorithm.equilibriumRelaxation = numba.njit(baseAlgorithm.
                                                          equilibriumRelaxation,
                                                          parallel=parallel,

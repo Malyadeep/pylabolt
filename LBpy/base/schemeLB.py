@@ -14,10 +14,7 @@ class collisionScheme:
             if collisionDict['model'] == 'BGK':
                 if parallelization == 'cuda':
                     self.collisionType = 1      # Stands for BGK
-<<<<<<< HEAD
                     self.collisionFunc = collisionModels.BGK
-=======
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
                 else:
                     self.collisionFunc = collisionModels.BGK
 
@@ -28,23 +25,17 @@ class collisionScheme:
             if collisionDict['equilibrium'] == 'firstOrder':
                 if parallelization == 'cuda':
                     self.equilibriumType = 1     # Stands for first order
-<<<<<<< HEAD
                     self.equilibriumFunc = equilibriumModels.firstOrder
                     self.equilibriumArgs = (self.cs_2, self.c, self.w)
-=======
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
                 else:
                     self.equilibriumFunc = equilibriumModels.firstOrder
                     self.equilibriumArgs = (self.cs_2, self.c, self.w)
             elif collisionDict['equilibrium'] == 'secondOrder':
                 if parallelization == 'cuda':
                     self.equilibriumType = 2      # Stands for second order
-<<<<<<< HEAD
                     self.equilibriumFunc = equilibriumModels.secondOrder
                     self.equilibriumArgs = (self.cs_2, self.cs_4,
                                             self.c, self.w)
-=======
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
                 else:
                     self.equilibriumFunc = equilibriumModels.secondOrder
                     self.equilibriumArgs = (self.cs_2, self.cs_4,

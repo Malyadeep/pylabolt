@@ -64,11 +64,8 @@ class boundary:
         self.outDirections = []
 
         # Cuda device data
-<<<<<<< HEAD
         self.boundaryVector_device = []
         self.boundaryScalar_device = []
-=======
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
         self.boundaryIndices_device = []
         self.faceList_device = []
         self.invDirections_device = []
@@ -176,11 +173,8 @@ class boundary:
 
     def setupBoundary_cpu(self, parallel):
         for itr in range(self.noOfBoundaries):
-<<<<<<< HEAD
             self.boundaryFunc.append(getattr(boundaryConditions,
                                              self.boundaryType[itr]))
-=======
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
             self.boundaryFunc[itr] = numba.njit(self.boundaryFunc[itr],
                                                 parallel=parallel,
                                                 cache=False,
@@ -195,7 +189,6 @@ class boundary:
                     lattice.cs, mesh.Nx, mesh.Ny)
             self.boundaryFunc[itr](*args)
 
-<<<<<<< HEAD
     def setupBoundary_cuda(self):
         self.boundaryScalar_device = cuda.to_device(
             self.boundaryScalar
@@ -228,13 +221,3 @@ class boundary:
                     self.boundaryScalar_device[itr], device.c, device.w,
                     device.cs[0], device.Nx[0], device.Ny[0])
             self.boundaryFunc[itr][blocks, n_threads](*args)
-=======
-    def setBoundary_cuda(self, fields, lattice, mesh):
-        for itr in range(self.noOfBoundaries):
-            args = (fields.f, fields.f_new, fields.rho, fields.u,
-                    self.faceList[itr], self.outDirections[itr],
-                    self.invDirections[itr], self.boundaryVector[itr],
-                    self.boundaryScalar[itr], lattice.c, lattice.w,
-                    lattice.cs, mesh.Nx, mesh.Ny)
-            self.boundaryFunc[itr](*args)
->>>>>>> 763b1fb88aebd7534ec6dac5ae28097d575b24a7
