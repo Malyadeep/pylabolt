@@ -1,8 +1,10 @@
 from argparse import ArgumentParser
 import os
+import mpi4py
 
 
 def main():
+    mpi4py.rc(initialize=False, finalize=False)
     parser = ArgumentParser(description='A Lattice Boltzmann Python solver')
     parser.add_argument('-s', '--solver', choices=['fluidLB'], type=str,
                         help='choice of solver to run')
