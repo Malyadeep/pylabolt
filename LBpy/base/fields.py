@@ -1,9 +1,10 @@
 import numpy as np
 import os
+import numba
 
 
 class fields:
-    def __init__(self, mesh, lattice, U_initial, rho_initial, precision):
+    def __init__(self, mesh, lattice, U_initial, rho_initial, precision, size):
         self.f = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
                           dtype=precision)
         self.f_eq = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
@@ -13,15 +14,24 @@ class fields:
         self.u = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
         self.rho = np.full(mesh.Nx * mesh.Ny, fill_value=rho_initial,
                            dtype=precision)
-        self.x = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
-        self.y = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         for ind in range(mesh.Nx * mesh.Ny):
             self.u[ind, 0] = U_initial[0]
             self.u[ind, 1] = U_initial[1]
-            self.x[ind] = int(ind / mesh.Ny) * mesh.delX
-            self.y[ind] = int(ind % mesh.Ny) * mesh.delX
         self.solid = np.full((mesh.Nx * mesh.Ny), fill_value=0,
                              dtype=np.int32)
+        self.procBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
+        if size > 1:
+            self.procBoundary = setProcBoundary(mesh.Nx, mesh.Ny)
+
+
+@numba.njit
+def setProcBoundary(Nx, Ny):
+    procBoundary = np.ones((Nx * Ny), dtype=np.int32)
+    for i in range(1, Nx - 1):
+        for j in range(1, Ny - 1):
+            ind = i * Ny + j
+            procBoundary[ind] = 0
+    return procBoundary
 
 
 def circle(center, radius, fields, mesh):

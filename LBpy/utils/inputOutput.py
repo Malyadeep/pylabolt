@@ -2,7 +2,7 @@ import os
 import pickle
 
 
-def writeFields(timeStep, fields):
+def writeFields(timeStep, fields, mesh):
     if not os.path.isdir('output'):
         os.makedirs('output')
     if not os.path.isdir('output/' + str(timeStep)):
@@ -10,8 +10,8 @@ def writeFields(timeStep, fields):
     writeFile = open('output/' + str(timeStep) + '/fields.dat', 'w')
     for ind in range(fields.u.shape[0]):
         writeFile.write(str(round(ind, 10)).ljust(12) + '\t' +
-                        str(round(fields.x[ind], 10)).ljust(12) + '\t' +
-                        str(round(fields.y[ind], 10)).ljust(12) + '\t' +
+                        str(round(mesh.x[ind], 10)).ljust(12) + '\t' +
+                        str(round(mesh.y[ind], 10)).ljust(12) + '\t' +
                         str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
                         str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
                         str(round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
@@ -31,7 +31,7 @@ def saveState(timeStep, simulation):
 
 def loadState(timeStep):
     if not os.path.isdir('states'):
-        print('ERROR! no previous states present!')
+        print('ERROMPIR! no previous states present!')
     else:
         try:
             fileName = 'states/' + str(timeStep) + '/fields.pkl'
@@ -52,3 +52,20 @@ def copyFields_cuda(device, fields, flag):
         device.f_new.copy_to_host(fields.f_new)
         device.f_eq.copy_to_host(fields.f_eq)
     pass
+
+
+def writeFields_mpi(timeStep, u, rho, solid, mesh):
+    if not os.path.isdir('output'):
+        os.makedirs('output')
+    if not os.path.isdir('output/' + str(timeStep)):
+        os.makedirs('output/' + str(timeStep))
+    writeFile = open('output/' + str(timeStep) + '/fields.dat', 'w')
+    for ind in range(u.shape[0]):
+        writeFile.write(str(round(ind, 10)).ljust(12) + '\t' +
+                        str(round(mesh.x[ind], 10)).ljust(12) + '\t' +
+                        str(round(mesh.y[ind], 10)).ljust(12) + '\t' +
+                        str(round(rho[ind], 10)).ljust(12) + '\t' +
+                        str(round(u[ind, 0], 10)).ljust(12) + '\t' +
+                        str(round(u[ind, 1], 10)).ljust(12) + '\t' +
+                        str(round(solid[ind], 10)).ljust(12) + '\n')
+    writeFile.close()

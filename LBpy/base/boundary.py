@@ -43,7 +43,7 @@ def initializeBoundaryElements(Nx, Ny, invList, noOfDirections,
                 currentId = int(i * Ny + j)
                 if currentId == ind:
                     faceList.append(ind)
-    return np.array(faceList, dtype=np.int32),\
+    return np.array(faceList, dtype=np.int64),\
         outDirections,\
         invDirections
 
@@ -152,8 +152,8 @@ class boundary:
                 self.boundaryIndices.append([tempIndex_i, tempIndex_f])
         self.boundaryIndices = np.array(self.boundaryIndices)
         for itr in range(self.noOfBoundaries):
-            args = (mesh.Nx, mesh.Ny, lattice.invList, lattice.noOfDirections,
-                    self.boundaryIndices[itr])
+            args = (mesh.Nx_global, mesh.Ny_global, lattice.invList,
+                    lattice.noOfDirections, self.boundaryIndices[itr])
             tempFaceList, tempOutDirections, tempInvDirections = \
                 initializeBoundaryElements(*args)
             self.faceList.append(tempFaceList)
@@ -170,6 +170,7 @@ class boundary:
         print(self.faceList)
         print(self.outDirections)
         print(self.invDirections)
+        print(self.boundaryFunc)
 
     def setupBoundary_cpu(self, parallel):
         for itr in range(self.noOfBoundaries):

@@ -2,17 +2,20 @@ import numpy as np
 from numba import prange, cuda
 import copy
 
-from LBpy.utils.inputOutput import writeFields, saveState, copyFields_cuda
+from LBpy.utils.inputOutput import (writeFields, saveState, copyFields_cuda,
+                                    writeFields_mpi)
 from LBpy.base.cuda.kernels import (equilibriumRelaxation_cuda,
                                     computeFields_cuda, stream_cuda,
                                     computeResiduals_cuda)
+from LBpy.parallel.MPI_comm import (computeResiduals, gather, proc_boundary,
+                                    proc_copy)
 
 
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
                           collisionFunc, equilibriumFunc, preFactor,
-                          eqilibriumArgs):
+                          eqilibriumArgs, procBoundary):
     for ind in prange(Nx * Ny):
-        if solid[ind] != 1:
+        if solid[ind] != 1 and procBoundary[ind] != 1:
             equilibriumFunc(f_eq[ind, :], u[ind, :],
                             rho[ind], *eqilibriumArgs)
 
@@ -21,12 +24,12 @@ def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
 
 
 def computeFields(Nx, Ny, f_new, u, rho, solid, c,
-                  noOfDirections, u_old, rho_old):
+                  noOfDirections, procBoundary, size, u_old, rho_old):
     u_sq, u_err_sq = 0., 0.
     v_sq, v_err_sq = 0., 0.
     rho_sq, rho_err_sq = 0., 0.
     for ind in prange(Nx * Ny):
-        if solid[ind] != 1:
+        if solid[ind] != 1 and procBoundary[ind] != 1:
             rhoSum = 0.
             uSum = 0.
             vSum = 0.
@@ -51,10 +54,7 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
             u_old[ind, 0] = u[ind, 0]
             u_old[ind, 1] = u[ind, 1]
             rho_old[ind] = rho[ind]
-    resU = np.sqrt(u_err_sq/(u_sq + 1e-8))
-    resV = np.sqrt(v_err_sq/(v_sq + 1e-8))
-    resRho = np.sqrt(rho_err_sq/(rho_sq + 1e-8))
-    return resU, resV, resRho
+    return u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq
 
 
 def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid):
@@ -77,7 +77,7 @@ class baseAlgorithm:
         self.stream = stream
         self.computeFields = computeFields
 
-    def jitWarmUp(self, simulation):
+    def jitWarmUp(self, simulation, size, rank, comm):
         print('JIT warmup...')
         tempSim = copy.deepcopy(simulation)
         tempSim.startTime = 1
@@ -85,47 +85,73 @@ class baseAlgorithm:
         tempSim.stdOutputInterval = 100
         tempSim.saveInterval = 100
         tempSim.saveStateInterval = None
-        self.solver(tempSim)
+        self.solver(tempSim, size, rank, comm)
         print('JIT warmup done!!\n\n')
         del tempSim
 
-    def solver(self, simulation):
+    def solver(self, simulation, size, rank, comm):
         resU, resV = 1e6, 1e6
         resRho = 1e6
         u_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny, 2),
-                         dtype=np.float64)
+                         dtype=simulation.precision)
         rho_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny),
-                           dtype=np.float64)
+                           dtype=simulation.precision)
+        if rank == 0:
+            print('Starting simulation...\n')
         for timeStep in range(simulation.startTime, simulation.endTime,
                               simulation.lattice.deltaT):
-            resU, resV, resRho = self.computeFields(*simulation.
-                                                    computeFieldsArgs,
-                                                    u_old, rho_old)
-            if timeStep % simulation.stdOutputInterval == 0:
+            u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq = \
+                self.computeFields(*simulation.
+                                   computeFieldsArgs,
+                                   u_old, rho_old)
+            resU, resV, resRho = computeResiduals(u_err_sq, u_sq, v_err_sq,
+                                                  v_sq, rho_err_sq, rho_sq,
+                                                  comm, rank, size)
+            if timeStep % simulation.stdOutputInterval == 0 and rank == 0:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
                       ' | resU = ' + str(round(resU, 10)).ljust(12) +
                       ' | resV = ' + str(round(resV, 10)).ljust(12) +
                       ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
                       '\n', flush=True)
             if timeStep % simulation.saveInterval == 0:
-                writeFields(timeStep, simulation.fields)
+                if size == 1:
+                    writeFields(timeStep, simulation.fields, simulation.mesh)
+                else:
+                    u, rho, solid = gather(*simulation.gatherArgs)
+                    if rank == 0:
+                        writeFields_mpi(timeStep, u, rho, solid,
+                                        simulation.mesh)
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     saveState(timeStep, simulation)
-            if (resU < simulation.relTolU and resV < simulation.relTolV and
-                    resRho < simulation.relTolRho):
+            if rank == 0 and (resU < simulation.relTolU and
+                              resV < simulation.relTolV and
+                              resRho < simulation.relTolRho):
                 print('Convergence Criteria matched!!', flush=True)
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
                       ' | resU = ' + str(round(resU, 10)).ljust(12) +
                       ' | resV = ' + str(round(resV, 10)).ljust(12) +
                       ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
                       '\n', flush=True)
-                writeFields(timeStep, simulation.fields)
-                break
-
+                if size == 1:
+                    writeFields(timeStep, simulation.fields)
+                    break
+                else:
+                    u, rho, solid = gather(*simulation.gatherArgs)
+                    writeFields_mpi(timeStep, u, rho, solid,
+                                    simulation.mesh)
+                    break
+            # print(simulation.fields.u, rank)
+            # print()
             self.equilibriumRelaxation(*simulation.collisionArgs)
 
             self.stream(*simulation.streamArgs)
+
+            if size > 1:
+                comm.Barrier()
+                proc_boundary(*simulation.proc_boundaryArgs)
+                comm.Barrier()
+                proc_copy(*simulation.proc_copyArgs)
 
             simulation.setBoundaryFunc(simulation.fields, simulation.lattice,
                                        simulation.mesh)

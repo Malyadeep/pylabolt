@@ -1,6 +1,6 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 30000,
+    'endTime': 10000,
     'stdOutputInterval': 100,
     'saveInterval': 9999,
     'saveStateInterval': None,
@@ -43,6 +43,11 @@ latticeDict = {
 meshDict = {
     'grid': [100, 100],
     'boundingBox': [[0, 0], [1, 1]]
+}
+
+decomposeDict = {
+    'nx': 2,
+    'ny': 2
 }
 
 obstacle = {
