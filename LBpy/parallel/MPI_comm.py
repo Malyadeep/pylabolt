@@ -222,8 +222,8 @@ def gather_copy(u_all, rho_all, solid_all, u_temp, rho_temp,
         i_write += 1
 
 
-def gather(u, rho, solid, rank, comm, nProc_x, nProc_y,
-           Nx, Ny, Nx_local, Ny_local, precision):
+def gather(u, rho, solid, rank, nProc_x, nProc_y,
+           Nx, Ny, Nx_local, Ny_local, precision, comm):
     if rank == 0:
         u_all = np.zeros((Nx * Ny, 2), dtype=precision)
         rho_all = np.ones((Nx * Ny), dtype=precision)

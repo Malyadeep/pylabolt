@@ -25,7 +25,6 @@ class simulation:
     def __init__(self, parallelization, rank, size, comm):
         self.rank = rank
         self.size = size
-        self.comm = comm
         if rank == 0:
             print('Reading simulation parameters...\n', flush=True)
         try:
@@ -145,7 +144,7 @@ class simulation:
 
         if size > 1:
             self.gatherArgs = (self.fields.u, self.fields.rho,
-                               self.fields.solid, self.rank, self.comm,
+                               self.fields.solid, self.rank,
                                self.mpiParams.nProc_x,
                                self.mpiParams.nProc_y,
                                self.mesh.Nx_global, self.mesh.Ny_global,
@@ -156,7 +155,7 @@ class simulation:
                                       self.fields.f_new, self.fields.f,
                                       self.mpiParams.nx, self.mpiParams.ny,
                                       self.mpiParams.nProc_x,
-                                      self.mpiParams.nProc_y, self.comm)
+                                      self.mpiParams.nProc_y)
             self.proc_copyArgs = (self.mesh.Nx, self.mesh.Ny,
                                   self.lattice.c, self.fields.f_new)
 

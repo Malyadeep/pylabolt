@@ -78,7 +78,8 @@ class baseAlgorithm:
         self.computeFields = computeFields
 
     def jitWarmUp(self, simulation, size, rank, comm):
-        print('JIT warmup...')
+        if rank == 0:
+            print('\nJIT warmup...')
         tempSim = copy.deepcopy(simulation)
         tempSim.startTime = 1
         tempSim.endTime = 2
@@ -86,7 +87,8 @@ class baseAlgorithm:
         tempSim.saveInterval = 100
         tempSim.saveStateInterval = None
         self.solver(tempSim, size, rank, comm)
-        print('JIT warmup done!!\n\n')
+        if rank == 0:
+            print('JIT warmup done!!\n\n')
         del tempSim
 
     def solver(self, simulation, size, rank, comm):
@@ -96,8 +98,7 @@ class baseAlgorithm:
                          dtype=simulation.precision)
         rho_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny),
                            dtype=simulation.precision)
-        if rank == 0:
-            print('Starting simulation...\n')
+
         for timeStep in range(simulation.startTime, simulation.endTime,
                               simulation.lattice.deltaT):
             u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq = \
@@ -111,13 +112,13 @@ class baseAlgorithm:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
                       ' | resU = ' + str(round(resU, 10)).ljust(12) +
                       ' | resV = ' + str(round(resV, 10)).ljust(12) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
-                      '\n', flush=True)
+                      ' | resRho = ' + str(round(resRho, 10)).ljust(12),
+                      flush=True)
             if timeStep % simulation.saveInterval == 0:
                 if size == 1:
                     writeFields(timeStep, simulation.fields, simulation.mesh)
                 else:
-                    u, rho, solid = gather(*simulation.gatherArgs)
+                    u, rho, solid = gather(*simulation.gatherArgs, comm)
                     if rank == 0:
                         writeFields_mpi(timeStep, u, rho, solid,
                                         simulation.mesh)
@@ -137,7 +138,7 @@ class baseAlgorithm:
                     writeFields(timeStep, simulation.fields)
                     break
                 else:
-                    u, rho, solid = gather(*simulation.gatherArgs)
+                    u, rho, solid = gather(*simulation.gatherArgs, comm)
                     writeFields_mpi(timeStep, u, rho, solid,
                                     simulation.mesh)
                     break
@@ -149,7 +150,7 @@ class baseAlgorithm:
 
             if size > 1:
                 comm.Barrier()
-                proc_boundary(*simulation.proc_boundaryArgs)
+                proc_boundary(*simulation.proc_boundaryArgs, comm)
                 comm.Barrier()
                 proc_copy(*simulation.proc_copyArgs)
 

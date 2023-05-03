@@ -31,10 +31,7 @@ def main(parallelization, n_threads):
         if size > 1:
             distributeBoundaries_mpi(simulation.boundary, simulation.mpiParams,
                                      simulation.mesh, rank, size, comm)
-            # if rank == 3:
-            #     simulation.boundary.details()
-        # if rank == 0:
-        #     base.jitWarmUp(simulation, size, rank, comm)
+        base.jitWarmUp(simulation, size, rank, comm)
     if parallel.mode == 'cuda':
         start = time.perf_counter()
         base.solver_cuda(simulation, parallel)
@@ -44,6 +41,6 @@ def main(parallelization, n_threads):
         base.solver(simulation, size, rank, comm)
         runTime = time.perf_counter() - start
     if rank == 0:
-        print('Simulation completed : Runtime = ' + str(runTime) + '\n')
-    if parallelization != 'cuda':
-        MPI.Finalize()
+        print('\nSimulation completed : Runtime = ' + str(runTime) + '\n')
+
+    MPI.Finalize()
