@@ -99,7 +99,7 @@ class baseAlgorithm:
         rho_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny),
                            dtype=simulation.precision)
 
-        for timeStep in range(simulation.startTime, simulation.endTime,
+        for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
             u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq = \
                 self.computeFields(*simulation.
@@ -132,8 +132,8 @@ class baseAlgorithm:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
                       ' | resU = ' + str(round(resU, 10)).ljust(12) +
                       ' | resV = ' + str(round(resV, 10)).ljust(12) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
-                      '\n', flush=True)
+                      ' | resRho = ' + str(round(resRho, 10)).ljust(12),
+                      flush=True)
                 if size == 1:
                     writeFields(timeStep, simulation.fields)
                     break
@@ -142,8 +142,6 @@ class baseAlgorithm:
                     writeFields_mpi(timeStep, u, rho, solid,
                                     simulation.mesh)
                     break
-            # print(simulation.fields.u, rank)
-            # print()
             self.equilibriumRelaxation(*simulation.collisionArgs)
 
             self.stream(*simulation.streamArgs)
@@ -158,7 +156,6 @@ class baseAlgorithm:
                                        simulation.mesh)
 
     def solver_cuda(self, simulation, parallel):
-        print('solver_cuda')
         resU, resV = 1e6, 1e6
         resRho = 1e6
         u_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny, 2),
@@ -180,7 +177,7 @@ class baseAlgorithm:
         residueArgs = (
             u_sq_device, u_err_sq_device, rho_sq_device, rho_err_sq_device,
         )
-        for timeStep in range(simulation.startTime, simulation.endTime,
+        for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
             computeFields_cuda[parallel.blocks,
                                parallel.n_threads](*parallel.device.
@@ -193,8 +190,8 @@ class baseAlgorithm:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
                       ' | resU = ' + str(round(resU, 10)).ljust(12) +
                       ' | resV = ' + str(round(resV, 10)).ljust(12) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
-                      '\n', flush=True)
+                      ' | resRho = ' + str(round(resRho, 10)).ljust(12),
+                      flush=True)
             if timeStep % simulation.saveInterval == 0:
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')
@@ -210,8 +207,8 @@ class baseAlgorithm:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
                       ' | resU = ' + str(round(resU, 10)).ljust(12) +
                       ' | resV = ' + str(round(resV, 10)).ljust(12) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
-                      '\n', flush=True)
+                      ' | resRho = ' + str(round(resRho, 10)).ljust(12),
+                      flush=True)
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')
                 writeFields(timeStep, simulation.fields, simulation.mesh)

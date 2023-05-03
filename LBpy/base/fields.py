@@ -84,6 +84,9 @@ def setObstacle(obstacle, fields, mesh):
                       + " a list")
                 os._exit(1)
             rectangle(boundingBox, fields, mesh)
+        else:
+            print("ERROR!")
+            print("Unsupported obstacle type!")
     except KeyError as e:
         print("ERROR!")
         print(str(e) + " keyword missing in 'obstacle' dictionary")
