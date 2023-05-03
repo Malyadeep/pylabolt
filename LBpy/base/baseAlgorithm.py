@@ -197,7 +197,7 @@ class baseAlgorithm:
             if timeStep % simulation.saveInterval == 0:
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')
-                writeFields(timeStep, simulation.fields)
+                writeFields(timeStep, simulation.fields, simulation.mesh)
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     copyFields_cuda(parallel.device, simulation.fields,
@@ -213,7 +213,7 @@ class baseAlgorithm:
                       '\n', flush=True)
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')
-                writeFields(timeStep, simulation.fields)
+                writeFields(timeStep, simulation.fields, simulation.mesh)
                 break
             equilibriumRelaxation_cuda[parallel.blocks,
                                        parallel.n_threads](*parallel.device.

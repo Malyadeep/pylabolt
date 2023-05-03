@@ -10,11 +10,10 @@ from LBpy.parallel.MPI_comm import distributeBoundaries_mpi
 
 
 def main(parallelization, n_threads):
-    if parallelization != 'cuda':
-        MPI.Init()
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
+    MPI.Init()
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
 
     simulation = createSim.simulation(parallelization, rank, size, comm)
     if simulation.startTime != 0:
