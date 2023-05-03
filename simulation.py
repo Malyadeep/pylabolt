@@ -2,7 +2,7 @@ controlDict = {
     'startTime': 0,
     'endTime': 10000,
     'stdOutputInterval': 100,
-    'saveInterval': 9999,
+    'saveInterval': 10000,
     'saveStateInterval': None,
     'relTolU': 1e-9,
     'relTolV': 1e-9,
@@ -19,11 +19,11 @@ internalFields = {
 boundaryDict = {
     'walls': {
         'type': 'bounceBack',
-        'points_2': [[1, 0], [1, 1]],
-        'points_0': [[0, 0], [1, 0]],
-        'points_1': [[0, 0], [0, 1]]
+        'points_1': [[1, 0], [1, 1]],
+        'points_2': [[0, 0], [1, 0]],
+        'points_3': [[0, 0], [0, 1]]
     },
-    'lid': {
+    'inlet': {
         'type': 'fixedU',
         'value': [0.1, 0],
         'points_1': [[0, 1], [1, 1]]

@@ -7,8 +7,7 @@ from LBpy.utils.inputOutput import (writeFields, saveState, copyFields_cuda,
 from LBpy.base.cuda.kernels import (equilibriumRelaxation_cuda,
                                     computeFields_cuda, stream_cuda,
                                     computeResiduals_cuda)
-from LBpy.parallel.MPI_comm import (computeResiduals, gather, proc_boundary,
-                                    proc_copy)
+from LBpy.parallel.MPI_comm import computeResiduals, gather, proc_boundary
 
 
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
@@ -57,14 +56,15 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
     return u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq
 
 
-def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid):
+def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid, size):
     for ind in prange(Nx * Ny):
         i, j = int(ind / Ny), int(ind % Ny)
         for k in range(noOfDirections):
-            i_old = (i - int(c[k, 0])
-                     + Nx) % Nx
-            j_old = (j - int(c[k, 1])
-                     + Ny) % Ny
+            i_old = i - int(c[k, 0])
+            j_old = j - int(c[k, 1])
+            if size == 1:
+                i_old = (i_old + Nx) % Nx
+                j_old = (i_old + Ny) % Ny
             if solid[i_old * Ny + j_old] != 1:
                 f_new[ind, k] = f[i_old * Ny + j_old, k]
             elif solid[i_old * Ny + j_old] == 1:
@@ -144,13 +144,12 @@ class baseAlgorithm:
                     break
             self.equilibriumRelaxation(*simulation.collisionArgs)
 
-            self.stream(*simulation.streamArgs)
-
             if size > 1:
                 comm.Barrier()
                 proc_boundary(*simulation.proc_boundaryArgs, comm)
                 comm.Barrier()
-                proc_copy(*simulation.proc_copyArgs)
+
+            self.stream(*simulation.streamArgs)
 
             simulation.setBoundaryFunc(simulation.fields, simulation.lattice,
                                        simulation.mesh)

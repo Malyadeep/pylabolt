@@ -60,6 +60,7 @@ class simulation:
         except KeyError as e:
             if rank == 0:
                 print('ERROR! Keyword ' + str(e) + ' missing in controlDict')
+            os._exit(1)
         if rank == 0:
             self.writeControlLog()
             print('Setting control parameters done!\n', flush=True)
@@ -73,7 +74,7 @@ class simulation:
             if rank == 0:
                 print('ERROR! Keyword ' + str(e) +
                       ' missing in internalFields')
-
+                os._exit(1)
         if rank == 0:
             print('Reading mesh info and creating mesh...', flush=True)
         self.mesh = mesh.createMesh(meshDict, self.precision)
@@ -108,7 +109,6 @@ class simulation:
             self.boundary.readBoundaryDict()
             self.boundary.initializeBoundary(self.lattice, self.mesh,
                                              self.fields)
-            # self.boundary.details()
         if rank == 0:
             self.writeDomainLog(meshDict)
             print('Reading boundary conditions done...\n')
@@ -132,7 +132,7 @@ class simulation:
         self.streamArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f, self.fields.f_new,
             self.lattice.c, self.lattice.noOfDirections,
-            self.lattice.invList, self.fields.solid,
+            self.lattice.invList, self.fields.solid, self.size
         )
 
         self.computeFieldsArgs = (
@@ -151,13 +151,14 @@ class simulation:
                                self.mesh.Nx, self.mesh.Ny, self.precision)
 
             self.proc_boundaryArgs = (self.mesh.Nx, self.mesh.Ny,
-                                      self.lattice.c, self.lattice.invList,
-                                      self.fields.f_new, self.fields.f,
+                                      self.fields.f,
+                                      self.fields.f_send_topBottom,
+                                      self.fields.f_recv_topBottom,
+                                      self.fields.f_send_leftRight,
+                                      self.fields.f_recv_leftRight,
                                       self.mpiParams.nx, self.mpiParams.ny,
                                       self.mpiParams.nProc_x,
                                       self.mpiParams.nProc_y)
-            self.proc_copyArgs = (self.mesh.Nx, self.mesh.Ny,
-                                  self.lattice.c, self.fields.f_new)
 
         initializePopulations(
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq, self.fields.f,

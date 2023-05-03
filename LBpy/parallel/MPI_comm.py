@@ -4,164 +4,116 @@ import sys
 import numba
 
 
-def proc_boundary(Nx_local, Ny_local, c, invList, f_new, f, nx, ny,
-                  nProc_x, nProc_y, comm):
+def proc_boundary(Nx, Ny, f, f_send_topBottom,
+                  f_recv_topBottom, f_send_leftRight, f_recv_leftRight,
+                  nx, ny, nProc_x, nProc_y, comm):
     current_rank = nx * nProc_y + ny
-    for i in range(Nx_local):
-        if ny % 2 == 0:
-            if ny < nProc_y - 1:
-                for j in range(Ny_local - 1, Ny_local):
-                    for k in range(1, 9):
-                        if j + int(c[k, 1]) > Ny_local - 1:
-                            rank_send = nx * nProc_y + ny + 1
-                            ind = i * Ny_local + j
-                            comm.send(f_new[ind, k], dest=rank_send,
-                                      tag=1*i*rank_send)
-                            f_new[ind, invList[k]] = \
-                                comm.recv(source=rank_send,
-                                          tag=3*i*current_rank
-                                          )
-            if ny > 0:
-                for j in range(0, 1):
-                    for k in range(1, 9):
-                        if j - int(c[k, 1]) < 0:
-                            rank_send = nx * nProc_y + ny - 1
-                            ind = i * Ny_local + j
-                            f_new[ind, k] = \
-                                comm.recv(source=rank_send,
-                                          tag=4*i*current_rank)
-                            comm.send(f_new[ind, invList[k]], dest=rank_send,
-                                      tag=2*i*rank_send)
-        elif ny % 2 != 0:
-            if ny > 0:
-                for j in range(0, 1):
-                    for k in range(1, 9):
-                        if j - int(c[k, 1]) < 0:
-                            rank_send = nx * nProc_y + ny - 1
-                            ind = i * Ny_local + j
-                            f_new[ind, k] = \
-                                comm.recv(source=rank_send,
-                                          tag=1*i*current_rank
-                                          )
-                            comm.send(f_new[ind, invList[k]], dest=rank_send,
-                                      tag=3*i*rank_send)
-            if ny < nProc_y - 1:
-                for j in range(Ny_local - 1, Ny_local):
-                    for k in range(1, 9):
-                        if j + int(c[k, 1]) > Ny_local + 1:
-                            rank_send = nx * nProc_y + ny + 1
-                            ind = i * Ny_local + j
-                            comm.send(f_new[ind, k], dest=rank_send,
-                                      tag=4*i*rank_send)
-                            f_new[ind, invList[k]] = \
-                                comm.recv(source=rank_send,
-                                          tag=2*i*current_rank
-                                          )
+    if ny % 2 == 0:
+        if ny < nProc_y - 1:
+            rank_send = nx * nProc_y + ny + 1
+            sendLims = (0, Nx, Ny - 2, Ny - 1, Nx, Ny)
+            sendCopy(f, f_send_topBottom, *sendLims)
+            comm.Send(f_send_topBottom, dest=rank_send,
+                      tag=1*rank_send)
+            comm.Recv(f_recv_topBottom, source=rank_send,
+                      tag=3*current_rank)
+            recvLims = (0, Nx, Ny - 1, Ny, Nx, Ny)
+            recvCopy(f, f_recv_topBottom, *recvLims)
+        if ny > 0:
+            rank_send = nx * nProc_y + ny - 1
+            comm.Recv(f_recv_topBottom, source=rank_send,
+                      tag=4*current_rank)
+            recvLims = (0, Nx, 0, 1, Nx, Ny)
+            recvCopy(f, f_recv_topBottom, *recvLims)
+            sendLims = (0, Nx, 1, 2, Nx, Ny)
+            sendCopy(f, f_send_topBottom, *sendLims)
+            comm.Send(f_send_topBottom, dest=rank_send,
+                      tag=2*rank_send)
+    elif ny % 2 != 0:
+        if ny > 0:
+            rank_send = nx * nProc_y + ny - 1
+            comm.Recv(f_recv_topBottom, source=rank_send,
+                      tag=1*current_rank)
+            recvLims = (0, Nx, 0, 1, Nx, Ny)
+            recvCopy(f, f_recv_topBottom, *recvLims)
+            sendLims = (0, Nx, 1, 2, Nx, Ny)
+            sendCopy(f, f_send_topBottom, *sendLims)
+            comm.Send(f_send_topBottom, dest=rank_send,
+                      tag=3*rank_send)
+        if ny < nProc_y - 1:
+            rank_send = nx * nProc_y + ny + 1
+            sendLims = (0, Nx, Ny - 2, Ny - 1, Nx, Ny)
+            sendCopy(f, f_send_topBottom, *sendLims)
+            comm.Send(f_send_topBottom, dest=rank_send,
+                      tag=4*rank_send)
+            comm.Recv(f_recv_topBottom, source=rank_send,
+                      tag=2*current_rank)
+            recvLims = (0, Nx, Ny - 1, Ny, Nx, Ny)
+            recvCopy(f, f_recv_topBottom, *recvLims)
     comm.Barrier()
-    for j in range(Ny_local):
-        if nx % 2 == 0:
-            if nx < nProc_x - 1:
-                for i in range(Nx_local - 1, Nx_local):
-                    for k in range(1, 9):
-                        if i + int(c[k, 0]) > Nx_local - 1:
-                            rank_send = (nx + 1) * nProc_y + ny
-                            ind = i * Ny_local + j
-                            comm.send(f_new[ind, k], dest=rank_send,
-                                      tag=1*j*rank_send)
-                            f_new[ind, invList[k]] = \
-                                comm.recv(source=rank_send,
-                                          tag=3*j*current_rank
-                                          )
-            if nx > 0:
-                for i in range(0, 1):
-                    for k in range(1, 9):
-                        if i - int(c[k, 0]) < 0:
-                            rank_send = (nx - 1) * nProc_y + ny
-                            ind = i * Ny_local + j
-                            f_new[ind, k] = \
-                                comm.recv(source=rank_send,
-                                          tag=4*j*current_rank
-                                          )
-                            comm.send(f_new[ind, invList[k]], dest=rank_send,
-                                      tag=2*j*rank_send)
-        elif nx % 2 != 0:
-            if nx > 0:
-                for i in range(0, 1):
-                    for k in range(1, 9):
-                        if i - int(c[k, 0]) < 0:
-                            rank_send = (nx - 1) * nProc_y + ny
-                            ind = i * Ny_local + j
-                            f_new[ind, k] = \
-                                comm.recv(source=rank_send,
-                                          tag=1*j*current_rank
-                                          )
-                            comm.send(f_new[ind, invList[k]], dest=rank_send,
-                                      tag=3*j*rank_send)
-            if nx < nProc_x - 1:
-                for i in range(Nx_local - 1, Nx_local):
-                    for k in range(1, 9):
-                        if i + int(c[k, 0]) > Nx_local - 1:
-                            rank_send = (nx + 1) * nProc_y + ny
-                            ind = i * Ny_local + j
-                            comm.send(f_new[ind, k], dest=rank_send,
-                                      tag=4*j*rank_send)
-                            f_new[ind, invList[k]] = \
-                                comm.recv(source=rank_send,
-                                          tag=2*j*current_rank
-                                          )
+    if nx % 2 == 0:
+        if nx < nProc_x - 1:
+            rank_send = (nx + 1) * nProc_y + ny
+            sendLims = (Nx - 2, Nx - 1, 0, Ny, Nx, Ny)
+            sendCopy(f, f_send_leftRight, *sendLims)
+            comm.Send(f_send_leftRight, dest=rank_send,
+                      tag=1*rank_send)
+            comm.Recv(f_recv_leftRight, source=rank_send,
+                      tag=3*current_rank)
+            recvLims = (Nx - 1, Nx, 0, Ny, Nx, Ny)
+            recvCopy(f, f_recv_leftRight, *recvLims)
+        if nx > 0:
+            rank_send = (nx - 1) * nProc_y + ny
+            comm.Recv(f_recv_leftRight, source=rank_send,
+                      tag=4*current_rank)
+            recvLims = (0, 1, 0, Ny, Nx, Ny)
+            recvCopy(f, f_recv_leftRight, *recvLims)
+            sendLims = (1, 2, 0, Ny, Nx, Ny)
+            sendCopy(f, f_send_leftRight, *sendLims)
+            comm.Send(f_send_leftRight, dest=rank_send,
+                      tag=2*rank_send)
+    elif nx % 2 != 0:
+        if nx > 0:
+            rank_send = (nx - 1) * nProc_y + ny
+            comm.Recv(f_recv_leftRight, source=rank_send,
+                      tag=1*current_rank)
+            recvLims = (0, 1, 0, Ny, Nx, Ny)
+            recvCopy(f, f_recv_leftRight, *recvLims)
+            sendLims = (1, 2, 0, Ny, Nx, Ny)
+            sendCopy(f, f_send_leftRight, *sendLims)
+            comm.Send(f_send_leftRight, dest=rank_send,
+                      tag=3*rank_send)
+        if nx < nProc_x - 1:
+            rank_send = (nx + 1) * nProc_y + ny
+            sendLims = (Nx - 2, Nx - 1, 0, Ny, Nx, Ny)
+            sendCopy(f, f_send_leftRight, *sendLims)
+            comm.Send(f_send_leftRight, dest=rank_send,
+                      tag=4*rank_send)
+            comm.Recv(f_recv_leftRight, source=rank_send,
+                      tag=2*current_rank)
+            recvLims = (Nx - 1, Nx, 0, Ny, Nx, Ny)
+            recvCopy(f, f_recv_leftRight, *recvLims)
     comm.Barrier()
 
 
 @numba.njit
-def proc_copy(Nx_local, Ny_local, c, f_new):
-    for i in range(1, Nx_local - 1):
-        for j in range(Ny_local - 2, Ny_local - 1):
-            for k in range(1, 9):
-                if (j - int(c[k, 1]) > Ny_local - 2
-                        and i - int(c[k, 0]) > Nx_local - 2):
-                    ind, ind_nb = i * Ny_local + j, (i + 1) * Ny_local + j + 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-                elif j - int(c[k, 1]) > Ny_local - 2 and i - int(c[k, 0]) < 1:
-                    ind, ind_nb = i * Ny_local + j, (i - 1) * Ny_local + j + 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-                elif j - int(c[k, 1]) > Ny_local - 2:
-                    ind, ind_nb = i * Ny_local + j, i * Ny_local + j + 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-        for j in range(1, 2):
-            for k in range(1, 9):
-                if (j - int(c[k, 1]) < 1 and i - int(c[k, 0]) < 1):
-                    ind, ind_nb = i * Ny_local + j, (i - 1) * Ny_local + j - 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-                elif j - int(c[k, 1]) < 1 and i - int(c[k, 0]) > Nx_local - 2:
-                    ind, ind_nb = i * Ny_local + j, (i + 1) * Ny_local + j - 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-                elif j - int(c[k, 1]) < 1:
-                    ind, ind_nb = i * Ny_local + j, i * Ny_local + j - 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-    for j in range(1, Ny_local - 1):
-        for i in range(1, 2):
-            for k in range(1, 9):
-                if i - int(c[k, 0]) < 1 and j - int(c[k, 1]) < 1:
-                    ind, ind_nb = i * Ny_local + j, (i - 1) * Ny_local + j - 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-                elif i - int(c[k, 0]) < 1 and j - int(c[k, 1]) > Ny_local - 2:
-                    ind, ind_nb = i * Ny_local + j, (i - 1) * Ny_local + j + 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-                elif i - int(c[k, 0]) < 1:
-                    ind, ind_nb = i * Ny_local + j, (i - 1) * Ny_local + j
-                    f_new[ind, k] = f_new[ind_nb, k]
-        for i in range(Nx_local - 2, Nx_local - 1):
-            for k in range(1, 9):
-                if i - int(c[k, 0]) > Nx_local - 2 and j - int(c[k, 1]) < 1:
-                    ind, ind_nb = i * Ny_local + j, (i + 1) * Ny_local + j - 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-                elif (i - int(c[k, 0]) > Nx_local - 2 and
-                      j - int(c[k, 1]) > Ny_local - 2):
-                    ind, ind_nb = i * Ny_local + j, (i + 1) * Ny_local + j + 1
-                    f_new[ind, k] = f_new[ind_nb, k]
-                elif i - int(c[k, 0]) > Nx_local - 2:
-                    ind, ind_nb = i * Ny_local + j, (i + 1) * Ny_local + j
-                    f_new[ind, k] = f_new[ind_nb, k]
+def sendCopy(f, f_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+    itr = 0
+    for i in range(Nx_i, Nx_f):
+        for j in range(Ny_i, Ny_f):
+            ind = i * Ny + j
+            f_send[itr, :] = f[ind, :]
+            itr += 1
+
+
+@numba.njit
+def recvCopy(f, f_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+    itr = 0
+    for i in range(Nx_i, Nx_f):
+        for j in range(Ny_i, Ny_f):
+            ind = i * Ny + j
+            f[ind, :] = f_recv[itr, :]
+            itr += 1
 
 
 def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,

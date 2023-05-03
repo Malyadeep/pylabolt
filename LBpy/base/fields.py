@@ -22,6 +22,10 @@ class fields:
         self.procBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
         if size > 1:
             self.procBoundary = setProcBoundary(mesh.Nx, mesh.Ny)
+            self.f_send_topBottom = np.zeros((mesh.Nx + 2, 9), dtype=precision)
+            self.f_recv_topBottom = np.zeros((mesh.Nx + 2, 9), dtype=precision)
+            self.f_send_leftRight = np.zeros((mesh.Ny + 2, 9), dtype=precision)
+            self.f_recv_leftRight = np.zeros((mesh.Ny + 2, 9), dtype=precision)
 
 
 @numba.njit
