@@ -64,7 +64,7 @@ def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid, size):
             j_old = j - int(c[k, 1])
             if size == 1:
                 i_old = (i_old + Nx) % Nx
-                j_old = (i_old + Ny) % Ny
+                j_old = (j_old + Ny) % Ny
             if solid[i_old * Ny + j_old] != 1:
                 f_new[ind, k] = f[i_old * Ny + j_old, k]
             elif solid[i_old * Ny + j_old] == 1:
