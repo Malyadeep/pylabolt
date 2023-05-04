@@ -266,6 +266,8 @@ class decomposeParams:
 
 def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
     if rank == 0:
+        print('MPI option selected')
+        print('Distributing boundaries to sub-domains...')
         for nx in range(mpiParams.nProc_x - 1, -1, -1):
             for ny in range(mpiParams.nProc_y - 1, -1, -1):
                 noOfBoundaries = 0
