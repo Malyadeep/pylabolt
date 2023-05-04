@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 import os
 import mpi4py
-from LBpy.utils.vtkconvert import toVTK
 
 
 def main():
@@ -40,4 +39,5 @@ def main():
         fluidLB.main(parallelization, n_threads=args.n_threads)
 
     if args.toVTK is not None:
+        from LBpy.utils.vtkconvert import toVTK
         toVTK(args.toVTK)
