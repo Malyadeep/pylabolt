@@ -6,7 +6,7 @@ from LBpy.utils.inputOutput import loadState, saveState
 import LBpy.base.createSim as createSim
 from LBpy.base.baseAlgorithm import baseAlgorithm
 from LBpy.parallel.parallelSetup import parallelSetup
-from LBpy.parallel.MPI_comm import distributeBoundaries_mpi
+from LBpy.parallel.MPI_decompose import distributeBoundaries_mpi
 
 
 def main(parallelization, n_threads):

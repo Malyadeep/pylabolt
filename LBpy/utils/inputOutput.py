@@ -54,18 +54,21 @@ def copyFields_cuda(device, fields, flag):
     pass
 
 
-def writeFields_mpi(timeStep, u, rho, solid, mesh):
-    if not os.path.isdir('output'):
-        os.makedirs('output')
-    if not os.path.isdir('output/' + str(timeStep)):
-        os.makedirs('output/' + str(timeStep))
-    writeFile = open('output/' + str(timeStep) + '/fields.dat', 'w')
-    for ind in range(u.shape[0]):
-        writeFile.write(str(round(ind, 10)).ljust(12) + '\t' +
-                        str(round(mesh.x[ind], 10)).ljust(12) + '\t' +
-                        str(round(mesh.y[ind], 10)).ljust(12) + '\t' +
-                        str(round(rho[ind], 10)).ljust(12) + '\t' +
-                        str(round(u[ind, 0], 10)).ljust(12) + '\t' +
-                        str(round(u[ind, 1], 10)).ljust(12) + '\t' +
-                        str(round(solid[ind], 10)).ljust(12) + '\n')
+def writeFields_mpi(timeStep, fields, mesh, rank, comm):
+    if not os.path.isdir('procs'):
+        os.makedirs('procs')
+    if not os.path.isdir('procs/proc_' + str(rank)):
+        os.makedirs('procs/proc_' + str(rank))
+    if not os.path.isdir('procs/proc_' + str(rank) + '/' + str(timeStep)):
+        os.makedirs('procs/proc_' + str(rank) + '/' + str(timeStep))
+    writeFile = open('procs/proc_' + str(rank) + '/' +
+                     str(timeStep) + '/fields.dat', 'w')
+    for i in range(mesh.Nx):
+        for j in range(mesh.Ny):
+            ind = i * mesh.Ny + j
+            writeFile.write(str(round(ind, 10)).ljust(12) + '\t' +
+                            str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
+                            str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
+                            str(round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
+                            str(round(fields.solid[ind], 10)).ljust(12) + '\n')
     writeFile.close()

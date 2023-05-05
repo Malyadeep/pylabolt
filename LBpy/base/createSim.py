@@ -5,7 +5,7 @@ import numba
 
 
 from LBpy.base import mesh, lattice, boundary, schemeLB, fields
-from LBpy.parallel.MPI_comm import decompose
+from LBpy.parallel.MPI_decompose import decompose
 
 
 @numba.njit
@@ -74,14 +74,14 @@ class simulation:
             if rank == 0:
                 print('ERROR! Keyword ' + str(e) +
                       ' missing in internalFields')
-                os._exit(1)
+
         if rank == 0:
             print('Reading mesh info and creating mesh...', flush=True)
         self.mesh = mesh.createMesh(meshDict, self.precision)
         if rank == 0:
             print('Reading mesh info and creating mesh done!\n', flush=True)
         if size > 1:
-            self.mpiParams = decompose(self.mesh, self.rank, self.size)
+            self.mpiParams = decompose(self.mesh, self.rank, self.size, comm)
         if rank == 0:
             print('Setting lattice structure...', flush=True)
         self.lattice = lattice.createLattice(latticeDict, self.precision)
@@ -109,6 +109,7 @@ class simulation:
             self.boundary.readBoundaryDict()
             self.boundary.initializeBoundary(self.lattice, self.mesh,
                                              self.fields)
+            # self.boundary.details()
         if rank == 0:
             self.writeDomainLog(meshDict)
             print('Reading boundary conditions done...\n')
@@ -159,6 +160,8 @@ class simulation:
                                       self.mpiParams.nx, self.mpiParams.ny,
                                       self.mpiParams.nProc_x,
                                       self.mpiParams.nProc_y)
+            self.proc_copyArgs = (self.mesh.Nx, self.mesh.Ny,
+                                  self.lattice.c, self.fields.f_new)
 
         initializePopulations(
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq, self.fields.f,
@@ -189,10 +192,12 @@ class simulation:
         meshFile.write('Domain Information...\n')
         meshFile.write('\tBounding box : ' + str(meshDict['boundingBox'])
                        + '\n')
-        meshFile.write('\tGrid points in x-direction ' + str(self.mesh.Nx)
-                       + '\n')
-        meshFile.write('\tGrid points in y-direction ' + str(self.mesh.Ny)
-                       + '\n')
+        meshFile.write('\tGrid points in x-direction : ' +
+                       str(self.mesh.Nx_global) + '\n')
+        meshFile.write('\tGrid points in y-direction : ' +
+                       str(self.mesh.Ny_global) + '\n')
+        meshFile.write('\tdelX : ' +
+                       str(self.mesh.delX) + '\n')
         meshFile.write('\nBoundary information...\n')
         for itr, name in enumerate(self.boundary.nameList):
             meshFile.write('\n\tboundary name : ' + str(name) + '\n')

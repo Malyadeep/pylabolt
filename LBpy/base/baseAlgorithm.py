@@ -7,7 +7,7 @@ from LBpy.utils.inputOutput import (writeFields, saveState, copyFields_cuda,
 from LBpy.base.cuda.kernels import (equilibriumRelaxation_cuda,
                                     computeFields_cuda, stream_cuda,
                                     computeResiduals_cuda)
-from LBpy.parallel.MPI_comm import computeResiduals, gather, proc_boundary
+from LBpy.parallel.MPI_comm import computeResiduals, proc_boundary
 
 
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
@@ -64,7 +64,7 @@ def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid, size):
             j_old = j - int(c[k, 1])
             if size == 1:
                 i_old = (i_old + Nx) % Nx
-                j_old = (j_old + Ny) % Ny
+                j_old = (i_old + Ny) % Ny
             if solid[i_old * Ny + j_old] != 1:
                 f_new[ind, k] = f[i_old * Ny + j_old, k]
             elif solid[i_old * Ny + j_old] == 1:
@@ -118,10 +118,8 @@ class baseAlgorithm:
                 if size == 1:
                     writeFields(timeStep, simulation.fields, simulation.mesh)
                 else:
-                    u, rho, solid = gather(*simulation.gatherArgs, comm)
-                    if rank == 0:
-                        writeFields_mpi(timeStep, u, rho, solid,
-                                        simulation.mesh)
+                    writeFields_mpi(timeStep, simulation.fields,
+                                    simulation.mesh, rank, comm)
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     saveState(timeStep, simulation)
@@ -138,9 +136,8 @@ class baseAlgorithm:
                     writeFields(timeStep, simulation.fields)
                     break
                 else:
-                    u, rho, solid = gather(*simulation.gatherArgs, comm)
-                    writeFields_mpi(timeStep, u, rho, solid,
-                                    simulation.mesh)
+                    writeFields_mpi(timeStep, simulation.fields,
+                                    simulation.mesh, rank, comm)
                     break
             self.equilibriumRelaxation(*simulation.collisionArgs)
 

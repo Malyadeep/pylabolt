@@ -14,7 +14,10 @@ def toVTK(options):
     if options == 'last':
         try:
             from simulation import controlDict
-            time = int(controlDict['endTime']/controlDict['endTime']) * \
+            if int(controlDict['endTime']) < int(controlDict['saveInterval']):
+                raise Warning("'endTime' in controlDict is greater than" +
+                              " 'saveInterval'! Execution may fail!")
+            time = int(controlDict['endTime']/controlDict['saveInterval']) * \
                 controlDict['saveInterval']
             inputPath = "output/" + str(time) + "/"
             if not os.path.isdir('output/VTK'):
