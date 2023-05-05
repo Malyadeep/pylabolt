@@ -73,19 +73,19 @@ def writeData(time, x, y, u, rho, solid):
 @numba.njit
 def gather_copy(u_all, rho_all, solid_all, u_temp, rho_temp,
                 solid_temp, N_sub, nx, ny, Ny_global):
-    i_write, j_write = 0, 0
+    i_read, j_read = 0, 0
     for i in range(int(nx * (N_sub[0] - 2)), int((nx + 1) * (N_sub[0] - 2))):
         for j in range(int(ny * (N_sub[1] - 2)),
                        int((ny + 1) * (N_sub[1] - 2))):
             ind = int(i * Ny_global + j)
-            ind_write = int((i_write + 1) * N_sub[1] + (j_write + 1))
-            u_all[ind, 0] = u_temp[ind_write, 0]
-            u_all[ind, 1] = u_temp[ind_write, 1]
-            rho_all[ind] = rho_temp[ind_write]
-            solid_all[ind] = solid_temp[ind_write]
-            j_write += 1
-        j_write = 0
-        i_write += 1
+            ind_read = int((i_read + 1) * N_sub[1] + (j_read + 1))
+            u_all[ind, 0] = u_temp[ind_read, 0]
+            u_all[ind, 1] = u_temp[ind_read, 1]
+            rho_all[ind] = rho_temp[ind_read]
+            solid_all[ind] = solid_temp[ind_read]
+            j_read += 1
+        j_read = 0
+        i_read += 1
 
 
 def gather(rank, timeStep, comm):

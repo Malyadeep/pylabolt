@@ -5,7 +5,7 @@ import numba
 
 
 from LBpy.base import mesh, lattice, boundary, schemeLB, fields
-from LBpy.parallel.MPI_decompose import decompose
+from LBpy.parallel.MPI_decompose import decompose, distributeSolid_mpi
 
 
 @numba.njit
@@ -100,7 +100,12 @@ class simulation:
         self.fields = fields.fields(self.mesh, self.lattice,
                                     self.U_initial, self.rho_initial,
                                     self.precision, size)
-        fields.setObstacle(obstacle, self.fields, self.mesh)
+        solid = fields.setObstacle(obstacle, self.mesh)
+        if size == 1:
+            fields.solid = solid
+        else:
+            distributeSolid_mpi(solid, self.fields, self.mpiParams, self.mesh,
+                                self.rank, self.size, comm)
         if rank == 0:
             print('Initializing fields done!\n')
             print('Reading boundary conditions...')

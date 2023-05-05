@@ -66,7 +66,46 @@ class decomposeParams:
         self.ny = 0
 
 
+def solidCopy(solid, fields, mpiParams, mesh):
+    i_write, j_write = 0, 0
+    for i in range(int(mpiParams.nx * (mesh.Nx - 2)),
+                   int((mpiParams.nx + 1) * (mesh.Nx - 2))):
+        for j in range(int(mpiParams.ny * (mesh.Ny - 2)),
+                       int((mpiParams.ny + 1) * (mesh.Ny - 2))):
+            ind = int(i * mesh.Ny_global + j)
+            ind_write = int((i_write + 1) * mesh.Ny + (j_write + 1))
+            fields.solid[ind_write] = solid[ind]
+            j_write += 1
+        j_write = 0
+        i_write += 1
+
+
+def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
+    if rank == 0:
+        print('MPI option selected')
+        print('Distributing obstacle to sub-domains...')
+    if rank == 0:
+        for nx in range(mpiParams.nProc_x):
+            for ny in range(mpiParams.nProc_y):
+                rank_send = int(nx * mpiParams.nProc_y + ny)
+                if rank_send == 0:
+                    solidCopy(solid, fields, mpiParams, mesh)
+                else:
+                    comm.Send(solid, dest=rank_send, tag=rank_send)
+    else:
+        solid_temp = np.zeros((mesh.Nx_global * mesh.Ny_global),
+                              dtype=np.int32)
+        comm.Recv(solid_temp, source=0, tag=rank)
+        solidCopy(solid, fields, mpiParams, mesh)
+    comm.Barrier()
+    if rank == 0:
+        print('done distributing obstacle')
+
+
 def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
+    if rank == 0:
+        print('MPI option selected')
+        print('Distributing boundaries to sub-domains...')
     if rank == 0:
         for nx in range(mpiParams.nProc_x - 1, -1, -1):
             for ny in range(mpiParams.nProc_y - 1, -1, -1):

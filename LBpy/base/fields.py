@@ -38,30 +38,30 @@ def setProcBoundary(Nx, Ny):
     return procBoundary
 
 
-def circle(center, radius, fields, mesh):
+def circle(center, radius, solid, mesh):
     center_idx = np.int32(np.divide(center, mesh.delX))
     radius_idx = int(radius/mesh.delX)
-    for i in range(mesh.Nx):
-        for j in range(mesh.Ny):
+    for i in range(mesh.Nx_global):
+        for j in range(mesh.Ny_global):
             if ((i - center_idx[0])*(i - center_idx[0]) +
                     (j - center_idx[1])*(j - center_idx[1]) <=
                     radius_idx*radius_idx):
-                ind = i * mesh.Ny + j
-                fields.solid[ind] = 1
+                ind = i * mesh.Ny_global + j
+                solid[ind] = 1
 
 
-def rectangle(boundingBox, fields, mesh):
+def rectangle(boundingBox, solid, mesh):
     boundingBox_idx = np.int32(np.divide(boundingBox, mesh.delX))
-    for i in range(mesh.Nx):
-        for j in range(mesh.Ny):
+    for i in range(mesh.Nx_global):
+        for j in range(mesh.Ny_global):
             if (i >= boundingBox_idx[0, 0] and i <= boundingBox_idx[1, 0]
                     and j >= boundingBox_idx[0, 1] and
                     j <= boundingBox_idx[1, 1]):
-                ind = i * mesh.Ny + j
-                fields.solid[ind] = 1
+                ind = i * mesh.Ny_global + j
+                solid[ind] = 1
 
 
-def setObstacle(obstacle, fields, mesh):
+def setObstacle(obstacle, mesh):
     try:
         if len(obstacle.keys()) == 0:
             return
@@ -77,7 +77,9 @@ def setObstacle(obstacle, fields, mesh):
                 print("For 'circle' type obstacle center must be a list and"
                       + " radius must be a float")
                 os._exit(1)
-            circle(center, radius, fields, mesh)
+            solid = np.full((mesh.Nx_global * mesh.Ny_global), fill_value=0,
+                            dtype=np.int32)
+            circle(center, radius, solid, mesh)
         elif obstacleType == 'rectangle':
             boundingBox = obstacle['boundingBox']
             if isinstance(boundingBox, list):
@@ -87,10 +89,13 @@ def setObstacle(obstacle, fields, mesh):
                 print("For 'rectangle' type obstacle bounding box must be"
                       + " a list")
                 os._exit(1)
-            rectangle(boundingBox, fields, mesh)
+            solid = np.full((mesh.Nx_global * mesh.Ny_global), fill_value=0,
+                            dtype=np.int32)
+            rectangle(boundingBox, solid, mesh)
         else:
             print("ERROR!")
             print("Unsupported obstacle type!")
+        return solid
     except KeyError as e:
         print("ERROR!")
         print(str(e) + " keyword missing in 'obstacle' dictionary")
