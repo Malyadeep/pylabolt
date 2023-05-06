@@ -7,90 +7,106 @@ def proc_boundary(Nx, Ny, f, f_send_topBottom,
                   nx, ny, nProc_x, nProc_y, comm):
     current_rank = nx * nProc_y + ny
     if ny % 2 == 0:
-        if ny < nProc_y - 1:
-            rank_send = nx * nProc_y + ny + 1
-            sendLims = (0, Nx, Ny - 2, Ny - 1, Nx, Ny)
-            sendCopy(f, f_send_topBottom, *sendLims)
-            comm.Send(f_send_topBottom, dest=rank_send,
-                      tag=1*rank_send)
-            comm.Recv(f_recv_topBottom, source=rank_send,
-                      tag=3*current_rank)
-            recvLims = (0, Nx, Ny - 1, Ny, Nx, Ny)
-            recvCopy(f, f_recv_topBottom, *recvLims)
-        if ny > 0:
-            rank_send = nx * nProc_y + ny - 1
-            comm.Recv(f_recv_topBottom, source=rank_send,
-                      tag=4*current_rank)
-            recvLims = (0, Nx, 0, 1, Nx, Ny)
-            recvCopy(f, f_recv_topBottom, *recvLims)
-            sendLims = (0, Nx, 1, 2, Nx, Ny)
-            sendCopy(f, f_send_topBottom, *sendLims)
-            comm.Send(f_send_topBottom, dest=rank_send,
-                      tag=2*rank_send)
+        # Even top
+        nx_send = (nx + nProc_x) % nProc_x
+        ny_send = (ny + 1 + nProc_y) % nProc_y
+        rank_send = nx_send * nProc_y + ny_send
+        sendLims = (0, Nx, Ny - 2, Ny - 1, Nx, Ny)
+        sendCopy(f, f_send_topBottom, *sendLims)
+        comm.Send(f_send_topBottom, dest=rank_send,
+                  tag=1*rank_send)
+        comm.Recv(f_recv_topBottom, source=rank_send,
+                  tag=3*current_rank)
+        recvLims = (0, Nx, Ny - 1, Ny, Nx, Ny)
+        recvCopy(f, f_recv_topBottom, *recvLims)
+        # Even bottom
+        nx_send = (nx + nProc_x) % nProc_x
+        ny_send = (ny - 1 + nProc_y) % nProc_y
+        rank_send = nx_send * nProc_y + ny_send
+        comm.Recv(f_recv_topBottom, source=rank_send,
+                  tag=4*current_rank)
+        recvLims = (0, Nx, 0, 1, Nx, Ny)
+        recvCopy(f, f_recv_topBottom, *recvLims)
+        sendLims = (0, Nx, 1, 2, Nx, Ny)
+        sendCopy(f, f_send_topBottom, *sendLims)
+        comm.Send(f_send_topBottom, dest=rank_send,
+                  tag=2*rank_send)
     elif ny % 2 != 0:
-        if ny > 0:
-            rank_send = nx * nProc_y + ny - 1
-            comm.Recv(f_recv_topBottom, source=rank_send,
-                      tag=1*current_rank)
-            recvLims = (0, Nx, 0, 1, Nx, Ny)
-            recvCopy(f, f_recv_topBottom, *recvLims)
-            sendLims = (0, Nx, 1, 2, Nx, Ny)
-            sendCopy(f, f_send_topBottom, *sendLims)
-            comm.Send(f_send_topBottom, dest=rank_send,
-                      tag=3*rank_send)
-        if ny < nProc_y - 1:
-            rank_send = nx * nProc_y + ny + 1
-            sendLims = (0, Nx, Ny - 2, Ny - 1, Nx, Ny)
-            sendCopy(f, f_send_topBottom, *sendLims)
-            comm.Send(f_send_topBottom, dest=rank_send,
-                      tag=4*rank_send)
-            comm.Recv(f_recv_topBottom, source=rank_send,
-                      tag=2*current_rank)
-            recvLims = (0, Nx, Ny - 1, Ny, Nx, Ny)
-            recvCopy(f, f_recv_topBottom, *recvLims)
+        # Odd bottom
+        nx_send = (nx + nProc_x) % nProc_x
+        ny_send = (ny - 1 + nProc_y) % nProc_y
+        rank_send = nx_send * nProc_y + ny_send
+        comm.Recv(f_recv_topBottom, source=rank_send,
+                  tag=1*current_rank)
+        recvLims = (0, Nx, 0, 1, Nx, Ny)
+        recvCopy(f, f_recv_topBottom, *recvLims)
+        sendLims = (0, Nx, 1, 2, Nx, Ny)
+        sendCopy(f, f_send_topBottom, *sendLims)
+        comm.Send(f_send_topBottom, dest=rank_send,
+                  tag=3*rank_send)
+        # Odd top
+        nx_send = (nx + nProc_x) % nProc_x
+        ny_send = (ny + 1 + nProc_y) % nProc_y
+        rank_send = nx_send * nProc_y + ny_send
+        sendLims = (0, Nx, Ny - 2, Ny - 1, Nx, Ny)
+        sendCopy(f, f_send_topBottom, *sendLims)
+        comm.Send(f_send_topBottom, dest=rank_send,
+                  tag=4*rank_send)
+        comm.Recv(f_recv_topBottom, source=rank_send,
+                  tag=2*current_rank)
+        recvLims = (0, Nx, Ny - 1, Ny, Nx, Ny)
+        recvCopy(f, f_recv_topBottom, *recvLims)
     comm.Barrier()
     if nx % 2 == 0:
-        if nx < nProc_x - 1:
-            rank_send = (nx + 1) * nProc_y + ny
-            sendLims = (Nx - 2, Nx - 1, 0, Ny, Nx, Ny)
-            sendCopy(f, f_send_leftRight, *sendLims)
-            comm.Send(f_send_leftRight, dest=rank_send,
-                      tag=1*rank_send)
-            comm.Recv(f_recv_leftRight, source=rank_send,
-                      tag=3*current_rank)
-            recvLims = (Nx - 1, Nx, 0, Ny, Nx, Ny)
-            recvCopy(f, f_recv_leftRight, *recvLims)
-        if nx > 0:
-            rank_send = (nx - 1) * nProc_y + ny
-            comm.Recv(f_recv_leftRight, source=rank_send,
-                      tag=4*current_rank)
-            recvLims = (0, 1, 0, Ny, Nx, Ny)
-            recvCopy(f, f_recv_leftRight, *recvLims)
-            sendLims = (1, 2, 0, Ny, Nx, Ny)
-            sendCopy(f, f_send_leftRight, *sendLims)
-            comm.Send(f_send_leftRight, dest=rank_send,
-                      tag=2*rank_send)
+        # Even right
+        nx_send = (nx + 1 + nProc_x) % nProc_x
+        ny_send = (ny + nProc_y) % nProc_y
+        rank_send = nx_send * nProc_y + ny_send
+        sendLims = (Nx - 2, Nx - 1, 0, Ny, Nx, Ny)
+        sendCopy(f, f_send_leftRight, *sendLims)
+        comm.Send(f_send_leftRight, dest=rank_send,
+                  tag=1*rank_send)
+        comm.Recv(f_recv_leftRight, source=rank_send,
+                  tag=3*current_rank)
+        recvLims = (Nx - 1, Nx, 0, Ny, Nx, Ny)
+        recvCopy(f, f_recv_leftRight, *recvLims)
+        # Even left
+        nx_send = (nx - 1 + nProc_x) % nProc_x
+        ny_send = (ny + nProc_y) % nProc_y
+        rank_send = nx_send * nProc_y + ny_send
+        comm.Recv(f_recv_leftRight, source=rank_send,
+                  tag=4*current_rank)
+        recvLims = (0, 1, 0, Ny, Nx, Ny)
+        recvCopy(f, f_recv_leftRight, *recvLims)
+        sendLims = (1, 2, 0, Ny, Nx, Ny)
+        sendCopy(f, f_send_leftRight, *sendLims)
+        comm.Send(f_send_leftRight, dest=rank_send,
+                  tag=2*rank_send)
     elif nx % 2 != 0:
-        if nx > 0:
-            rank_send = (nx - 1) * nProc_y + ny
-            comm.Recv(f_recv_leftRight, source=rank_send,
-                      tag=1*current_rank)
-            recvLims = (0, 1, 0, Ny, Nx, Ny)
-            recvCopy(f, f_recv_leftRight, *recvLims)
-            sendLims = (1, 2, 0, Ny, Nx, Ny)
-            sendCopy(f, f_send_leftRight, *sendLims)
-            comm.Send(f_send_leftRight, dest=rank_send,
-                      tag=3*rank_send)
-        if nx < nProc_x - 1:
-            rank_send = (nx + 1) * nProc_y + ny
-            sendLims = (Nx - 2, Nx - 1, 0, Ny, Nx, Ny)
-            sendCopy(f, f_send_leftRight, *sendLims)
-            comm.Send(f_send_leftRight, dest=rank_send,
-                      tag=4*rank_send)
-            comm.Recv(f_recv_leftRight, source=rank_send,
-                      tag=2*current_rank)
-            recvLims = (Nx - 1, Nx, 0, Ny, Nx, Ny)
-            recvCopy(f, f_recv_leftRight, *recvLims)
+        # Odd left
+        nx_send = (nx - 1 + nProc_x) % nProc_x
+        ny_send = (ny + nProc_y) % nProc_y
+        rank_send = nx_send * nProc_y + ny_send
+        comm.Recv(f_recv_leftRight, source=rank_send,
+                  tag=1*current_rank)
+        recvLims = (0, 1, 0, Ny, Nx, Ny)
+        recvCopy(f, f_recv_leftRight, *recvLims)
+        sendLims = (1, 2, 0, Ny, Nx, Ny)
+        sendCopy(f, f_send_leftRight, *sendLims)
+        comm.Send(f_send_leftRight, dest=rank_send,
+                  tag=3*rank_send)
+        # Odd right
+        nx_send = (nx + 1 + nProc_x) % nProc_x
+        ny_send = (ny + nProc_y) % nProc_y
+        rank_send = nx_send * nProc_y + ny_send
+        sendLims = (Nx - 2, Nx - 1, 0, Ny, Nx, Ny)
+        sendCopy(f, f_send_leftRight, *sendLims)
+        comm.Send(f_send_leftRight, dest=rank_send,
+                  tag=4*rank_send)
+        comm.Recv(f_recv_leftRight, source=rank_send,
+                  tag=2*current_rank)
+        recvLims = (Nx - 1, Nx, 0, Ny, Nx, Ny)
+        recvCopy(f, f_recv_leftRight, *recvLims)
     comm.Barrier()
 
 

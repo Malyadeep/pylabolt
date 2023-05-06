@@ -14,11 +14,13 @@ def main():
                         help='set to run simulation in parallel using CUDA')
     parser.add_argument('-nt', '--n_threads', type=int, default=None,
                         help='Number of threads for OpenMP/CUDA')
-    parser.add_argument('--reconstruct', choices=['last', 'all', None],
-                        default=None, help='Convert output data to VTK format'
+    parser.add_argument('--reconstruct', choices=['last', 'all', 'time', None],
+                        default=None, help='Domain reconstruction'
                         )
-    parser.add_argument('--toVTK', choices=['last', 'all', None], default=None,
-                        help='Convert output data to VTK format')
+    parser.add_argument('-t', '--time', type=int, default=0,
+                        help='Specify time which is to be reconstructed')
+    parser.add_argument('--toVTK', choices=['last', 'all', 'time', None],
+                        default=None, help='Convert output data to VTK format')
     args = parser.parse_args()
 
     if args.parallel is True:
@@ -43,8 +45,8 @@ def main():
 
     if args.reconstruct is not None:
         from LBpy.parallel.MPI_reconstruct import reconstruct
-        reconstruct(args.reconstruct)
+        reconstruct(args.reconstruct, args.time)
 
     if args.toVTK is not None:
         from LBpy.utils.vtkconvert import toVTK
-        toVTK(args.toVTK)
+        toVTK(args.toVTK, args.time)

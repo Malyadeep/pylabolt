@@ -1,9 +1,0 @@
-Control parameters...
-	startTime = 0
-	endTime = 50000
-	stdOutputInterval = 100
-saveInterval = 100
-	saveStateInterval = None
-	relTolU = 1e-09
-	relTolV = 1e-09
-	relTolRho = 1e-07

@@ -8,7 +8,7 @@ from vtkmodules.vtkCommonCore import vtkDoubleArray, vtkIntArray
 from vtkmodules.vtkCommonDataModel import vtkRectilinearGrid
 
 
-def toVTK(options):
+def toVTK(options, time):
     currentDir = os.getcwd()
     sys.path.append(currentDir)
     if options == 'last':
@@ -63,6 +63,18 @@ def toVTK(options):
             print(str(e))
             print('Aborting....')
             os._exit(1)
+        except FileNotFoundError as e:
+            print('FATAL ERROR!')
+            print(str(e))
+            print('Aborting....')
+            os._exit(1)
+    elif options == 'time':
+        try:
+            inputPath = "output/" + str(time) + "/"
+            if not os.path.isdir('output/VTK'):
+                os.makedirs('output/VTK')
+            outputPath = "output/VTK/"
+            vtkConverter(inputPath, outputPath, time)
         except FileNotFoundError as e:
             print('FATAL ERROR!')
             print(str(e))

@@ -64,7 +64,7 @@ def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid, size):
             j_old = j - int(c[k, 1])
             if size == 1:
                 i_old = (i_old + Nx) % Nx
-                j_old = (i_old + Ny) % Ny
+                j_old = (j_old + Ny) % Ny
             if solid[i_old * Ny + j_old] != 1:
                 f_new[ind, k] = f[i_old * Ny + j_old, k]
             elif solid[i_old * Ny + j_old] == 1:
@@ -109,10 +109,10 @@ class baseAlgorithm:
                                                   v_sq, rho_err_sq, rho_sq,
                                                   comm, rank, size)
             if timeStep % simulation.stdOutputInterval == 0 and rank == 0:
-                print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
-                      ' | resU = ' + str(round(resU, 10)).ljust(12) +
-                      ' | resV = ' + str(round(resV, 10)).ljust(12) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(12),
+                print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
+                      ' | resU = ' + str(round(resU, 10)).ljust(16) +
+                      ' | resV = ' + str(round(resV, 10)).ljust(16) +
+                      ' | resRho = ' + str(round(resRho, 10)).ljust(16),
                       flush=True)
             if timeStep % simulation.saveInterval == 0:
                 if size == 1:
@@ -123,22 +123,37 @@ class baseAlgorithm:
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     saveState(timeStep, simulation)
-            if rank == 0 and (resU < simulation.relTolU and
-                              resV < simulation.relTolV and
-                              resRho < simulation.relTolRho):
-                print('Convergence Criteria matched!!', flush=True)
-                print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
-                      ' | resU = ' + str(round(resU, 10)).ljust(12) +
-                      ' | resV = ' + str(round(resV, 10)).ljust(12) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(12),
-                      flush=True)
-                if size == 1:
-                    writeFields(timeStep, simulation.fields)
-                    break
+            if rank == 0:
+                if (resU < simulation.relTolU and
+                        resV < simulation.relTolV and
+                        resRho < simulation.relTolRho):
+                    print('Convergence Criteria matched!!', flush=True)
+                    print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
+                          ' | resU = ' + str(round(resU, 10)).ljust(16) +
+                          ' | resV = ' + str(round(resV, 10)).ljust(16) +
+                          ' | resRho = ' + str(round(resRho, 10)).ljust(16),
+                          flush=True)
+                    if size == 1:
+                        writeFields(timeStep, simulation.fields,
+                                    simulation.mesh)
+                        break
+                    else:
+                        for proc in range(size):
+                            comm.send(1, dest=proc, tag=1*proc)
+                        writeFields_mpi(timeStep, simulation.fields,
+                                        simulation.mesh, rank, comm)
+                        break
                 else:
+                    if size > 1:
+                        for proc in range(size):
+                            comm.send(0, dest=proc, tag=1*proc)
+            elif size > 1 and rank != 0:
+                flag = comm.recv(source=0, tag=1*rank)
+                if flag == 1:
                     writeFields_mpi(timeStep, simulation.fields,
                                     simulation.mesh, rank, comm)
                     break
+
             self.equilibriumRelaxation(*simulation.collisionArgs)
 
             if size > 1:
@@ -183,10 +198,10 @@ class baseAlgorithm:
                                                    *residueArgs)
             resU, resV, resRho = computeResiduals_cuda(*residueArgs)
             if timeStep % simulation.stdOutputInterval == 0:
-                print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
-                      ' | resU = ' + str(round(resU, 10)).ljust(12) +
-                      ' | resV = ' + str(round(resV, 10)).ljust(12) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(12),
+                print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
+                      ' | resU = ' + str(round(resU, 10)).ljust(16) +
+                      ' | resV = ' + str(round(resV, 10)).ljust(16) +
+                      ' | resRho = ' + str(round(resRho, 10)).ljust(16),
                       flush=True)
             if timeStep % simulation.saveInterval == 0:
                 copyFields_cuda(parallel.device, simulation.fields,
@@ -200,10 +215,10 @@ class baseAlgorithm:
             if (resU < simulation.relTolU and resV < simulation.relTolV and
                     resRho < simulation.relTolRho):
                 print('Convergence Criteria matched!!', flush=True)
-                print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
-                      ' | resU = ' + str(round(resU, 10)).ljust(12) +
-                      ' | resV = ' + str(round(resV, 10)).ljust(12) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(12),
+                print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
+                      ' | resU = ' + str(round(resU, 10)).ljust(16) +
+                      ' | resV = ' + str(round(resV, 10)).ljust(16) +
+                      ' | resRho = ' + str(round(resRho, 10)).ljust(16),
                       flush=True)
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')

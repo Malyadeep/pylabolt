@@ -72,11 +72,19 @@ def writeData(time, x, y, u, rho, solid):
 
 @numba.njit
 def gather_copy(u_all, rho_all, solid_all, u_temp, rho_temp,
-                solid_temp, N_sub, nx, ny, Ny_global):
+                solid_temp, N_sub, nx, ny, Nx_global, Ny_global,
+                nProc_x, nProc_y):
     i_read, j_read = 0, 0
-    for i in range(int(nx * (N_sub[0] - 2)), int((nx + 1) * (N_sub[0] - 2))):
-        for j in range(int(ny * (N_sub[1] - 2)),
-                       int((ny + 1) * (N_sub[1] - 2))):
+    Nx_i, Nx_f = int(nx * (N_sub[0] - 2)), int((nx + 1) * (N_sub[0] - 2))
+    Ny_i, Ny_f = int(ny * (N_sub[1] - 2)), int((ny + 1) * (N_sub[1] - 2))
+    if nx == nProc_x - 1:
+        Nx_i = nx * int(np.ceil(Nx_global/nProc_x))
+        Nx_f = int(Nx_i + N_sub[0] - 2)
+    if ny == nProc_y - 1:
+        Ny_i = ny * int(np.ceil(Ny_global/nProc_y))
+        Ny_f = int(Ny_i + N_sub[1] - 2)
+    for i in range(Nx_i, Nx_f):
+        for j in range(Ny_i, Ny_f):
             ind = int(i * Ny_global + j)
             ind_read = int((i_read + 1) * N_sub[1] + (j_read + 1))
             u_all[ind, 0] = u_temp[ind_read, 0]
@@ -129,7 +137,7 @@ def gather(rank, timeStep, comm):
                 if current_rank == 0:
                     N_sub = np.array([Nx, Ny], dtype=np.int32)
                     gather_copy(*fieldsToGather, u, rho, solid, N_sub, nx,
-                                ny, Ny_global)
+                                ny, Nx_global, Ny_global, nProc_x, nProc_y)
                 else:
                     N_sub = np.zeros(2, dtype=np.int32)
                     comm.Recv(N_sub, source=current_rank,
@@ -147,7 +155,8 @@ def gather(rank, timeStep, comm):
                     comm.Recv(solid_temp, source=current_rank,
                               tag=4*current_rank)
                     gather_copy(*fieldsToGather, u_temp, rho_temp, solid_temp,
-                                N_sub, nx, ny, Ny_global)
+                                N_sub, nx, ny, Nx_global, Ny_global, nProc_x,
+                                nProc_y)
         return x, y, u_all, rho_all, solid_all
     else:
         comm.Send(np.array([Nx, Ny], dtype=np.int32),
@@ -158,7 +167,7 @@ def gather(rank, timeStep, comm):
         return 0, 0, 0, 0, 0
 
 
-def reconstruct(options):
+def reconstruct(options, time):
     MPI.Init()
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -200,7 +209,7 @@ def reconstruct(options):
             print('Aborting....')
             comm.Abort(1)
         if rank == 0:
-            print('reconstructing fields --> time = ' + str(time))
+            print('Reconstructing fields --> time = ' + str(time))
         x, y, u, rho, solid = gather(rank, time, comm)
         if rank == 0:
             writeData(time, x, y, u, rho, solid)
@@ -231,10 +240,16 @@ def reconstruct(options):
             comm.Abort(1)
         for time in range(startTime, endTime + 1, interval):
             if rank == 0:
-                print('reconstructing fields --> time = ' + str(time))
+                print('Reconstructing fields --> time = ' + str(time))
             x, y, u, rho, solid = gather(rank, time, comm)
             if rank == 0:
                 writeData(time, x, y, u, rho, solid)
+    elif options == 'time':
+        if rank == 0:
+            print('Reconstructing fields --> time = ' + str(time))
+        x, y, u, rho, solid = gather(rank, time, comm)
+        if rank == 0:
+            writeData(time, x, y, u, rho, solid)
     if rank == 0:
         print('\nReconstruction of Fields done!\n')
     MPI.Finalize()

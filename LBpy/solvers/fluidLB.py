@@ -31,6 +31,8 @@ def main(parallelization, n_threads):
         if size > 1:
             distributeBoundaries_mpi(simulation.boundary, simulation.mpiParams,
                                      simulation.mesh, rank, size, comm)
+            # if rank == 1:
+            #     simulation.boundary.details()
         base.jitWarmUp(simulation, size, rank, comm)
     if parallel.mode == 'cuda':
         start = time.perf_counter()

@@ -1,12 +1,13 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 100000,
+    'endTime': 50000,
     'stdOutputInterval': 100,
-    'saveInterval': 100,
+    'saveInterval': 10000,
     'saveStateInterval': None,
     'relTolU': 1e-9,
     'relTolV': 1e-9,
     'relTolRho': 1e-7,
+    'precision': 'double'
 }
 
 internalFields = {
@@ -17,15 +18,13 @@ internalFields = {
 
 boundaryDict = {
     'walls': {
-        'type': 'bounceBack', 
-        'points_1': [[0, 0], [10, 0]]
+        'type': 'bounceBack',
+        'points_1': [[0, 0], [1, 0]]
     },
-   
     'movingWall': {
         'type': 'fixedU',
         'value': [0.1, 0],
         'points_0': [[0, 1], [1, 1]]
-
     },
     'Periodic': {
         'type': 'periodic',
@@ -51,4 +50,12 @@ meshDict = {
 }
 
 obstacle = {
+    # 'type': 'circle',
+    # 'center': [2, 0.5],
+    # 'radius': 0.25
+}
+
+decomposeDict = {
+    'nx': 2,
+    'ny': 2
 }

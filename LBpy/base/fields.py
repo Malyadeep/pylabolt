@@ -63,8 +63,10 @@ def rectangle(boundingBox, solid, mesh):
 
 def setObstacle(obstacle, mesh):
     try:
+        solid = np.full((mesh.Nx_global * mesh.Ny_global), fill_value=0,
+                        dtype=np.int32)
         if len(obstacle.keys()) == 0:
-            return
+            return solid
         obstacleType = obstacle['type']
         if obstacleType == 'circle':
             center = obstacle['center']
@@ -77,8 +79,6 @@ def setObstacle(obstacle, mesh):
                 print("For 'circle' type obstacle center must be a list and"
                       + " radius must be a float")
                 os._exit(1)
-            solid = np.full((mesh.Nx_global * mesh.Ny_global), fill_value=0,
-                            dtype=np.int32)
             circle(center, radius, solid, mesh)
         elif obstacleType == 'rectangle':
             boundingBox = obstacle['boundingBox']
@@ -89,12 +89,11 @@ def setObstacle(obstacle, mesh):
                 print("For 'rectangle' type obstacle bounding box must be"
                       + " a list")
                 os._exit(1)
-            solid = np.full((mesh.Nx_global * mesh.Ny_global), fill_value=0,
-                            dtype=np.int32)
             rectangle(boundingBox, solid, mesh)
         else:
             print("ERROR!")
             print("Unsupported obstacle type!")
+            os._exit(1)
         return solid
     except KeyError as e:
         print("ERROR!")
