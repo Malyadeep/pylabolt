@@ -2,4 +2,4 @@
 pylabolt
 ------
 
-A single phase 2D lattice Boltzmann solver for fluid flow.
+A single phase, 2D, parallel lattice Boltzmann solver for fluid flow.
