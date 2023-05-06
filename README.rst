@@ -22,5 +22,23 @@ pylabolt can be installed via ``pip`` via the command::
     $ pip install pylabolt
 
 More details on the dependencies required to be installed and their configuration can be found
-in the pylabolt documentation `here <https://pylabolt.readthedocs.io/en/latest/>`.
- 
+in the pylabolt documentation `here <https://pylabolt.readthedocs.io/en/latest/>`_.
+Tutorial cases are provided in the ``tutorials`` folder. For example, consider the lid driven cavity
+problem in ``tutorials/cavity/Re_100/``. The configuration file that defines the simulations is 
+named as ``simulation.py``. After installation just run the following command from the ``tutorials/cavity/Re_100/``
+folder to run the simulation::
+
+    $ pylabolt --solver fluidLB
+
+The output data is written in the ``output`` folder. By default the data is written into binary files with 
+``.dat`` extension. To visualize the data in `Paraview <https://www.paraview.org/>`_ / 
+`Mayavi <https://docs.enthought.com/mayavi/mayavi/>`_, the `VTK <https://vtk.org/>`_ library is used.
+For example, to convert the last time-step data to a ``.vtk`` file, the following command should be run from
+the working directory::
+
+    $ pylabolt --toVTK last
+
+The ``output_<time-step>.vtk`` files are stored in ``output/VTK`` directory which can be opened in
+Paraview/Mayavi.
+
+More details on setting up and running simulations can be found in the `documentation <https://pylabolt.readthedocs.io/en/latest/>`_.
