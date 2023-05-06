@@ -2,7 +2,7 @@
 Overview
 ==========
 
-A single phase 2D lattice Boltzmann solver
+A single phase, 2D, parallel lattice Boltzmann solver
 
 ==============
 Installation

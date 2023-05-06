@@ -6,10 +6,10 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'LBpy'
+project = 'pylabolt'
 copyright = '2023, Malyadeep Bhattacharya, Mithun M Nair'
 author = 'Malyadeep Bhattacharya, Mithun M Nair'
-release = '0.0.2'
+release = '0.1.1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
