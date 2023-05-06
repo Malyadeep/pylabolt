@@ -2,12 +2,12 @@ import numpy as np
 from numba import prange, cuda
 import copy
 
-from LBpy.utils.inputOutput import (writeFields, saveState, copyFields_cuda,
-                                    writeFields_mpi)
-from LBpy.base.cuda.kernels import (equilibriumRelaxation_cuda,
-                                    computeFields_cuda, stream_cuda,
-                                    computeResiduals_cuda)
-from LBpy.parallel.MPI_comm import computeResiduals, proc_boundary
+from pylabolt.utils.inputOutput import (writeFields, saveState,
+                                        copyFields_cuda, writeFields_mpi)
+from pylabolt.base.cuda.kernels import (equilibriumRelaxation_cuda,
+                                        computeFields_cuda, stream_cuda,
+                                        computeResiduals_cuda)
+from pylabolt.parallel.MPI_comm import computeResiduals, proc_boundary
 
 
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,

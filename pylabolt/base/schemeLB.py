@@ -1,5 +1,5 @@
 import os
-from LBpy.base.models import collisionModels, equilibriumModels
+from pylabolt.base.models import collisionModels, equilibriumModels
 
 
 class collisionScheme:

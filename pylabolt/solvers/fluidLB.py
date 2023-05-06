@@ -2,11 +2,11 @@ import time
 
 from mpi4py import MPI
 
-from LBpy.utils.inputOutput import loadState, saveState
-import LBpy.base.createSim as createSim
-from LBpy.base.baseAlgorithm import baseAlgorithm
-from LBpy.parallel.parallelSetup import parallelSetup
-from LBpy.parallel.MPI_decompose import distributeBoundaries_mpi
+from pylabolt.utils.inputOutput import loadState, saveState
+import pylabolt.base.createSim as createSim
+from pylabolt.base.baseAlgorithm import baseAlgorithm
+from pylabolt.parallel.parallelSetup import parallelSetup
+from pylabolt.parallel.MPI_decompose import distributeBoundaries_mpi
 
 
 def main(parallelization, n_threads):

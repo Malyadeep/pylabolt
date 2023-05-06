@@ -1,8 +1,8 @@
 import numpy as np
 from numba import cuda
-from LBpy.base.cuda.models.equilibriumModels_cuda import (firstOrder,
-                                                          secondOrder)
-from LBpy.base.cuda.models.collisionModels_cuda import BGK
+from pylabolt.base.cuda.models.equilibriumModels_cuda import (firstOrder,
+                                                              secondOrder)
+from pylabolt.base.cuda.models.collisionModels_cuda import BGK
 
 
 @cuda.jit

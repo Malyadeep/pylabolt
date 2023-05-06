@@ -4,8 +4,8 @@ import numpy as np
 import numba
 
 
-from LBpy.base import mesh, lattice, boundary, schemeLB, fields
-from LBpy.parallel.MPI_decompose import decompose, distributeSolid_mpi
+from pylabolt.base import mesh, lattice, boundary, schemeLB, fields
+from pylabolt.parallel.MPI_decompose import decompose, distributeSolid_mpi
 
 
 @numba.njit

@@ -40,13 +40,13 @@ def main():
         parallelization = None
 
     if args.solver == 'fluidLB':
-        from LBpy.solvers import fluidLB
+        from pylabolt.solvers import fluidLB
         fluidLB.main(parallelization, n_threads=args.n_threads)
 
     if args.reconstruct is not None:
-        from LBpy.parallel.MPI_reconstruct import reconstruct
+        from pylabolt.parallel.MPI_reconstruct import reconstruct
         reconstruct(args.reconstruct, args.time)
 
     if args.toVTK is not None:
-        from LBpy.utils.vtkconvert import toVTK
+        from pylabolt.utils.vtkconvert import toVTK
         toVTK(args.toVTK, args.time)

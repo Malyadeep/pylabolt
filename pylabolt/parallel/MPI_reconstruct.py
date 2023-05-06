@@ -3,7 +3,7 @@ import os
 import sys
 import numba
 from mpi4py import MPI
-from LBpy.base.mesh import createMesh
+from pylabolt.base.mesh import createMesh
 
 
 def reconstructMesh(comm, precision):

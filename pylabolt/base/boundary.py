@@ -3,8 +3,8 @@ import os
 import numba
 from numba import cuda
 
-from LBpy.base import boundaryConditions
-from LBpy.base.cuda import boundaryConditions_cuda
+from pylabolt.base import boundaryConditions
+from pylabolt.base.cuda import boundaryConditions_cuda
 
 
 @numba.njit

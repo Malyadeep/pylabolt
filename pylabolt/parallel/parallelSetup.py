@@ -2,7 +2,7 @@ import numba
 import numpy as np
 from numba import cuda
 
-from LBpy.base.cuda.deviceFields import deviceData
+from pylabolt.base.cuda.deviceFields import deviceData
 
 
 class parallelSetup:
