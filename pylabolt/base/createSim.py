@@ -4,24 +4,29 @@ import numpy as np
 import numba
 
 
-from LBpy.base import mesh, lattice, boundary, schemeLB, fields
+from pylabolt.base import mesh, lattice, boundary, schemeLB, fields
+from pylabolt.parallel.MPI_decompose import decompose, distributeSolid_mpi
 
 
 @numba.njit
 def initializePopulations(Nx, Ny, f_eq, f, f_new, u, rho,
                           noOfDirections, equilibriumFunc,
-                          equilibriumArgs):
+                          equilibriumArgs, procBoundary):
     for ind in range(Nx * Ny):
-        equilibriumFunc(f_eq[ind, :], u[ind, :], rho[ind],
-                        *equilibriumArgs)
-        for k in range(noOfDirections):
-            f[ind, k] = f_eq[ind, k]
-            f_new[ind, k] = f_eq[ind, k]
+        if procBoundary[ind] != 1:
+            equilibriumFunc(f_eq[ind, :], u[ind, :], rho[ind],
+                            *equilibriumArgs)
+            for k in range(noOfDirections):
+                f[ind, k] = f_eq[ind, k]
+                f_new[ind, k] = f_eq[ind, k]
 
 
 class simulation:
-    def __init__(self):
-        print('Reading simulation parameters...\n', flush=True)
+    def __init__(self, parallelization, rank, size, comm):
+        self.rank = rank
+        self.size = size
+        if rank == 0:
+            print('Reading simulation parameters...\n', flush=True)
         try:
             workingDir = os.getcwd()
             sys.path.append(workingDir)
@@ -34,7 +39,8 @@ class simulation:
             print('Aborting....')
             os._exit(1)
 
-        print('Setting control parameters...', flush=True)
+        if rank == 0:
+            print('Setting control parameters...', flush=True)
         try:
             self.startTime = controlDict['startTime']
             self.endTime = controlDict['endTime']
@@ -44,44 +50,74 @@ class simulation:
             self.relTolU = controlDict['relTolU']
             self.relTolV = controlDict['relTolV']
             self.relTolRho = controlDict['relTolRho']
+            self.precisionType = controlDict['precision']
+            if self.precisionType == 'single':
+                self.precision = np.float32
+            elif self.precisionType == 'double':
+                self.precision = np.float64
+            else:
+                raise RuntimeError("Incorrect precision specified!")
         except KeyError as e:
-            print('ERROR! Keyword ' + str(e) + ' missing in controlDict')
-        self.writeControlLog()
-        print('Setting control parameters done!\n', flush=True)
+            if rank == 0:
+                print('ERROR! Keyword ' + str(e) + ' missing in controlDict')
+            os._exit(1)
+        if rank == 0:
+            self.writeControlLog()
+            print('Setting control parameters done!\n', flush=True)
         try:
             self.u_initial = internalFields['u']
             self.v_initial = internalFields['v']
             self.U_initial = np.array([self.u_initial, self.v_initial],
-                                      dtype=np.float64)
+                                      dtype=self.precision)
             self.rho_initial = np.float64(internalFields['rho'])
         except KeyError as e:
-            print('ERROR! Keyword ' + str(e) + ' missing in internalFields')
+            if rank == 0:
+                print('ERROR! Keyword ' + str(e) +
+                      ' missing in internalFields')
 
-        print('Reading mesh info and creating mesh...', flush=True)
-        self.mesh = mesh.createMesh(meshDict)
-        print('Reading mesh info and creating mesh done!\n', flush=True)
-        print('Setting lattice structure...', flush=True)
-        self.lattice = lattice.createLattice(latticeDict)
-        print('Setting lattice structure done!\n', flush=True)
-        print('Setting collision scheme and equilibrium model...',
-              flush=True)
+        if rank == 0:
+            print('Reading mesh info and creating mesh...', flush=True)
+        self.mesh = mesh.createMesh(meshDict, self.precision)
+        if rank == 0:
+            print('Reading mesh info and creating mesh done!\n', flush=True)
+        if size > 1:
+            self.mpiParams = decompose(self.mesh, self.rank, self.size, comm)
+        if rank == 0:
+            print('Setting lattice structure...', flush=True)
+        self.lattice = lattice.createLattice(latticeDict, self.precision)
+        if rank == 0:
+            print('Setting lattice structure done!\n', flush=True)
+            print('Setting collision scheme and equilibrium model...',
+                  flush=True)
         self.collisionScheme = schemeLB.collisionScheme(self.lattice,
-                                                        collisionDict)
-        self.schemeLog()
-        print('Setting collision scheme and equilibrium model done!\n',
-              flush=True)
-        print('Initializing fields...', flush=True)
+                                                        collisionDict,
+                                                        parallelization)
+        if rank == 0:
+            self.schemeLog()
+            print('Setting collision scheme and equilibrium model done!\n',
+                  flush=True)
+            print('Initializing fields...', flush=True)
         self.fields = fields.fields(self.mesh, self.lattice,
-                                    self.U_initial, self.rho_initial)
-        fields.setObstacle(obstacle, self.fields, self.mesh)
-        print('Initializing fields done!\n')
-        print('Reading boundary conditions...')
+                                    self.U_initial, self.rho_initial,
+                                    self.precision, size)
+        solid = fields.setObstacle(obstacle, self.mesh)
+        if size == 1:
+            fields.solid = solid
+        else:
+            distributeSolid_mpi(solid, self.fields, self.mpiParams, self.mesh,
+                                self.rank, self.size, comm)
+        if rank == 0:
+            print('Initializing fields done!\n')
+            print('Reading boundary conditions...')
         self.boundary = boundary.boundary(boundaryDict)
-        self.boundary.readBoundaryDict()
-        self.boundary.initializeBoundary(self.lattice, self.mesh,
-                                         self.fields)
-        self.writeDomainLog(meshDict)
-        print('Reading boundary conditions done...\n')
+        if rank == 0:
+            self.boundary.readBoundaryDict()
+            self.boundary.initializeBoundary(self.lattice, self.mesh,
+                                             self.fields)
+            # self.boundary.details()
+        if rank == 0:
+            self.writeDomainLog(meshDict)
+            print('Reading boundary conditions done...\n')
 
         # initialize functions
         self.equilibriumFunc = self.collisionScheme.equilibriumFunc
@@ -95,26 +131,49 @@ class simulation:
             self.fields.f, self.fields.f_new, self.fields.u, self.fields.rho,
             self.fields.solid, self.collisionFunc, self.equilibriumFunc,
             self.collisionScheme.preFactor,
-            self.collisionScheme.equilibriumArgs
+            self.collisionScheme.equilibriumArgs,
+            self.fields.procBoundary
         )
 
         self.streamArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f, self.fields.f_new,
             self.lattice.c, self.lattice.noOfDirections,
-            self.lattice.invList, self.fields.solid
+            self.lattice.invList, self.fields.solid, self.size
         )
 
         self.computeFieldsArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f_new,
             self.fields.u, self.fields.rho, self.fields.solid,
-            self.lattice.c, self.lattice.noOfDirections
+            self.lattice.c, self.lattice.noOfDirections,
+            self.fields.procBoundary, self.size
         )
+
+        if size > 1:
+            self.gatherArgs = (self.fields.u, self.fields.rho,
+                               self.fields.solid, self.rank,
+                               self.mpiParams.nProc_x,
+                               self.mpiParams.nProc_y,
+                               self.mesh.Nx_global, self.mesh.Ny_global,
+                               self.mesh.Nx, self.mesh.Ny, self.precision)
+
+            self.proc_boundaryArgs = (self.mesh.Nx, self.mesh.Ny,
+                                      self.fields.f,
+                                      self.fields.f_send_topBottom,
+                                      self.fields.f_recv_topBottom,
+                                      self.fields.f_send_leftRight,
+                                      self.fields.f_recv_leftRight,
+                                      self.mpiParams.nx, self.mpiParams.ny,
+                                      self.mpiParams.nProc_x,
+                                      self.mpiParams.nProc_y)
+            self.proc_copyArgs = (self.mesh.Nx, self.mesh.Ny,
+                                  self.lattice.c, self.fields.f_new)
 
         initializePopulations(
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq, self.fields.f,
             self.fields.f_new, self.fields.u, self.fields.rho,
             self.lattice.noOfDirections, self.equilibriumFunc,
-            self.equilibriumArgs
+            self.equilibriumArgs,
+            self.fields.procBoundary
         )
 
     def writeControlLog(self):
@@ -138,10 +197,12 @@ class simulation:
         meshFile.write('Domain Information...\n')
         meshFile.write('\tBounding box : ' + str(meshDict['boundingBox'])
                        + '\n')
-        meshFile.write('\tGrid points in x-direction ' + str(self.mesh.Nx)
-                       + '\n')
-        meshFile.write('\tGrid points in y-direction ' + str(self.mesh.Ny)
-                       + '\n')
+        meshFile.write('\tGrid points in x-direction : ' +
+                       str(self.mesh.Nx_global) + '\n')
+        meshFile.write('\tGrid points in y-direction : ' +
+                       str(self.mesh.Ny_global) + '\n')
+        meshFile.write('\tdelX : ' +
+                       str(self.mesh.delX) + '\n')
         meshFile.write('\nBoundary information...\n')
         for itr, name in enumerate(self.boundary.nameList):
             meshFile.write('\n\tboundary name : ' + str(name) + '\n')

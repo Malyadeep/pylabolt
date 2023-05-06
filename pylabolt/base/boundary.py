@@ -1,8 +1,10 @@
 import numpy as np
 import os
 import numba
+from numba import cuda
 
-from LBpy.base import boundaryConditions
+from pylabolt.base import boundaryConditions
+from pylabolt.base.cuda import boundaryConditions_cuda
 
 
 @numba.njit
@@ -41,7 +43,7 @@ def initializeBoundaryElements(Nx, Ny, invList, noOfDirections,
                 currentId = int(i * Ny + j)
                 if currentId == ind:
                     faceList.append(ind)
-    return np.array(faceList, dtype=np.int32),\
+    return np.array(faceList, dtype=np.int64),\
         outDirections,\
         invDirections
 
@@ -60,6 +62,15 @@ class boundary:
         self.faceList = []
         self.invDirections = []
         self.outDirections = []
+
+        # Cuda device data
+        self.boundaryVector_device = []
+        self.boundaryScalar_device = []
+        self.boundaryIndices_device = []
+        self.faceList_device = []
+        self.invDirections_device = []
+        self.outDirections_device = []
+        self.noOfBoundaries_device = np.zeros(1, np.int32)
 
     def readBoundaryDict(self):
         for item in self.nameList:
@@ -122,16 +133,13 @@ class boundary:
                     tempPoints.append(self.boundaryDict[item][data])
                     self.boundaryType.append(self.boundaryDict[item]
                                              ['type'])
-                    self.boundaryFunc.append(getattr(boundaryConditions,
-                                                     self.boundaryDict[item]
-                                                     ['type']))
                     self.boundaryVector.append(vectorValue)
                     self.boundaryScalar.append(scalarValue)
                 self.points[item] = tempPoints
                 if flag is False:
                     print("ERROR! 'type' keyword not defined")
                     os._exit(0)
-        self.noOfBoundaries = len(self.boundaryFunc)
+        self.noOfBoundaries = len(self.boundaryType)
 
     def initializeBoundary(self, lattice, mesh, fields):
         for name in self.nameList:
@@ -144,8 +152,8 @@ class boundary:
                 self.boundaryIndices.append([tempIndex_i, tempIndex_f])
         self.boundaryIndices = np.array(self.boundaryIndices)
         for itr in range(self.noOfBoundaries):
-            args = (mesh.Nx, mesh.Ny, lattice.invList, lattice.noOfDirections,
-                    self.boundaryIndices[itr])
+            args = (mesh.Nx_global, mesh.Ny_global, lattice.invList,
+                    lattice.noOfDirections, self.boundaryIndices[itr])
             tempFaceList, tempOutDirections, tempInvDirections = \
                 initializeBoundaryElements(*args)
             self.faceList.append(tempFaceList)
@@ -162,6 +170,16 @@ class boundary:
         print(self.faceList)
         print(self.outDirections)
         print(self.invDirections)
+        print(self.boundaryFunc)
+
+    def setupBoundary_cpu(self, parallel):
+        for itr in range(self.noOfBoundaries):
+            self.boundaryFunc.append(getattr(boundaryConditions,
+                                             self.boundaryType[itr]))
+            self.boundaryFunc[itr] = numba.njit(self.boundaryFunc[itr],
+                                                parallel=parallel,
+                                                cache=False,
+                                                nogil=True)
 
     def setBoundary(self, fields, lattice, mesh):
         for itr in range(self.noOfBoundaries):
@@ -171,3 +189,36 @@ class boundary:
                     self.boundaryScalar[itr], lattice.c, lattice.w,
                     lattice.cs, mesh.Nx, mesh.Ny)
             self.boundaryFunc[itr](*args)
+
+    def setupBoundary_cuda(self):
+        self.boundaryScalar_device = cuda.to_device(
+            self.boundaryScalar
+        )
+        for itr in range(self.noOfBoundaries):
+            self.boundaryIndices_device.append(cuda.to_device(
+                self.boundaryIndices[itr]
+            ))
+            self.faceList_device.append(cuda.to_device(
+                self.faceList[itr]
+            ))
+            self.invDirections_device.append(cuda.to_device(
+                self.invDirections[itr]
+            ))
+            self.outDirections_device.append(cuda.to_device(
+                self.outDirections[itr]
+            ))
+            self.boundaryVector_device.append(cuda.to_device(
+                self.boundaryVector[itr]
+            ))
+            self.boundaryFunc.append(getattr(boundaryConditions_cuda,
+                                             self.boundaryType[itr]))
+
+    def setBoundary_cuda(self, n_threads, blocks, device):
+        for itr in range(self.noOfBoundaries):
+            args = (device.f, device.f_new, device.rho, device.u,
+                    self.faceList_device[itr], self.outDirections_device[itr],
+                    self.invDirections_device[itr],
+                    self.boundaryVector_device[itr],
+                    self.boundaryScalar_device[itr], device.c, device.w,
+                    device.cs[0], device.Nx[0], device.Ny[0])
+            self.boundaryFunc[itr][blocks, n_threads](*args)

@@ -7,6 +7,7 @@ controlDict = {
     'relTolU': 1e-9,
     'relTolV': 1e-9,
     'relTolRho': 1e-7,
+    'precision': 'double'
 }
 
 internalFields = {
@@ -16,7 +17,7 @@ internalFields = {
 }
 
 boundaryDict = {
-    'walls': {
+    'outlet': {
         'type': 'zeroGradient',
         'points_2': [[10, 0], [10, 1]]
     },
@@ -53,3 +54,9 @@ obstacle = {
     'center': [2, 0.5],
     'radius': 0.25
 }
+
+decomposeDict = {
+    'nx': 4,
+    'ny': 2
+}
+

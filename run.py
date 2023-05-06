@@ -1,4 +1,5 @@
-from LBpy.LBpy import main
+from pylabolt.pylabolt import main
+
 
 if __name__ == '__main__':
     main()
