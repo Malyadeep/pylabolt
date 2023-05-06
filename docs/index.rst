@@ -10,6 +10,15 @@ Welcome to pylabolt's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+.. toctree::
+   :maxdepth: 2
+   
+   Overview.rst
+
+.. toctree::
+   :maxdepth: 2
+   
+   installation.rst
 
 
 Indices and tables
