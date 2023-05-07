@@ -20,6 +20,11 @@ Welcome to PyLaBolt's documentation!
    
    installation.rst
 
+.. toctree::
+   :maxdepth: 2
+   
+   Acknowledgements.rst
+
 
 Indices and tables
 ==================
