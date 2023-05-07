@@ -46,7 +46,7 @@ Paraview/Mayavi. Sample results for lid driven cavity, plane Poiseuille flow, an
    :width: 550px
    :alt: lid driven cavity (Re = 100)
 
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/V_contour.png
+.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/Re_100/V_contour.png
    :width: 550px
    :alt: Plane Poiseuille flow (Re = 100)
 

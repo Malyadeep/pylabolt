@@ -59,17 +59,6 @@ like::
         'boundingBox': [[0, 0], [1, 1]]
     }
 
-    obstacle = {
-        'type': 'circle',
-        'center': [2, 0.5],
-        'radius': 0.25
-    }
-
-    decomposeDict = {
-        'nx': 2,
-        'ny': 2
-    }
-
 We shall use this file to run the simulations for lid driven cavity. The following
 subsections expand on the various dictionaries present in ``simulation.py`` file.
 
