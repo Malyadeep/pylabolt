@@ -59,4 +59,3 @@ decomposeDict = {
     'nx': 4,
     'ny': 2
 }
-

@@ -31,8 +31,7 @@ class simulation:
             workingDir = os.getcwd()
             sys.path.append(workingDir)
             from simulation import (controlDict, boundaryDict, collisionDict,
-                                    latticeDict, meshDict, obstacle,
-                                    internalFields)
+                                    latticeDict, meshDict, internalFields)
         except ImportError as e:
             print('FATAL ERROR!')
             print(str(e))
@@ -100,7 +99,7 @@ class simulation:
         self.fields = fields.fields(self.mesh, self.lattice,
                                     self.U_initial, self.rho_initial,
                                     self.precision, size)
-        solid = fields.setObstacle(obstacle, self.mesh)
+        solid = fields.setObstacle(self.mesh)
         if size == 1:
             fields.solid = solid
         else:

@@ -6,7 +6,7 @@ Installation
 Installing dependencies
 ------------------------
 
-PyLaBolt relies on various Python libraries to run the simulations. The various dependencies of PyLaBolt are as follows:
+PyLaBolt relies on various Python libraries to run the simulations. The dependencies of PyLaBolt are as follows:
 
 - `Numpy <https://numba.readthedocs.io/en/stable/>`_ >= 1.23.5
 - `Numba <https://numba.readthedocs.io/en/stable/>`_ >= 0.56.4
@@ -20,7 +20,7 @@ The dependencies can be installed via ``pip`` as follows::
 
     $ pip install numpy numba mpi4py vtk
 
-To run simulations on parallel using MPI, check whether gcc/mpicc is properly cofigured or not.
+To run simulations on parallel using MPI, check whether gcc/mpicc is properly configured or not.
 To check the gcc and mpicc version run the following command in terminal/shell::
 
     $ gcc --version

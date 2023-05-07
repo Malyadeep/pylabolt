@@ -50,12 +50,6 @@ meshDict = {
     'boundingBox': [[0, 0], [3, 1]]
 }
 
-obstacle = {
-    # 'type': 'circle',
-    # 'center': [2, 0.5],
-    # 'radius': 0.25
-}
-
 decomposeDict = {
     'nx': 2,
     'ny': 2

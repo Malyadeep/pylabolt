@@ -23,6 +23,11 @@ Welcome to PyLaBolt's documentation!
 .. toctree::
    :maxdepth: 2
    
+   Setup.rst
+
+.. toctree::
+   :maxdepth: 2
+   
    Acknowledgements.rst
 
 

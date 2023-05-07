@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import sys
 import numba
 
 
@@ -61,7 +62,15 @@ def rectangle(boundingBox, solid, mesh):
                 solid[ind] = 1
 
 
-def setObstacle(obstacle, mesh):
+def setObstacle(mesh):
+    workingDir = os.getcwd()
+    sys.path.append(workingDir)
+    try:
+        from simulation import obstacle
+        print('Reading Obstacle data...')
+    except ImportError:
+        print("No obstacle defined!!")
+        return
     try:
         solid = np.full((mesh.Nx_global * mesh.Ny_global), fill_value=0,
                         dtype=np.int32)
@@ -94,6 +103,7 @@ def setObstacle(obstacle, mesh):
             print("ERROR!")
             print("Unsupported obstacle type!")
             os._exit(1)
+        print('Reading Obstacle data done!')
         return solid
     except KeyError as e:
         print("ERROR!")
