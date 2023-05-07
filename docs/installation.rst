@@ -1,6 +1,11 @@
 ==============
 Installation
 ==============
+
+------------------------
+Installing dependencies
+------------------------
+
 PyLaBolt relies on various Python libraries to run the simulations. The various dependencies of PyLaBolt are as follows:
 
 - `Numpy <https://numba.readthedocs.io/en/stable/>`_ >= 1.23.5
@@ -11,7 +16,7 @@ Optional dependencies required to convert data to VTK formats include
 
 - `vtk <https://pypi.org/project/vtk/>`_ >= 9.2.6
 
-The dependencies can be installed via pip as follows::
+The dependencies can be installed via ``pip`` as follows::
 
     $ pip install numpy numba mpi4py vtk
 
