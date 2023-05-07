@@ -19,7 +19,7 @@ Installation and Usage
 =======================
 PyLaBolt can be installed via ``pip`` via the command::
 
-    $ pip install pylaBolt
+    $ pip install pylabolt
 
 More details on the dependencies and their configuration can be found
 in the PyLaBolt documentation `here <https://PyLaBolt.readthedocs.io/en/latest/>`_.
@@ -40,7 +40,19 @@ the working directory::
     $ pylabolt --toVTK last
 
 The ``output_<time-step>.vtk`` files are stored in ``output/VTK`` directory which can be opened in
-Paraview/Mayavi.
+Paraview/Mayavi. Sample results for lid driven cavity, plane Poiseuille flow, and flow past a cylinder are shown below.
+
+.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/Re_100/cavity_Vcontour.png
+   :width: 550px
+   :alt: lid driven cavity (Re = 100)
+
+.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/V_contour.png
+   :width: 550px
+   :alt: Plane Poiseuille flow (Re = 100)
+
+.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png
+   :width: 550px
+   :alt: Flow past a cylinder (Re = 100)
 
 More details on setting up and running simulations can be found in the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
 
@@ -87,3 +99,15 @@ GPUs to run large simulations. Currently the parallel computing features support
 - PyLaBolt provides support to convert output to `VTK <https://vtk.org/>`_ format, which can post-processed in Paraview/Mayavi.
 
 For more details, refer to the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
+
+=======================
+Acknowledgements
+=======================
+PyLaBolt grew from the course project of AE6102 course, of the Department of Aerospace Engineering at Indian Institute of Technology, Bombay.
+We are grateful to Prof. Prabhu Ramachandran of Department of Areospace Engineering at Indian Institute of Technology, Bombay
+for exposing us to the necessary skills to write high performance scientific codes.
+
+We are also grateful to Dr. Amol Subhedar at Department of Chemical Engineering, Indian Institute of Technology, Bombay for providing 
+us critical suggestions on the theoretical foundations of the algorithms.
+
+For contributors see the `Github contributors page <https://github.com/Malyadeep/pylabolt/graphs/contributors>`_.
