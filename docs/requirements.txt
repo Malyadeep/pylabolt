@@ -41,6 +41,7 @@ sphinx==6.2.1
     #   -r requirements.in
     #   sphinx-rtd-theme
     #   sphinxcontrib-jquery
+    #   sphinxcontrib-video
 sphinx-rtd-theme==1.2.0
     # via -r requirements.in
 sphinxcontrib-applehelp==1.0.4
@@ -57,6 +58,8 @@ sphinxcontrib-qthelp==1.0.3
     # via sphinx
 sphinxcontrib-serializinghtml==1.1.5
     # via sphinx
+sphinxcontrib-video==0.1.1
+    # via -r requirements.in
 urllib3==2.0.2
     # via requests
 zipp==3.15.0
