@@ -45,7 +45,11 @@
 <li class="toctree-l1"><a class="reference internal" href="Overview.html#features">Features</a></li>
 </ul>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#additional-configurations-for-gpu-users">Additional configurations for GPU users</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-pylabolt">Installing PyLaBolt</a></li>
+</ul>
+</li>
 </ul>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="Acknowledgements.html">Acknowledgements</a></li>
@@ -77,7 +81,87 @@
              
   <section id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h1>
-<p>Install like this</p>
+<p>PyLaBolt relies on various Python libraries to run the simulations. The various dependencies of PyLaBolt are as follows:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://numba.readthedocs.io/en/stable/">Numpy</a> &gt;= 1.23.5</p></li>
+<li><p><a class="reference external" href="https://numba.readthedocs.io/en/stable/">Numba</a> &gt;= 0.56.4</p></li>
+<li><p><a class="reference external" href="https://mpi4py.readthedocs.io/en/stable/">mpi4py</a> &gt;= 3.1.4</p></li>
+</ul>
+<p>Optional dependencies required to convert data to VTK formats include</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://pypi.org/project/vtk/">vtk</a> &gt;= 9.2.6</p></li>
+</ul>
+<p>The dependencies can be installed via pip as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pip install numpy numba mpi4py vtk
+</pre></div>
+</div>
+<p>To run simulations on parallel using MPI, check whether gcc/mpicc is properly cofigured or not.
+To check the gcc and mpicc version run the following command in terminal/shell:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ gcc --version
+$ mpicc --version
+</pre></div>
+</div>
+<p>If not properly configured visit <a class="reference external" href="https://www.open-mpi.org/">OpenMPI’s homepage</a>.
+Also, for visualization of <code class="docutils literal notranslate"><span class="pre">.vtk</span></code> files, it is recommended that Paraview/Mayavi be used.
+For installing Paraview visit <a class="reference external" href="https://www.paraview.org/Wiki/ParaView:Build_And_Install">Paraview installation</a>.
+For installing Mayavi visit <a class="reference external" href="https://docs.enthought.com/mayavi/mayavi/installation.html">Mayavi installation</a>.</p>
+<section id="additional-configurations-for-gpu-users">
+<h2>Additional configurations for GPU users<a class="headerlink" href="#additional-configurations-for-gpu-users" title="Permalink to this heading"></a></h2>
+<p>PyLaBolt uses Numba’s CUDA bindings to run simulations on NVIDIA GPU. In order to run simulations on GPU, make
+sure you have a compatible GPU. Currently Numba supports GPUs with compute capability &gt;= 3.5. For more information
+visit <a class="reference external" href="https://numba.readthedocs.io/en/stable/cuda/overview.html">Numba for CUDA users</a></p>
+<p>To install CUDA toolkit and drivers, visit <a class="reference external" href="https://developer.nvidia.com/cuda-toolkit">NVIDIA developer’s</a> page. Once CUDA
+toolkit and Numba is installed, fire up a python shell and run the following commands to check the compute capability
+of the GPU:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;&gt;</span> <span class="kn">from</span> <span class="nn">numba</span> <span class="kn">import</span> <span class="n">cuda</span>
+<span class="o">&gt;&gt;</span> <span class="n">cuda</span><span class="o">.</span><span class="n">detect</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Though PyLaBolt supports execution on GPUs, it is fairly unoptimized compared to the CPU counterparts
+as of version 0.1.1.</p>
+<p>This issue is being catered to and hopefully will be fixed in a future release.</p>
+</div>
+</section>
+<section id="installing-pylabolt">
+<h2>Installing PyLaBolt<a class="headerlink" href="#installing-pylabolt" title="Permalink to this heading"></a></h2>
+<p>Once the dependencies are installed, PyLaBolt can be installed via <code class="docutils literal notranslate"><span class="pre">pip</span></code> as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pip install pylabolt
+</pre></div>
+</div>
+<p>To install an older version, one can use <code class="docutils literal notranslate"><span class="pre">==</span></code> and specify the version name explicitly. For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pip install pylabolt==0.1.1
+</pre></div>
+</div>
+<p>For the release history and version numbers, visit the official PyPi repository of <a class="reference external" href="https://pypi.org/project/pylabolt/">PyLaBolt</a>.</p>
+<p>To verify whether the installation was successfull, run the following command from the terminal:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pylabolt -h
+</pre></div>
+</div>
+<p>For successfull installation, the output should look like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pylabolt -h
+usage: pylabolt [-h] [-s {fluidLB}] [-p] [-c] [-nt N_THREADS] [--reconstruct {last,all,time,None}] [-t TIME] [--toVTK {last,all,time,None}]
+
+A Lattice Boltzmann Python solver
+
+optional arguments:
+-h, --help            show this help message and exit
+-s {fluidLB}, --solver {fluidLB}
+                        choice of solver to run
+-p, --parallel        set to run simulation in parallel using OpenMP
+-c, --cuda            set to run simulation in parallel using CUDA
+-nt N_THREADS, --n_threads N_THREADS
+                        Number of threads for OpenMP/CUDA
+--reconstruct {last,all,time,None}
+                        Domain reconstruction
+-t TIME, --time TIME  Specify time which is to be reconstructed
+--toVTK {last,all,time,None}
+                        Convert output data to VTK format
+</pre></div>
+</div>
+<p>Voila! PyLaBolt is successfully installed. Now you can run simulations.</p>
+</section>
 </section>
 
 
