@@ -145,23 +145,45 @@ like:</p>
     <span class="s1">&#39;grid&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mi">101</span><span class="p">,</span> <span class="mi">101</span><span class="p">],</span>
     <span class="s1">&#39;boundingBox&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]</span>
 <span class="p">}</span>
-
-<span class="n">obstacle</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;circle&#39;</span><span class="p">,</span>
-    <span class="s1">&#39;center&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span>
-    <span class="s1">&#39;radius&#39;</span><span class="p">:</span> <span class="mf">0.25</span>
-<span class="p">}</span>
-
-<span class="n">decomposeDict</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s1">&#39;nx&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-    <span class="s1">&#39;ny&#39;</span><span class="p">:</span> <span class="mi">2</span>
-<span class="p">}</span>
 </pre></div>
 </div>
 <p>We shall use this file to run the simulations for lid driven cavity. The following
 subsections expand on the various dictionaries present in <code class="docutils literal notranslate"><span class="pre">simulation.py</span></code> file.</p>
 <section id="controldict">
 <h3><code class="docutils literal notranslate"><span class="pre">controlDict</span></code><a class="headerlink" href="#controldict" title="Permalink to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">controlDict</span></code> has the following entries:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">startTime</span></code> - denotes the starting timestep of the simulation. Usually set to zero.
+If set to any time other than zero, the solver searches for saved states at the specified
+time step. If a saved state is found, the solver resumes the simulation from the saved state.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">endTime</span></code> - denotes the end timestep.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The timesteps doesn’t necessarily mean physical time in seconds. All the fields in lattice
+Boltzmann simulations are scaled appropriately to lattice units. For more information on
+scaling refer to <a class="reference external" href="https://doi.org/10.1007/978-3-319-44649-3">The Lattice Boltzmann Method - Timm Krüger, Halim Kusumaatmaja, Alexandr Kuzmin, Orest Shardt, Goncalo Silva, Erlend Magnus Viggen</a></p>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">stdOutputInterval</span></code> - denotes the time interval after which output is displayed to terminal/shell</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">saveInterval</span></code> - denotes the time interval after which the state of the simulation must be saved. Useful
+for large simulations which can be resumed from a saved state in between if something goes wrong. Default value
+is <code class="docutils literal notranslate"><span class="pre">None</span></code>. (Currently not implemented for usage with MPI. Will be added in future release)</p></li>
+</ul>
+<p>All timestep and time interval values must be integers.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">relTolU</span></code> - denotes the desired relative tolerance for x-component of velocity.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">relTolV</span></code> - denotes the desired relative tolerance for y-component of velocity.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">relTolRho</span></code> - denotes the desired relative tolerance for density.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">precision</span></code> - denotes the floating point precision to be used for simulation. For single precision floating point
+use the string entry <code class="docutils literal notranslate"><span class="pre">single</span></code>. Similarly for double precision use <code class="docutils literal notranslate"><span class="pre">double</span></code>.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For GPU users, choose the floating point precision carefully because double precision floating point
+operations are considerably slower on a GPU compared to single precision. Consider the <code class="docutils literal notranslate"><span class="pre">FP32/FP64</span></code>
+performance ratio and the accuracy needed in the simulation before setting the precision.</p>
+</div>
 </section>
 <section id="internalfields">
 <h3><code class="docutils literal notranslate"><span class="pre">internalFields</span></code><a class="headerlink" href="#internalfields" title="Permalink to this heading"></a></h3>
