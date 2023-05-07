@@ -88,7 +88,7 @@ For more information on the schemes and boundary conditions, we urge the reader 
 - `The Lattice Boltzmann Equation: For Complex States of Flowing Matter - Sauro Succi 
   <https://global.oup.com/academic/product/the-lattice-boltzmann-equation-9780199592357?cc=us&lang=en&>`_
 
-PyLaBolt lvereages the performance advantages on multi-core CPUs, High Perfomance computing clusters, and
+PyLaBolt leverages the performance advantages on multi-core CPUs, High Perfomance computing clusters, and
 GPUs to run large simulations. Currently the parallel computing features supported by PyLaBolt are:
 
 - `Numba <https://numba.readthedocs.io/en/stable/>`_ accelerated `Python <https://www.python.org/>`_ code can
