@@ -10,7 +10,7 @@ Numba's own `OpenMP <https://www.openmp.org/>`_ parallelization and the `mpi4py 
 For running on NVIDIA GPUs, PyLaBolt uses Numba's `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ bindings.
 
 
-.. |Documentation status| image:: https://readthedocs.org/projects/PyLaBolt/badge/?version=latest
+.. |Documentation status| image:: https://readthedocs.org/projects/pylabolt/badge/?version=latest
     :target: https://PyLaBolt.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
@@ -85,3 +85,5 @@ GPUs to run large simulations. Currently the parallel computing features support
   library.
 - PyLaBolt can also run simulations on NVIDIA GPUs through Numba's `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ bindings.
 - PyLaBolt provides support to convert output to `VTK <https://vtk.org/>`_ format, which can post-processed in Paraview/Mayavi.
+
+For more details, refer to the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
