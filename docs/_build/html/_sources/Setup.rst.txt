@@ -101,7 +101,13 @@ All timestep and time interval values must be integers.
 +++++++++++++++++++
 ``internalFields``
 +++++++++++++++++++
+This dictionary defines the initial values of the velocity and density fields.
 
+- ``u`` - ``float`` entry that denotes initial value of x-component of velocity
+- ``v`` - ``float`` entry that denotes initial value of y-component of velocity
+- ``rho`` - ``float`` entry that denotes initial value of density
+
+All the fields are initialized to the specified uniformly.
 
 ++++++++++++++++
 ``boundaryDict``
