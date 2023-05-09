@@ -117,12 +117,34 @@ All the fields are initialized to the specified uniformly.
 +++++++++++++++++
 ``collisionDict``
 +++++++++++++++++
+This dictionary defines the collision and equilibrium scheme to be used
 
+- ``model`` - Keyword entry that defines the collision model to be used. Currently, 
+  supports only Bhatnagar-Gross-Krook model (``BGK``). In future releases the MRT and
+  TRT model will be added.
+ 
+- ``tau`` - ``float`` entry denoting the relaxation time for the BGK model.
+- ``equilibrium`` - Keyword entry denoting the type of equilbrium distribution functions
+  to be used. Currently, provides two operations
+  
+  * ``firstOrder`` - equilibrium distribution function which is first order in velocity.
+    Useful in advection of scalar fields.
+  * ``secondOrder`` - equilibrium distribution function which is second order in velocity.
+    Used in most fluid flow simulations.
 
 ++++++++++++++++
 ``latticeDict``
 ++++++++++++++++
-
+This dictionary lets you choose the type of lattices to use for simulation
+- ``latticeType`` - Keyword entry which tells the lattice to use for simulation. Currently,
+supports the following lattices
+  
+  * ``D1Q3`` - 1D lattice with 3 velcoity directions. Ideal for 1D simulations.
+  * ``D2Q9`` - 2D lattice with 9 velcoity directions. Ideal for 2D fluid flow and
+    heat transfer simulations.
+  
+In future release, ``D2Q5`` lattices will be added for 2D heat conduction simulations. A 3D extension
+is also planned which shall see the inclusion of 3D lattices as well.
 
 ++++++++++++++++
 ``meshDict``

@@ -200,9 +200,37 @@ performance ratio and the accuracy needed in the simulation before setting the p
 </section>
 <section id="collisiondict">
 <h3><code class="docutils literal notranslate"><span class="pre">collisionDict</span></code><a class="headerlink" href="#collisiondict" title="Permalink to this heading"></a></h3>
+<p>This dictionary defines the collision and equilibrium scheme to be used</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">model</span></code> - Keyword entry that defines the collision model to be used. Currently,
+supports only Bhatnagar-Gross-Krook model (<code class="docutils literal notranslate"><span class="pre">BGK</span></code>). In future releases the MRT and
+TRT model will be added.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tau</span></code> - <code class="docutils literal notranslate"><span class="pre">float</span></code> entry denoting the relaxation time for the BGK model.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">equilibrium</span></code> - Keyword entry denoting the type of equilbrium distribution functions
+to be used. Currently, provides two operations</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">firstOrder</span></code> - equilibrium distribution function which is first order in velocity.
+Useful in advection of scalar fields.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">secondOrder</span></code> - equilibrium distribution function which is second order in velocity.
+Used in most fluid flow simulations.</p></li>
+</ul>
+</li>
+</ul>
 </section>
 <section id="latticedict">
 <h3><code class="docutils literal notranslate"><span class="pre">latticeDict</span></code><a class="headerlink" href="#latticedict" title="Permalink to this heading"></a></h3>
+<p>This dictionary lets you choose the type of lattices to use for simulation
+- <code class="docutils literal notranslate"><span class="pre">latticeType</span></code> - Keyword entry which tells the lattice to use for simulation. Currently,
+supports the following lattices</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">D1Q3</span></code> - 1D lattice with 3 velcoity directions. Ideal for 1D simulations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">D2Q9</span></code> - 2D lattice with 9 velcoity directions. Ideal for 2D fluid flow and
+heat transfer simulations.</p></li>
+</ul>
+</div></blockquote>
+<p>In future release, <code class="docutils literal notranslate"><span class="pre">D2Q5</span></code> lattices will be added for 2D heat conduction simulations. A 3D extension
+is also planned which shall see the inclusion of 3D lattices as well.</p>
 </section>
 <section id="meshdict">
 <h3><code class="docutils literal notranslate"><span class="pre">meshDict</span></code><a class="headerlink" href="#meshdict" title="Permalink to this heading"></a></h3>
