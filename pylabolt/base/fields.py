@@ -62,19 +62,23 @@ def rectangle(boundingBox, solid, mesh):
                 solid[ind] = 1
 
 
-def setObstacle(mesh):
+def setObstacle(mesh, rank):
     workingDir = os.getcwd()
     sys.path.append(workingDir)
     try:
         from simulation import obstacle
-        print('Reading Obstacle data...')
+        if rank == 0:
+            print('Reading Obstacle data...', flush=True)
     except ImportError:
-        print("No obstacle defined!!")
+        if rank == 0:
+            print('No obstacle defined!', flush=True)
         return
     try:
         solid = np.full((mesh.Nx_global * mesh.Ny_global), fill_value=0,
                         dtype=np.int32)
         if len(obstacle.keys()) == 0:
+            if rank == 0:
+                print('Reading Obstacle data done!', flush=True)
             return solid
         obstacleType = obstacle['type']
         if obstacleType == 'circle':
@@ -86,7 +90,7 @@ def setObstacle(mesh):
             else:
                 print("ERROR!")
                 print("For 'circle' type obstacle center must be a list and"
-                      + " radius must be a float")
+                      + " radius must be a float", flush=True)
                 os._exit(1)
             circle(center, radius, solid, mesh)
         elif obstacleType == 'rectangle':
@@ -94,18 +98,19 @@ def setObstacle(mesh):
             if isinstance(boundingBox, list):
                 boundingBox = np.array(boundingBox, dtype=np.float64)
             else:
-                print("ERROR!")
+                print("ERROR!", flush=True)
                 print("For 'rectangle' type obstacle bounding box must be"
-                      + " a list")
+                      + " a list", flush=True)
                 os._exit(1)
             rectangle(boundingBox, solid, mesh)
         else:
             print("ERROR!")
-            print("Unsupported obstacle type!")
+            print("Unsupported obstacle type!", flush=True)
             os._exit(1)
-        print('Reading Obstacle data done!')
+        if rank == 0:
+            print('Reading Obstacle data done!', flush=True)
         return solid
     except KeyError as e:
         print("ERROR!")
-        print(str(e) + " keyword missing in 'obstacle' dictionary")
+        print(str(e) + " keyword missing in 'obstacle' dictionary", flush=True)
         os._exit(1)

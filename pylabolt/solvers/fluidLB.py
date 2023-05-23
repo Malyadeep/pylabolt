@@ -23,7 +23,8 @@ def main(parallelization, n_threads):
         else:
             simulation.fields = temp
     elif simulation.startTime == 0:
-        saveState(simulation.startTime, simulation)
+        if simulation.saveStateInterval is not None:
+            saveState(simulation.startTime, simulation)
     base = baseAlgorithm()
     parallel = parallelSetup(parallelization, n_threads, base, simulation)
 
@@ -43,6 +44,7 @@ def main(parallelization, n_threads):
         base.solver(simulation, size, rank, comm)
         runTime = time.perf_counter() - start
     if rank == 0:
-        print('\nSimulation completed : Runtime = ' + str(runTime) + '\n')
+        print('\nSimulation completed : Runtime = ' + str(runTime) + '\n',
+              flush=True)
 
     MPI.Finalize()

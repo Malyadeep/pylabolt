@@ -99,15 +99,16 @@ class simulation:
         self.fields = fields.fields(self.mesh, self.lattice,
                                     self.U_initial, self.rho_initial,
                                     self.precision, size)
-        solid = fields.setObstacle(self.mesh)
-        if size == 1:
+        solid = fields.setObstacle(self.mesh, self.rank)
+        comm.Barrier()
+        if size == 1 and solid is not None:
             fields.solid = solid
-        else:
+        elif size > 1 and solid is not None:
             distributeSolid_mpi(solid, self.fields, self.mpiParams, self.mesh,
                                 self.rank, self.size, comm)
         if rank == 0:
-            print('Initializing fields done!\n')
-            print('Reading boundary conditions...')
+            print('Initializing fields done!\n', flush=True)
+            print('Reading boundary conditions...', flush=True)
         self.boundary = boundary.boundary(boundaryDict)
         if rank == 0:
             self.boundary.readBoundaryDict()
@@ -116,7 +117,7 @@ class simulation:
             # self.boundary.details()
         if rank == 0:
             self.writeDomainLog(meshDict)
-            print('Reading boundary conditions done...\n')
+            print('Reading boundary conditions done...\n', flush=True)
 
         # initialize functions
         self.equilibriumFunc = self.collisionScheme.equilibriumFunc

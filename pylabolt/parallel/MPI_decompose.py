@@ -90,8 +90,8 @@ def solidCopy(solid, fields, mpiParams, mesh):
 
 def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
     if rank == 0:
-        print('MPI option selected')
-        print('Distributing obstacle to sub-domains...')
+        print('MPI option selected', flush=True)
+        print('Distributing obstacle to sub-domains...', flush=True)
     if rank == 0:
         for nx in range(mpiParams.nProc_x):
             for ny in range(mpiParams.nProc_y):
@@ -107,13 +107,13 @@ def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
         solidCopy(solid, fields, mpiParams, mesh)
     comm.Barrier()
     if rank == 0:
-        print('done distributing obstacle')
+        print('done distributing obstacle', flush=True)
 
 
 def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
     if rank == 0:
-        print('MPI option selected')
-        print('Distributing boundaries to sub-domains...')
+        print('MPI option selected', flush=True)
+        print('Distributing boundaries to sub-domains...', flush=True)
     if rank == 0:
         N_local = np.zeros((mpiParams.nProc_x, mpiParams.nProc_y, 2),
                            dtype=np.int64)
@@ -195,4 +195,4 @@ def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
         boundary.boundaryFunc = dataFromRoot[6]
     comm.Barrier()
     if rank == 0:
-        print('done distributing boundaries')
+        print('done distributing boundaries', flush=True)
