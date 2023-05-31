@@ -4,8 +4,9 @@ import numpy as np
 import numba
 
 
-from pylabolt.base import mesh, lattice, boundary, schemeLB, fields
-from pylabolt.parallel.MPI_decompose import decompose, distributeSolid_mpi
+from pylabolt.base import mesh, lattice, boundary, schemeLB, fields, initFields
+from pylabolt.parallel.MPI_decompose import (decompose, distributeSolid_mpi,
+                                             distributeInitialFields_mpi)
 
 
 @numba.njit
@@ -63,24 +64,13 @@ class simulation:
         if rank == 0:
             self.writeControlLog()
             print('Setting control parameters done!\n', flush=True)
-        try:
-            self.u_initial = internalFields['u']
-            self.v_initial = internalFields['v']
-            self.U_initial = np.array([self.u_initial, self.v_initial],
-                                      dtype=self.precision)
-            self.rho_initial = np.float64(internalFields['rho'])
-        except KeyError as e:
-            if rank == 0:
-                print('ERROR! Keyword ' + str(e) +
-                      ' missing in internalFields')
 
         if rank == 0:
             print('Reading mesh info and creating mesh...', flush=True)
         self.mesh = mesh.createMesh(meshDict, self.precision)
         if rank == 0:
             print('Reading mesh info and creating mesh done!\n', flush=True)
-        if size > 1:
-            self.mpiParams = decompose(self.mesh, self.rank, self.size, comm)
+
         if rank == 0:
             print('Setting lattice structure...', flush=True)
         self.lattice = lattice.createLattice(latticeDict, self.precision)
@@ -95,10 +85,35 @@ class simulation:
             self.schemeLog()
             print('Setting collision scheme and equilibrium model done!\n',
                   flush=True)
+
+        if size > 1:
+            if rank == 0:
+                print('Decomposing domain...', flush=True)
+            self.mpiParams = decompose(self.mesh, self.rank, self.size, comm)
+            if rank == 0:
+                print('Domain decomposition done!\n', flush=True)
+
+        if rank == 0:
             print('Initializing fields...', flush=True)
+
+        initialFields_temp = initFields.initFields(internalFields, self.mesh,
+                                                   self.precision, self.rank,
+                                                   comm)
+
+        self.initialFields = initFields.initialFields(self.mesh.Nx,
+                                                      self.mesh.Ny,
+                                                      self.precision)
+        if size > 1:
+            distributeInitialFields_mpi(initialFields_temp, self.initialFields,
+                                        self.mpiParams, self.mesh, self.rank,
+                                        self.size, comm)
+        else:
+            self.initialFields = initialFields_temp
+
         self.fields = fields.fields(self.mesh, self.lattice,
-                                    self.U_initial, self.rho_initial,
-                                    self.precision, size)
+                                    self.initialFields,
+                                    self.precision, size, rank)
+
         solid = fields.setObstacle(self.mesh, self.rank)
         comm.Barrier()
         if size == 1 and solid is not None:
@@ -106,8 +121,11 @@ class simulation:
         elif size > 1 and solid is not None:
             distributeSolid_mpi(solid, self.fields, self.mpiParams, self.mesh,
                                 self.rank, self.size, comm)
+
         if rank == 0:
             print('Initializing fields done!\n', flush=True)
+
+        if rank == 0:
             print('Reading boundary conditions...', flush=True)
         self.boundary = boundary.boundary(boundaryDict)
         if rank == 0:

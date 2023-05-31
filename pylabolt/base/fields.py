@@ -5,7 +5,7 @@ import numba
 
 
 class fields:
-    def __init__(self, mesh, lattice, U_initial, rho_initial, precision, size):
+    def __init__(self, mesh, lattice, initialFields, precision, size, rank):
         self.f = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
                           dtype=precision)
         self.f_eq = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
@@ -13,11 +13,11 @@ class fields:
         self.f_new = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
                               dtype=precision)
         self.u = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
-        self.rho = np.full(mesh.Nx * mesh.Ny, fill_value=rho_initial,
-                           dtype=precision)
+        self.rho = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         for ind in range(mesh.Nx * mesh.Ny):
-            self.u[ind, 0] = U_initial[0]
-            self.u[ind, 1] = U_initial[1]
+            self.u[ind, 0] = initialFields.u[ind, 0]
+            self.u[ind, 1] = initialFields.u[ind, 1]
+            self.rho[ind] = initialFields.rho[ind]
         self.solid = np.full((mesh.Nx * mesh.Ny), fill_value=0,
                              dtype=np.int32)
         self.procBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)

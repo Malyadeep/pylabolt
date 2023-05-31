@@ -74,6 +74,76 @@ class decomposeParams:
         self.ny = 0
 
 
+def computeLocalSize(mpiParams, mesh):
+    N_local = np.zeros((mpiParams.nProc_x, mpiParams.nProc_y, 2),
+                       dtype=np.int64)
+    for nx in range(mpiParams.nProc_x - 1, -1, -1):
+        for ny in range(mpiParams.nProc_y - 1, -1, -1):
+            N_local[nx, ny, 0] = int(np.ceil(mesh.Nx_global /
+                                     mpiParams.nProc_x))
+            N_local[nx, ny, 1] = int(np.ceil(mesh.Ny_global /
+                                     mpiParams.nProc_y))
+            if nx == mpiParams.nProc_x - 1:
+                N_local[nx, ny, 0] = mesh.Nx_global - \
+                    nx * int(np.ceil(mesh.Nx_global/mpiParams.nProc_x))
+            if ny == mpiParams.nProc_y - 1:
+                N_local[nx, ny, 1] = mesh.Ny_global - \
+                    ny * int(np.ceil(mesh.Ny_global/mpiParams.nProc_y))
+    return N_local
+
+
+def fieldCopy(fields_temp, fields, mpiParams, Nx_local, Ny_local, mesh):
+    i_write, j_write = 0, 0
+    Nx_final, Ny_final = Nx_local, Ny_local
+    if mpiParams.nx == mpiParams.nProc_x - 1:
+        Nx_final = mesh.Nx - 2
+    if mpiParams.ny == mpiParams.nProc_y - 1:
+        Ny_final = mesh.Ny - 2
+    for i in range(int(mpiParams.nx * Nx_local),
+                   int((mpiParams.nx + 1) * Nx_final + 1)):
+        for j in range(int(mpiParams.ny * Ny_local),
+                       int((mpiParams.ny + 1) * Ny_final + 1)):
+            ind = int(i * mesh.Ny_global + j)
+            ind_write = int((i_write + 1) * mesh.Ny + (j_write + 1))
+            fields.u[ind_write, 0] = fields_temp.u[ind, 0]
+            fields.u[ind_write, 1] = fields_temp.u[ind, 1]
+            fields.rho[ind_write] = fields_temp.rho[ind]
+            j_write += 1
+        j_write = 0
+        i_write += 1
+
+
+def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
+                                rank, size, comm):
+    if rank == 0:
+        print('MPI option selected', flush=True)
+        print('Distributing fields to sub-domains...', flush=True)
+    N_local = computeLocalSize(mpiParams, mesh)
+    nx = int(rank / mpiParams.nProc_y)
+    ny = int(rank % mpiParams.nProc_x)
+    Nx_local = N_local[nx, ny, 0]
+    Ny_local = N_local[nx, ny, 1]
+    if nx == mpiParams.nProc_x - 1:
+        Nx_local = N_local[nx - 1, ny, 0]
+    if ny == mpiParams.nProc_y - 1:
+        Ny_local = N_local[nx, ny - 1, 1]
+    if rank == 0:
+        for nx in range(mpiParams.nProc_x):
+            for ny in range(mpiParams.nProc_y):
+                rank_send = int(nx * mpiParams.nProc_y + ny)
+                if rank_send == 0:
+                    fieldCopy(fields_temp, fields, mpiParams, Nx_local,
+                              Ny_local, mesh)
+                else:
+                    comm.send(fields_temp, dest=rank_send, tag=rank_send)
+    else:
+        fields_temp = comm.recv(source=0, tag=rank)
+        fieldCopy(fields_temp, fields, mpiParams, Nx_local, Ny_local, mesh)
+    comm.Barrier()
+    if rank == 0:
+        print('Done distributing fields!', flush=True)
+
+
 def solidCopy(solid, fields, mpiParams, mesh):
     i_write, j_write = 0, 0
     for i in range(int(mpiParams.nx * (mesh.Nx - 2)),
@@ -107,7 +177,7 @@ def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
         solidCopy(solid, fields, mpiParams, mesh)
     comm.Barrier()
     if rank == 0:
-        print('done distributing obstacle', flush=True)
+        print('Done distributing obstacle!', flush=True)
 
 
 def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
@@ -115,20 +185,7 @@ def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
         print('MPI option selected', flush=True)
         print('Distributing boundaries to sub-domains...', flush=True)
     if rank == 0:
-        N_local = np.zeros((mpiParams.nProc_x, mpiParams.nProc_y, 2),
-                           dtype=np.int64)
-        for nx in range(mpiParams.nProc_x - 1, -1, -1):
-            for ny in range(mpiParams.nProc_y - 1, -1, -1):
-                N_local[nx, ny, 0] = int(np.ceil(mesh.Nx_global /
-                                                 mpiParams.nProc_x))
-                N_local[nx, ny, 1] = int(np.ceil(mesh.Ny_global /
-                                                 mpiParams.nProc_y))
-                if nx == mpiParams.nProc_x - 1:
-                    N_local[nx, ny, 0] = mesh.Nx_global - \
-                        nx * int(np.ceil(mesh.Nx_global/mpiParams.nProc_x))
-                if ny == mpiParams.nProc_y - 1:
-                    N_local[nx, ny, 1] = mesh.Ny_global - \
-                        ny * int(np.ceil(mesh.Ny_global/mpiParams.nProc_y))
+        N_local = computeLocalSize(mpiParams, mesh)
         for nx in range(mpiParams.nProc_x - 1, -1, -1):
             for ny in range(mpiParams.nProc_y - 1, -1, -1):
                 Nx_local = N_local[nx, ny, 0]
