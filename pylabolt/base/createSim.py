@@ -80,7 +80,9 @@ class simulation:
                   flush=True)
         self.collisionScheme = schemeLB.collisionScheme(self.lattice,
                                                         collisionDict,
-                                                        parallelization)
+                                                        parallelization,
+                                                        self.rank,
+                                                        self.precision)
         if rank == 0:
             self.schemeLog()
             print('Setting collision scheme and equilibrium model done!\n',

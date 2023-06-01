@@ -58,9 +58,22 @@ class parallelSetup:
                                                 dtype=np.int32))
         if simulation.collisionScheme.equilibriumType == 1:
             device.equilibriumArgs = (device.cs_2[0], device.c, device.w)
+            device.rho_0 = cuda.to_device(np.array([simulation.
+                                          collisionScheme.
+                                          rho_0],
+                                          dtype=simulation.precision))
         elif simulation.collisionScheme.equilibriumType == 2:
+            device.rho_0 = cuda.to_device(np.array(0,
+                                          dtype=simulation.precision))
             device.equilibriumArgs = (device.cs_2[0], device.cs_4[0],
                                       device.c, device.w)
+        elif simulation.collisionScheme.equilibriumType == 3:
+            device.rho_0 = cuda.to_device(np.array([simulation.
+                                          collisionScheme.
+                                          rho_0],
+                                          dtype=simulation.precision))
+            device.equilibriumArgs = (device.rho_0[0], device.cs_2[0],
+                                      device.cs_4[0], device.c, device.w)
 
         # Copy fields data
         device.f = cuda.to_device(simulation.fields.f)
@@ -74,8 +87,8 @@ class parallelSetup:
         device.collisionArgs = (
             device.Nx[0], device.Ny[0], device.f_eq, device.f, device.f_new,
             device.u, device.rho, device.solid, device.preFactor[0],
-            device.cs_2[0], device.cs_4[0], device.c, device.w,
-            device.equilibriumType[0], device.collisionType[0]
+            device.rho_0[0], device.cs_2[0], device.cs_4[0], device.c,
+            device.w, device.equilibriumType[0], device.collisionType[0]
         )
         device.streamArgs = (
             device.Nx[0], device.Ny[0], device.f, device.f_new, device.c,
