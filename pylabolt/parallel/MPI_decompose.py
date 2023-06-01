@@ -144,12 +144,17 @@ def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
         print('Done distributing fields!', flush=True)
 
 
-def solidCopy(solid, fields, mpiParams, mesh):
+def solidCopy(solid, fields, mpiParams, Nx_local, Ny_local, mesh):
     i_write, j_write = 0, 0
-    for i in range(int(mpiParams.nx * (mesh.Nx - 2)),
-                   int((mpiParams.nx + 1) * (mesh.Nx - 2))):
-        for j in range(int(mpiParams.ny * (mesh.Ny - 2)),
-                       int((mpiParams.ny + 1) * (mesh.Ny - 2))):
+    Nx_final, Ny_final = Nx_local, Ny_local
+    if mpiParams.nx == mpiParams.nProc_x - 1:
+        Nx_final = mesh.Nx - 2
+    if mpiParams.ny == mpiParams.nProc_y - 1:
+        Ny_final = mesh.Ny - 2
+    for i in range(int(mpiParams.nx * Nx_local),
+                   int((mpiParams.nx + 1) * Nx_final + 1)):
+        for j in range(int(mpiParams.ny * Ny_local),
+                       int((mpiParams.ny + 1) * Ny_final + 1)):
             ind = int(i * mesh.Ny_global + j)
             ind_write = int((i_write + 1) * mesh.Ny + (j_write + 1))
             fields.solid[ind_write] = solid[ind]
@@ -162,19 +167,29 @@ def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
     if rank == 0:
         print('MPI option selected', flush=True)
         print('Distributing obstacle to sub-domains...', flush=True)
+    N_local = computeLocalSize(mpiParams, mesh)
+    nx = int(rank / mpiParams.nProc_y)
+    ny = int(rank % mpiParams.nProc_x)
+    Nx_local = N_local[nx, ny, 0]
+    Ny_local = N_local[nx, ny, 1]
+    if nx == mpiParams.nProc_x - 1:
+        Nx_local = N_local[nx - 1, ny, 0]
+    if ny == mpiParams.nProc_y - 1:
+        Ny_local = N_local[nx, ny - 1, 1]
     if rank == 0:
         for nx in range(mpiParams.nProc_x):
             for ny in range(mpiParams.nProc_y):
                 rank_send = int(nx * mpiParams.nProc_y + ny)
                 if rank_send == 0:
-                    solidCopy(solid, fields, mpiParams, mesh)
+                    solidCopy(solid, fields, mpiParams, Nx_local, Ny_local,
+                              mesh)
                 else:
                     comm.Send(solid, dest=rank_send, tag=rank_send)
     else:
         solid_temp = np.zeros((mesh.Nx_global * mesh.Ny_global),
                               dtype=np.int32)
         comm.Recv(solid_temp, source=0, tag=rank)
-        solidCopy(solid, fields, mpiParams, mesh)
+        solidCopy(solid, fields, mpiParams, Nx_local, Ny_local, mesh)
     comm.Barrier()
     if rank == 0:
         print('Done distributing obstacle!', flush=True)
