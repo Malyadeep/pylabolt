@@ -112,9 +112,11 @@ like:</p>
 <span class="p">}</span>
 
 <span class="n">internalFields</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s1">&#39;u&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s1">&#39;rho&#39;</span><span class="p">:</span> <span class="mi">1</span>
+    <span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s1">&#39;u&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;rho&#39;</span><span class="p">:</span> <span class="mi">1</span>
+    <span class="p">}</span>
 <span class="p">}</span>
 
 <span class="n">boundaryDict</span> <span class="o">=</span> <span class="p">{</span>
@@ -187,16 +189,42 @@ performance ratio and the accuracy needed in the simulation before setting the p
 </section>
 <section id="internalfields">
 <h3><code class="docutils literal notranslate"><span class="pre">internalFields</span></code><a class="headerlink" href="#internalfields" title="Permalink to this heading"></a></h3>
-<p>This dictionary defines the initial values of the velocity and density fields.</p>
+<p>This dictionary defines the initial values of the velocity and density fields. The mandatory keyword is <code class="docutils literal notranslate"><span class="pre">default</span></code> under
+which the fields are defined. Custom initialization of a certain region in the domain is possible using keys other than <code class="docutils literal notranslate"><span class="pre">default</span></code>.
+Currently only <code class="docutils literal notranslate"><span class="pre">line</span></code> is supported for custom initialization. Other types of regions will be incorporated in future releases.
+For more information on defining regions look at the <code class="docutils literal notranslate"><span class="pre">velocity_diffusion</span></code> tutorial.</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">u</span></code> - <code class="docutils literal notranslate"><span class="pre">float</span></code> entry that denotes initial value of x-component of velocity</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">v</span></code> - <code class="docutils literal notranslate"><span class="pre">float</span></code> entry that denotes initial value of y-component of velocity</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">rho</span></code> - <code class="docutils literal notranslate"><span class="pre">float</span></code> entry that denotes initial value of density</p></li>
 </ul>
-<p>All the fields are initialized to the specified uniformly.</p>
+<p>All the fields are initialized to the specified values uniformly.</p>
 </section>
 <section id="boundarydict">
 <h3><code class="docutils literal notranslate"><span class="pre">boundaryDict</span></code><a class="headerlink" href="#boundarydict" title="Permalink to this heading"></a></h3>
+<p>This dictionary defines the boundaries of the domain and the boundary conditions on them.
+You can define multiple dictionaries inside this dictionary which represents a particular
+boundary region. A sample entry defining a wall boundary is as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s1">&#39;walls&#39;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;bounceBack&#39;</span><span class="p">,</span>
+          <span class="s1">&#39;points_0&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Here, the key <code class="docutils literal notranslate"><span class="pre">walls</span></code> is a user-specified name. Inside the <code class="docutils literal notranslate"><span class="pre">walls</span></code> dictionary, there is
+a mandatory entry <code class="docutils literal notranslate"><span class="pre">type</span></code>, which denotes the boundary condition to be applied. For example,
+here since the boundary is a wall, we apply <code class="docutils literal notranslate"><span class="pre">bounceBack</span></code> boundary condition. The next entries
+following the <code class="docutils literal notranslate"><span class="pre">type</span></code> keyword are the points that define the region of the boundary under
+consideration. Points must be a 2-Dimensional list entry that defines the starting and ending
+coordinates of the region on the boundary.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Note that the coordinates must be positive for now. This issue will be resolved in later releases.</p></li>
+<li><p>Make sure the coordinates in the first row of the point lists are less than or equal to
+the ones on the next row.</p></li>
+</ul>
+</div>
 </section>
 <section id="collisiondict">
 <h3><code class="docutils literal notranslate"><span class="pre">collisionDict</span></code><a class="headerlink" href="#collisiondict" title="Permalink to this heading"></a></h3>
@@ -209,10 +237,13 @@ TRT model will be added.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">equilibrium</span></code> - Keyword entry denoting the type of equilbrium distribution functions
 to be used. Currently, provides two operations</p>
 <ul>
-<li><p><code class="docutils literal notranslate"><span class="pre">firstOrder</span></code> - equilibrium distribution function which is first order in velocity.
-Useful in advection of scalar fields.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stokesLinear</span></code> - equilibrium distribution function which is first order in velocity.
+Useful in modelling Stokes’ flow. For this type of equilibrium another keyword is required
+called <code class="docutils literal notranslate"><span class="pre">rho_ref</span></code> which denotes the reference density for incompressible flows.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">secondOrder</span></code> - equilibrium distribution function which is second order in velocity.
 Used in most fluid flow simulations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">incompressible</span></code> - equilibrium distribution function which is second order in velocity for
+incompressible flow. For this model, <code class="docutils literal notranslate"><span class="pre">rho_ref</span></code> keyword is required.</p></li>
 </ul>
 </li>
 </ul>
@@ -234,6 +265,17 @@ is also planned which shall see the inclusion of 3D lattices as well.</p>
 </section>
 <section id="meshdict">
 <h3><code class="docutils literal notranslate"><span class="pre">meshDict</span></code><a class="headerlink" href="#meshdict" title="Permalink to this heading"></a></h3>
+<p>This dictionary defines the computational domain. The entire domain is supposed to take a rectangular shape.
+Following keywords are required to define the dictionary</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">boundingBox</span></code> - A 2-Dimensional list entry that defines two ends of the diagonal of the rectangular domain.
+Note that the coordinates must be positive for now. This issue will be resolved in later releases.
+Also, the coordinates must be defined in a way that the slope of the diagonal is positive.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">grid</span></code> - A list entry that defines the resolution of the computational domain, or in other words the no. of
+lattice points. The lattices must be square; accordingly the no. of grid points must be set.</p></li>
+</ul>
+</div></blockquote>
 </section>
 </section>
 </section>
