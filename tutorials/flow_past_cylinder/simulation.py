@@ -58,6 +58,6 @@ obstacle = {
 }
 
 decomposeDict = {
-    'nx': 4,
-    'ny': 2
+    'nx': 9,
+    'ny': 1
 }

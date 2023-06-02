@@ -50,8 +50,3 @@ meshDict = {
     'grid': [101, 101],
     'boundingBox': [[0, 0], [1, 1]]
 }
-
-decomposeDict = {
-    'nx': 2,
-    'ny': 2
-}

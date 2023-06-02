@@ -40,7 +40,8 @@ boundaryDict = {
 collisionDict = {
     'model': 'BGK',
     'tau': 0.8,
-    'equilibrium': 'secondOrder'
+    'equilibrium': 'incompressible',
+    'rho_ref': 1
 }
 
 latticeDict = {
@@ -50,9 +51,4 @@ latticeDict = {
 meshDict = {
     'grid': [121, 41],
     'boundingBox': [[0, 0], [3, 1]]
-}
-
-decomposeDict = {
-    'nx': 2,
-    'ny': 2
 }
