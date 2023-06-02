@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setting up simulations &mdash; pylabolt 0.1.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Acknowledgements" href="Acknowledgements.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            pylabolt
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="Overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Overview.html#features">Features</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Setting up simulations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#simulation-py-file"><code class="docutils literal notranslate"><span class="pre">simulation.py</span></code> file</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#controldict"><code class="docutils literal notranslate"><span class="pre">controlDict</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#internalfields"><code class="docutils literal notranslate"><span class="pre">internalFields</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#boundarydict"><code class="docutils literal notranslate"><span class="pre">boundaryDict</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#collisiondict"><code class="docutils literal notranslate"><span class="pre">collisionDict</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#latticedict"><code class="docutils literal notranslate"><span class="pre">latticeDict</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#meshdict"><code class="docutils literal notranslate"><span class="pre">meshDict</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="Acknowledgements.html">Acknowledgements</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">pylabolt</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Setting up simulations</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/Setup.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="setting-up-simulations">
+<h1>Setting up simulations<a class="headerlink" href="#setting-up-simulations" title="Permalink to this heading"></a></h1>
+<p>This section walks you through the setup of the simulations, to run using PyLaBolt.
+For this purpose we shall look into the <a class="reference external" href="https://github.com/Malyadeep/pylabolt/tree/main/tutorials/cavity/Re_100">lid driven cavity tutorial</a>,
+provided in the <a class="reference external" href="https://github.com/Malyadeep/pylabolt/tree/main">PyLaBolt Github repository</a>.</p>
+<section id="simulation-py-file">
+<h2><code class="docutils literal notranslate"><span class="pre">simulation.py</span></code> file<a class="headerlink" href="#simulation-py-file" title="Permalink to this heading"></a></h2>
+<p>All the input data from the user is provided in the <code class="docutils literal notranslate"><span class="pre">simulation.py</span></code> file which
+must be present in the working directory. A sample <code class="docutils literal notranslate"><span class="pre">simulation.py</span></code> file is looks
+like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">controlDict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;startTime&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s1">&#39;endTime&#39;</span><span class="p">:</span> <span class="mi">50000</span><span class="p">,</span>
+    <span class="s1">&#39;stdOutputInterval&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+    <span class="s1">&#39;saveInterval&#39;</span><span class="p">:</span> <span class="mi">10000</span><span class="p">,</span>
+    <span class="s1">&#39;saveStateInterval&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s1">&#39;relTolU&#39;</span><span class="p">:</span> <span class="mf">1e-9</span><span class="p">,</span>
+    <span class="s1">&#39;relTolV&#39;</span><span class="p">:</span> <span class="mf">1e-9</span><span class="p">,</span>
+    <span class="s1">&#39;relTolRho&#39;</span><span class="p">:</span> <span class="mf">1e-7</span><span class="p">,</span>
+    <span class="s1">&#39;precision&#39;</span><span class="p">:</span> <span class="s1">&#39;double&#39;</span>
+<span class="p">}</span>
+
+<span class="n">internalFields</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;u&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s1">&#39;rho&#39;</span><span class="p">:</span> <span class="mi">1</span>
+<span class="p">}</span>
+
+<span class="n">boundaryDict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;walls&#39;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;bounceBack&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;points_2&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]],</span>
+        <span class="s1">&#39;points_0&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]],</span>
+        <span class="s1">&#39;points_1&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]</span>
+    <span class="p">},</span>
+    <span class="s1">&#39;lid&#39;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;fixedU&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="s1">&#39;points_1&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">collisionDict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="s1">&#39;BGK&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;tau&#39;</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">,</span>
+    <span class="s1">&#39;equilibrium&#39;</span><span class="p">:</span> <span class="s1">&#39;secondOrder&#39;</span>
+<span class="p">}</span>
+
+<span class="n">latticeDict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;latticeType&#39;</span><span class="p">:</span> <span class="s1">&#39;D2Q9&#39;</span>
+<span class="p">}</span>
+
+<span class="n">meshDict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;grid&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mi">101</span><span class="p">,</span> <span class="mi">101</span><span class="p">],</span>
+    <span class="s1">&#39;boundingBox&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>We shall use this file to run the simulations for lid driven cavity. The following
+subsections expand on the various dictionaries present in <code class="docutils literal notranslate"><span class="pre">simulation.py</span></code> file.</p>
+<section id="controldict">
+<h3><code class="docutils literal notranslate"><span class="pre">controlDict</span></code><a class="headerlink" href="#controldict" title="Permalink to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">controlDict</span></code> has the following entries:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">startTime</span></code> - denotes the starting timestep of the simulation. Usually set to zero.
+If set to any time other than zero, the solver searches for saved states at the specified
+time step. If a saved state is found, the solver resumes the simulation from the saved state.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">endTime</span></code> - denotes the end timestep.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The timesteps doesn’t necessarily mean physical time in seconds. All the fields in lattice
+Boltzmann simulations are scaled appropriately to lattice units. For more information on
+scaling refer to <a class="reference external" href="https://doi.org/10.1007/978-3-319-44649-3">The Lattice Boltzmann Method - Timm Krüger, Halim Kusumaatmaja, Alexandr Kuzmin, Orest Shardt, Goncalo Silva, Erlend Magnus Viggen</a></p>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">stdOutputInterval</span></code> - denotes the time interval after which output is displayed to terminal/shell</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">saveInterval</span></code> - denotes the time interval after which the state of the simulation must be saved. Useful
+for large simulations which can be resumed from a saved state in between if something goes wrong. Default value
+is <code class="docutils literal notranslate"><span class="pre">None</span></code>. (Currently not implemented for usage with MPI. Will be added in future release)</p></li>
+</ul>
+<p>All timestep and time interval values must be integers.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">relTolU</span></code> - denotes the desired relative tolerance for x-component of velocity.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">relTolV</span></code> - denotes the desired relative tolerance for y-component of velocity.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">relTolRho</span></code> - denotes the desired relative tolerance for density.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">precision</span></code> - denotes the floating point precision to be used for simulation. For single precision floating point
+use the string entry <code class="docutils literal notranslate"><span class="pre">single</span></code>. Similarly for double precision use <code class="docutils literal notranslate"><span class="pre">double</span></code>.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For GPU users, choose the floating point precision carefully because double precision floating point
+operations are considerably slower on a GPU compared to single precision. Consider the <code class="docutils literal notranslate"><span class="pre">FP32/FP64</span></code>
+performance ratio and the accuracy needed in the simulation before setting the precision.</p>
+</div>
+</section>
+<section id="internalfields">
+<h3><code class="docutils literal notranslate"><span class="pre">internalFields</span></code><a class="headerlink" href="#internalfields" title="Permalink to this heading"></a></h3>
+<p>This dictionary defines the initial values of the velocity and density fields.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">u</span></code> - <code class="docutils literal notranslate"><span class="pre">float</span></code> entry that denotes initial value of x-component of velocity</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">v</span></code> - <code class="docutils literal notranslate"><span class="pre">float</span></code> entry that denotes initial value of y-component of velocity</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rho</span></code> - <code class="docutils literal notranslate"><span class="pre">float</span></code> entry that denotes initial value of density</p></li>
+</ul>
+<p>All the fields are initialized to the specified uniformly.</p>
+</section>
+<section id="boundarydict">
+<h3><code class="docutils literal notranslate"><span class="pre">boundaryDict</span></code><a class="headerlink" href="#boundarydict" title="Permalink to this heading"></a></h3>
+</section>
+<section id="collisiondict">
+<h3><code class="docutils literal notranslate"><span class="pre">collisionDict</span></code><a class="headerlink" href="#collisiondict" title="Permalink to this heading"></a></h3>
+<p>This dictionary defines the collision and equilibrium scheme to be used</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">model</span></code> - Keyword entry that defines the collision model to be used. Currently,
+supports only Bhatnagar-Gross-Krook model (<code class="docutils literal notranslate"><span class="pre">BGK</span></code>). In future releases the MRT and
+TRT model will be added.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tau</span></code> - <code class="docutils literal notranslate"><span class="pre">float</span></code> entry denoting the relaxation time for the BGK model.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">equilibrium</span></code> - Keyword entry denoting the type of equilbrium distribution functions
+to be used. Currently, provides two operations</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">firstOrder</span></code> - equilibrium distribution function which is first order in velocity.
+Useful in advection of scalar fields.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">secondOrder</span></code> - equilibrium distribution function which is second order in velocity.
+Used in most fluid flow simulations.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="latticedict">
+<h3><code class="docutils literal notranslate"><span class="pre">latticeDict</span></code><a class="headerlink" href="#latticedict" title="Permalink to this heading"></a></h3>
+<p>This dictionary lets you choose the type of lattices to use for simulation
+- <code class="docutils literal notranslate"><span class="pre">latticeType</span></code> - Keyword entry which tells the lattice to use for simulation. Currently,
+supports the following lattices</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">D1Q3</span></code> - 1D lattice with 3 velcoity directions. Ideal for 1D simulations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">D2Q9</span></code> - 2D lattice with 9 velcoity directions. Ideal for 2D fluid flow and
+heat transfer simulations.</p></li>
+</ul>
+</div></blockquote>
+<p>In future release, <code class="docutils literal notranslate"><span class="pre">D2Q5</span></code> lattices will be added for 2D heat conduction simulations. A 3D extension
+is also planned which shall see the inclusion of 3D lattices as well.</p>
+</section>
+<section id="meshdict">
+<h3><code class="docutils literal notranslate"><span class="pre">meshDict</span></code><a class="headerlink" href="#meshdict" title="Permalink to this heading"></a></h3>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="Acknowledgements.html" class="btn btn-neutral float-right" title="Acknowledgements" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Malyadeep Bhattacharya, Mithun M Nair.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

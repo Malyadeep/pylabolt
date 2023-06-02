@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Overview &mdash; pylabolt 0.1.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="installation.html" />
+    <link rel="prev" title="Welcome to PyLaBolt’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            pylabolt
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#features">Features</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="Setup.html">Setting up simulations</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="Acknowledgements.html">Acknowledgements</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">pylabolt</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Overview</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/Overview.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Permalink to this heading"></a></h1>
+<p>PyLaBolt is a single phase, 2D, parallel lattice Boltzmann solver for fluid flow. It uses
+<a class="reference external" href="https://numba.readthedocs.io/en/stable/">Numba</a> accelerated <a class="reference external" href="https://www.python.org/">Python</a> code
+to run lattice Boltzmann simulations on 2D lattices. Simulations can be run on CPU in parallel via
+Numba’s own <a class="reference external" href="https://www.openmp.org/">OpenMP</a> parallelization and the <a class="reference external" href="https://mpi4py.readthedocs.io/en/stable/">mpi4py</a> library.
+For running on NVIDIA GPUs, PyLaBolt uses Numba’s <a class="reference external" href="https://developer.nvidia.com/cuda-toolkit">CUDA</a> bindings.</p>
+</section>
+<section id="features">
+<h1>Features<a class="headerlink" href="#features" title="Permalink to this heading"></a></h1>
+<p>PyLaBolt currently supports the following collision schemes</p>
+<ul class="simple">
+<li><p>Bhatnagar-Gross-Krook (BGK) scheme - <a class="reference external" href="https://ui.adsabs.harvard.edu/link_gateway/1954PhRv...94..511B/doi:10.1103/PhysRev.94.511">Physical Review, vol. 94, Issue 3, pp. 511-525</a></p></li>
+</ul>
+<p>The <a class="reference external" href="https://doi.org/10.1098/rsta.2001.0955">MRT</a> and <a class="reference external" href="https://global-sci.org/intro/article_detail/cicp/7862.html">TRT</a>
+collision schemes will be added in future releases.</p>
+<p>The boundary conditions available are</p>
+<ul class="simple">
+<li><p>No slip boundary via the halfway bounce back method - <a class="reference external" href="https://doi.org/10.1017/S0022112094001771">Journal of Fluid Mechanics , Volume 271 , 25 July 1994
+, pp. 285 - 309</a></p></li>
+<li><p>Moving wall boundary condition via the halfway bounce back method - <a class="reference external" href="https://doi.org/10.1017/S0022112094001771">Journal of Fluid Mechanics , Volume 271 , 25 July 1994
+, pp. 285 - 309</a> ,
+<a class="reference external" href="https://doi.org/10.1023/A:1010414013942">Journal of Statistical Physics volume 104, pages 1191–1251 (2001)</a></p></li>
+<li><p>The fixed pressure boundary condition via the anti-bounce back method - <a class="reference external" href="https://www.researchgate.net/publication/281975403_Study_of_Simple_Hydrodynamic_Solutions_with_the_Two-Relaxation-Times_Lattice_Boltzmann_Scheme">Commun. Comput. Phys. 3, 427 (2008)</a></p></li>
+<li><p>Zero gradient boundary condition</p></li>
+<li><p>Periodic boundary condition - <a class="reference external" href="https://doi.org/10.1007/978-3-319-44649-3">The Lattice Boltzmann Method</a></p></li>
+</ul>
+<p>For more information on the schemes and boundary conditions, we urge the reader the go through the following books</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://doi.org/10.1007/978-3-319-44649-3">The Lattice Boltzmann Method - Timm Krüger, Halim Kusumaatmaja, Alexandr Kuzmin, Orest Shardt, Goncalo Silva, Erlend Magnus Viggen</a></p></li>
+<li><p><a class="reference external" href="https://global.oup.com/academic/product/the-lattice-boltzmann-equation-9780199592357?cc=us&amp;lang=en&amp;">The Lattice Boltzmann Equation: For Complex States of Flowing Matter - Sauro Succi</a></p></li>
+</ul>
+<p>PyLaBolt leverages the performance advantages on multi-core CPUs, High Perfomance computing clusters, and
+GPUs to run large simulations. Currently the parallel computing features supported by PyLaBolt are:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://numba.readthedocs.io/en/stable/">Numba</a> accelerated <a class="reference external" href="https://www.python.org/">Python</a> code can
+run in parallel on multi-core CPUs through <a class="reference external" href="https://www.openmp.org/">OpenMP</a>.</p></li>
+<li><p>To run on multiple machines/clusters, PyLaBolt uses <a class="reference external" href="https://www.open-mpi.org/">OpenMPI</a> via the <a class="reference external" href="https://mpi4py.readthedocs.io/en/stable/">mpi4py</a>
+library.</p></li>
+<li><p>PyLaBolt can also run simulations on NVIDIA GPUs through Numba’s <a class="reference external" href="https://developer.nvidia.com/cuda-toolkit">CUDA</a> bindings.</p></li>
+<li><p>PyLaBolt provides support to convert output to <a class="reference external" href="https://vtk.org/">VTK</a> format, which can post-processed in Paraview/Mayavi.</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to PyLaBolt’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="installation.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Malyadeep Bhattacharya, Mithun M Nair.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

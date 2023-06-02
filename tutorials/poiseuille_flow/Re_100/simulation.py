@@ -11,9 +11,11 @@ controlDict = {
 }
 
 internalFields = {
-    'u': 0,
-    'v': 0,
-    'rho': 1
+    'default': {
+        'u': 0,
+        'v': 0,
+        'rho': 1
+    }
 }
 
 boundaryDict = {
@@ -48,12 +50,6 @@ latticeDict = {
 meshDict = {
     'grid': [121, 41],
     'boundingBox': [[0, 0], [3, 1]]
-}
-
-obstacle = {
-    # 'type': 'circle',
-    # 'center': [2, 0.5],
-    # 'radius': 0.25
 }
 
 decomposeDict = {

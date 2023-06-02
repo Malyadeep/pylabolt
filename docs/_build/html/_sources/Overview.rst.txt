@@ -1,61 +1,12 @@
----------
-PyLaBolt
----------
-|Documentation status|
+==========
+Overview
+==========
 
 PyLaBolt is a single phase, 2D, parallel lattice Boltzmann solver for fluid flow. It uses 
 `Numba <https://numba.readthedocs.io/en/stable/>`_ accelerated `Python <https://www.python.org/>`_ code
 to run lattice Boltzmann simulations on 2D lattices. Simulations can be run on CPU in parallel via 
 Numba's own `OpenMP <https://www.openmp.org/>`_ parallelization and the `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_ library.
 For running on NVIDIA GPUs, PyLaBolt uses Numba's `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ bindings.
-
-
-.. |Documentation status| image:: https://readthedocs.org/projects/pylabolt/badge/?version=latest
-    :target: https://PyLaBolt.readthedocs.io/en/latest/?badge=latest
-    :alt: Documentation Status
-
-=======================
-Installation and Usage
-=======================
-PyLaBolt can be installed via ``pip`` via the command::
-
-    $ pip install pylabolt
-
-More details on the dependencies and their configuration can be found
-in the PyLaBolt documentation `here <https://PyLaBolt.readthedocs.io/en/latest/>`_.
-
-Tutorial cases are provided in the ``tutorials`` folder. For example, consider the lid driven cavity
-problem in ``tutorials/cavity/Re_100/``. The configuration file that defines the simulation is 
-called ``simulation.py``. After installation just run the following command from the ``tutorials/cavity/Re_100/``
-folder::
-
-    $ pylabolt --solver fluidLB
-
-The output data is written in the ``output`` folder. By default the data is written into binary files with 
-``.dat`` extension. To visualize the data in `Paraview <https://www.paraview.org/>`_ / 
-`Mayavi <https://docs.enthought.com/mayavi/mayavi/>`_, the `VTK <https://vtk.org/>`_ library is used.
-For example, to convert the last time-step data to a ``.vtk`` file, run the following command from
-the working directory::
-
-    $ pylabolt --toVTK last
-
-The ``output_<time-step>.vtk`` files are stored in ``output/VTK`` directory which can be opened in
-Paraview/Mayavi. Sample results for lid driven cavity, plane Poiseuille flow, and flow past a cylinder are shown below.
-
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/Re_100/cavity_Vcontour.png
-   :width: 550px
-   :alt: lid driven cavity (Re = 100)
-
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/Re_100/V_contour.png
-   :width: 550px
-   :alt: Plane Poiseuille flow (Re = 100)
-
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png
-   :width: 550px
-   :alt: Flow past a cylinder (Re = 100)
-
-More details on setting up and running simulations can be found in the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
-
 
 =======================
 Features
@@ -97,19 +48,3 @@ GPUs to run large simulations. Currently the parallel computing features support
   library.
 - PyLaBolt can also run simulations on NVIDIA GPUs through Numba's `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ bindings.
 - PyLaBolt provides support to convert output to `VTK <https://vtk.org/>`_ format, which can post-processed in Paraview/Mayavi.
-
-For more details, refer to the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
-
-=======================
-Acknowledgements
-=======================
-PyLaBolt grew from the course project of AE6102 course, of the `Department of Aerospace Engineering <https://www.aero.iitb.ac.in/home/>`_ 
-at Indian Institute of Technology, Bombay. We are grateful to `Prof. Prabhu Ramachandran <https://www.aero.iitb.ac.in/~prabhu/>`_ 
-of Department of Aerospace Engineering at Indian Institute of Technology, Bombay for exposing us to the necessary skills to write
-high performance scientific codes.
-
-We are also grateful to `Dr. Amol Subhedar <https://www.che.iitb.ac.in/faculty/amol-subhedar>`_ at
-`Department of Chemical Engineering <https://www.che.iitb.ac.in/>`_, Indian Institute of Technology, Bombay for providing 
-us critical suggestions on the theoretical foundations of the algorithms.
-
-For contributors see the `Github contributors page <https://github.com/Malyadeep/pylabolt/graphs/contributors>`_.

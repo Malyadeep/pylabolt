@@ -3,13 +3,32 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to pylabolt's documentation!
+Welcome to PyLaBolt's documentation!
 ====================================
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+.. toctree::
+   :maxdepth: 2
+   
+   Overview.rst
+
+.. toctree::
+   :maxdepth: 2
+   
+   installation.rst
+
+.. toctree::
+   :maxdepth: 2
+   
+   Setup.rst
+
+.. toctree::
+   :maxdepth: 2
+   
+   Acknowledgements.rst
 
 
 Indices and tables

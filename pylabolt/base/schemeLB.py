@@ -3,7 +3,8 @@ from pylabolt.base.models import collisionModels, equilibriumModels
 
 
 class collisionScheme:
-    def __init__(self, lattice, collisionDict, parallelization):
+    def __init__(self, lattice, collisionDict, parallelization,
+                 rank, precision):
         try:
             self.deltaX = lattice.deltaX
             self.deltaT = lattice.deltaT
@@ -19,17 +20,28 @@ class collisionScheme:
                     self.collisionFunc = collisionModels.BGK
 
             else:
-                print("ERROR! Unsupported collision model : " +
-                      collisionDict['model'])
+                if rank == 0:
+                    print("ERROR! Unsupported collision model : " +
+                          collisionDict['model'])
+                os._exit(1)
             self.collisionModel = collisionDict['model']
-            if collisionDict['equilibrium'] == 'firstOrder':
+            if collisionDict['equilibrium'] == 'stokesLinear':
+                try:
+                    self.rho_0 = precision(collisionDict['rho_ref'])
+                except KeyError:
+                    if rank == 0:
+                        print("ERROR! Missing keyword rho_ref " +
+                              "in collisionDict!")
+                    os._exit(1)
                 if parallelization == 'cuda':
                     self.equilibriumType = 1     # Stands for first order
-                    self.equilibriumFunc = equilibriumModels.firstOrder
-                    self.equilibriumArgs = (self.cs_2, self.c, self.w)
+                    self.equilibriumFunc = equilibriumModels.stokesLinear
+                    self.equilibriumArgs = (self.rho_0, self.cs_2, self.c,
+                                            self.w)
                 else:
-                    self.equilibriumFunc = equilibriumModels.firstOrder
-                    self.equilibriumArgs = (self.cs_2, self.c, self.w)
+                    self.equilibriumFunc = equilibriumModels.stokesLinear
+                    self.equilibriumArgs = (self.rho_0, self.cs_2, self.c,
+                                            self.w)
             elif collisionDict['equilibrium'] == 'secondOrder':
                 if parallelization == 'cuda':
                     self.equilibriumType = 2      # Stands for second order
@@ -40,17 +52,39 @@ class collisionScheme:
                     self.equilibriumFunc = equilibriumModels.secondOrder
                     self.equilibriumArgs = (self.cs_2, self.cs_4,
                                             self.c, self.w)
+            elif collisionDict['equilibrium'] == 'incompressible':
+                try:
+                    self.rho_0 = precision(collisionDict['rho_ref'])
+                except KeyError:
+                    if rank == 0:
+                        print("ERROR! Missing keyword rho_ref" +
+                              " in collisionDict!")
+                    os._exit(1)
+                if parallelization == 'cuda':
+                    self.equilibriumType = 3      # Stands for incompressible
+                    self.equilibriumFunc = equilibriumModels.incompressible
+                    self.equilibriumArgs = (self.rho_0, self.cs_2, self.cs_4,
+                                            self.c, self.w)
+                else:
+                    self.equilibriumFunc = equilibriumModels.incompressible
+                    self.equilibriumArgs = (self.rho_0, self.cs_2, self.cs_4,
+                                            self.c, self.w)
             else:
-                print("ERROR! Unsupported equilibrium model : " +
-                      collisionDict['equilibrium'])
+                if rank == 0:
+                    print("ERROR! Unsupported equilibrium model : " +
+                          collisionDict['equilibrium'])
                 os._exit(1)
             self.equilibriumModel = collisionDict['equilibrium']
         except KeyError as e:
-            print("ERROR! Keyword: " + str(e) + " missing in 'latticeDict'")
+            if rank == 0:
+                print("ERROR! Keyword: " + str(e) +
+                      " missing in 'collisionDict'")
             os._exit(1)
         try:
             self.tau = collisionDict['tau']
         except KeyError as e:
-            print("ERROR! Keyword: " + str(e) + " missing in 'collisionDict'")
+            if rank == 0:
+                print("ERROR! Keyword: " + str(e) +
+                      " missing in 'collisionDict'")
             os._exit(1)
         self.preFactor = self.deltaT/self.tau

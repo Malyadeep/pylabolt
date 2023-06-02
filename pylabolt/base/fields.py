@@ -1,10 +1,11 @@
 import numpy as np
 import os
+import sys
 import numba
 
 
 class fields:
-    def __init__(self, mesh, lattice, U_initial, rho_initial, precision, size):
+    def __init__(self, mesh, lattice, initialFields, precision, size, rank):
         self.f = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
                           dtype=precision)
         self.f_eq = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
@@ -12,11 +13,11 @@ class fields:
         self.f_new = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
                               dtype=precision)
         self.u = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
-        self.rho = np.full(mesh.Nx * mesh.Ny, fill_value=rho_initial,
-                           dtype=precision)
+        self.rho = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         for ind in range(mesh.Nx * mesh.Ny):
-            self.u[ind, 0] = U_initial[0]
-            self.u[ind, 1] = U_initial[1]
+            self.u[ind, 0] = initialFields.u[ind, 0]
+            self.u[ind, 1] = initialFields.u[ind, 1]
+            self.rho[ind] = initialFields.rho[ind]
         self.solid = np.full((mesh.Nx * mesh.Ny), fill_value=0,
                              dtype=np.int32)
         self.procBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
@@ -61,11 +62,23 @@ def rectangle(boundingBox, solid, mesh):
                 solid[ind] = 1
 
 
-def setObstacle(obstacle, mesh):
+def setObstacle(mesh, rank):
+    workingDir = os.getcwd()
+    sys.path.append(workingDir)
+    try:
+        from simulation import obstacle
+        if rank == 0:
+            print('Reading Obstacle data...', flush=True)
+    except ImportError:
+        if rank == 0:
+            print('No obstacle defined!', flush=True)
+        return
     try:
         solid = np.full((mesh.Nx_global * mesh.Ny_global), fill_value=0,
                         dtype=np.int32)
         if len(obstacle.keys()) == 0:
+            if rank == 0:
+                print('Reading Obstacle data done!', flush=True)
             return solid
         obstacleType = obstacle['type']
         if obstacleType == 'circle':
@@ -77,7 +90,7 @@ def setObstacle(obstacle, mesh):
             else:
                 print("ERROR!")
                 print("For 'circle' type obstacle center must be a list and"
-                      + " radius must be a float")
+                      + " radius must be a float", flush=True)
                 os._exit(1)
             circle(center, radius, solid, mesh)
         elif obstacleType == 'rectangle':
@@ -85,17 +98,19 @@ def setObstacle(obstacle, mesh):
             if isinstance(boundingBox, list):
                 boundingBox = np.array(boundingBox, dtype=np.float64)
             else:
-                print("ERROR!")
+                print("ERROR!", flush=True)
                 print("For 'rectangle' type obstacle bounding box must be"
-                      + " a list")
+                      + " a list", flush=True)
                 os._exit(1)
             rectangle(boundingBox, solid, mesh)
         else:
             print("ERROR!")
-            print("Unsupported obstacle type!")
+            print("Unsupported obstacle type!", flush=True)
             os._exit(1)
+        if rank == 0:
+            print('Reading Obstacle data done!', flush=True)
         return solid
     except KeyError as e:
         print("ERROR!")
-        print(str(e) + " keyword missing in 'obstacle' dictionary")
+        print(str(e) + " keyword missing in 'obstacle' dictionary", flush=True)
         os._exit(1)

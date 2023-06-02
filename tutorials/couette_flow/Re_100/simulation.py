@@ -11,22 +11,28 @@ controlDict = {
 }
 
 internalFields = {
-    'u': 0,
-    'v': 0,
-    'rho': 1
+    'default': {
+        'u': 0,
+        'v': 0,
+        'rho': 1
+    }
 }
 
 boundaryDict = {
     'walls': {
         'type': 'bounceBack',
-        'points_2': [[1, 0], [1, 1]],
-        'points_0': [[0, 0], [1, 0]],
-        'points_1': [[0, 0], [0, 1]]
+        'points_1': [[0, 0], [1, 0]]
     },
-    'lid': {
+    'movingWall': {
         'type': 'fixedU',
         'value': [0.1, 0],
-        'points_1': [[0, 1], [1, 1]]
+        'points_0': [[0, 1], [1, 1]]
+    },
+    'Periodic': {
+        'type': 'periodic',
+        'value': 0,
+        'points_0': [[0, 0], [0, 1]],
+        'points_1': [[1, 0], [1, 1]]
     }
 }
 
@@ -43,12 +49,6 @@ latticeDict = {
 meshDict = {
     'grid': [101, 101],
     'boundingBox': [[0, 0], [1, 1]]
-}
-
-obstacle = {
-    # 'type': 'circle',
-    # 'center': [2, 0.5],
-    # 'radius': 0.25
 }
 
 decomposeDict = {

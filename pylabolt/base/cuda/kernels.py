@@ -1,23 +1,27 @@
 import numpy as np
 from numba import cuda
-from pylabolt.base.cuda.models.equilibriumModels_cuda import (firstOrder,
-                                                              secondOrder)
+from pylabolt.base.cuda.models.equilibriumModels_cuda import (stokesLinear,
+                                                              secondOrder,
+                                                              incompressible)
 from pylabolt.base.cuda.models.collisionModels_cuda import BGK
 
 
 @cuda.jit
 def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
-                               preFactor, cs_2, cs_4, c, w, equilibriumType,
-                               collisionType):
+                               preFactor, rho_0, cs_2, cs_4, c, w,
+                               equilibriumType, collisionType):
     ind = cuda.grid(1)
     if ind < Nx * Ny:
         if solid[ind] != 1:
             if equilibriumType == 1:
-                firstOrder(f_eq[ind, :], u[ind, :],
-                           rho[ind], cs_2, cs_4, c, w)
+                stokesLinear(f_eq[ind, :], u[ind, :],
+                             rho[ind], rho_0, cs_2, c, w)
             elif equilibriumType == 2:
                 secondOrder(f_eq[ind, :], u[ind, :],
                             rho[ind], cs_2, cs_4, c, w)
+            elif equilibriumType == 3:
+                incompressible(f_eq[ind, :], u[ind, :],
+                               rho[ind], rho_0, cs_2, cs_4, c, w)
 
             if collisionType == 1:
                 BGK(f[ind, :], f_new[ind, :],

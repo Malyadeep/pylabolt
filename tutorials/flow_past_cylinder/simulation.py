@@ -11,9 +11,11 @@ controlDict = {
 }
 
 internalFields = {
-    'u': 0,
-    'v': 0,
-    'rho': 1
+    'default': {
+        'u': 0,
+        'v': 0,
+        'rho': 1
+    }
 }
 
 boundaryDict = {
@@ -59,4 +61,3 @@ decomposeDict = {
     'nx': 4,
     'ny': 2
 }
-

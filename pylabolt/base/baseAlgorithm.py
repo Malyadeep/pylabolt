@@ -79,7 +79,7 @@ class baseAlgorithm:
 
     def jitWarmUp(self, simulation, size, rank, comm):
         if rank == 0:
-            print('\nJIT warmup...')
+            print('\nJIT warmup...', flush=True)
         tempSim = copy.deepcopy(simulation)
         tempSim.startTime = 1
         tempSim.endTime = 2
@@ -88,7 +88,7 @@ class baseAlgorithm:
         tempSim.saveStateInterval = None
         self.solver(tempSim, size, rank, comm)
         if rank == 0:
-            print('JIT warmup done!!\n\n')
+            print('JIT warmup done!!\n\n', flush=True)
         del tempSim
 
     def solver(self, simulation, size, rank, comm):
@@ -145,7 +145,7 @@ class baseAlgorithm:
                         break
                 else:
                     if size > 1:
-                        for proc in range(size):
+                        for proc in range(1, size):
                             comm.send(0, dest=proc, tag=1*proc)
             elif size > 1 and rank != 0:
                 flag = comm.recv(source=0, tag=1*rank)
@@ -153,16 +153,13 @@ class baseAlgorithm:
                     writeFields_mpi(timeStep, simulation.fields,
                                     simulation.mesh, rank, comm)
                     break
-
+            comm.Barrier()
             self.equilibriumRelaxation(*simulation.collisionArgs)
-
             if size > 1:
                 comm.Barrier()
                 proc_boundary(*simulation.proc_boundaryArgs, comm)
                 comm.Barrier()
-
             self.stream(*simulation.streamArgs)
-
             simulation.setBoundaryFunc(simulation.fields, simulation.lattice,
                                        simulation.mesh)
 
