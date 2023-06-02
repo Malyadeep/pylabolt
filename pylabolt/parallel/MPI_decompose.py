@@ -100,9 +100,9 @@ def fieldCopy(fields_temp, fields, mpiParams, Nx_local, Ny_local, mesh):
     if mpiParams.ny == mpiParams.nProc_y - 1:
         Ny_final = mesh.Ny - 2
     for i in range(int(mpiParams.nx * Nx_local),
-                   int((mpiParams.nx + 1) * Nx_final + 1)):
+                   int(mpiParams.nx * Nx_local + Nx_final)):
         for j in range(int(mpiParams.ny * Ny_local),
-                       int((mpiParams.ny + 1) * Ny_final + 1)):
+                       int(mpiParams.ny * Ny_local + Ny_final)):
             ind = int(i * mesh.Ny_global + j)
             ind_write = int((i_write + 1) * mesh.Ny + (j_write + 1))
             fields.u[ind_write, 0] = fields_temp.u[ind, 0]
@@ -120,7 +120,7 @@ def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
         print('Distributing fields to sub-domains...', flush=True)
     N_local = computeLocalSize(mpiParams, mesh)
     nx = int(rank / mpiParams.nProc_y)
-    ny = int(rank % mpiParams.nProc_x)
+    ny = int(rank % mpiParams.nProc_y)
     Nx_local = N_local[nx, ny, 0]
     Ny_local = N_local[nx, ny, 1]
     if nx == mpiParams.nProc_x - 1:
@@ -152,9 +152,9 @@ def solidCopy(solid, fields, mpiParams, Nx_local, Ny_local, mesh):
     if mpiParams.ny == mpiParams.nProc_y - 1:
         Ny_final = mesh.Ny - 2
     for i in range(int(mpiParams.nx * Nx_local),
-                   int((mpiParams.nx + 1) * Nx_final + 1)):
+                   int(mpiParams.nx * Nx_local + Nx_final)):
         for j in range(int(mpiParams.ny * Ny_local),
-                       int((mpiParams.ny + 1) * Ny_final + 1)):
+                       int(mpiParams.ny * Ny_local + Ny_final)):
             ind = int(i * mesh.Ny_global + j)
             ind_write = int((i_write + 1) * mesh.Ny + (j_write + 1))
             fields.solid[ind_write] = solid[ind]
@@ -169,7 +169,7 @@ def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
         print('Distributing obstacle to sub-domains...', flush=True)
     N_local = computeLocalSize(mpiParams, mesh)
     nx = int(rank / mpiParams.nProc_y)
-    ny = int(rank % mpiParams.nProc_x)
+    ny = int(rank % mpiParams.nProc_y)
     Nx_local = N_local[nx, ny, 0]
     Ny_local = N_local[nx, ny, 1]
     if nx == mpiParams.nProc_x - 1:
