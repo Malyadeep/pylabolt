@@ -15,7 +15,7 @@ def writeFields(timeStep, fields, mesh):
                         str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
                         str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
                         str(round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
-                        str(round(fields.solid[ind], 10)).ljust(12) + '\n')
+                        str(round(fields.solid[ind, 0], 10)).ljust(12) + '\n')
     writeFile.close()
 
 
@@ -70,5 +70,24 @@ def writeFields_mpi(timeStep, fields, mesh, rank, comm):
                             str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
                             str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
                             str(round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
-                            str(round(fields.solid[ind], 10)).ljust(12) + '\n')
+                            str(round(fields.solid[ind, 0], 10)).ljust(12)
+                            + '\n')
     writeFile.close()
+
+
+def writeForces(timeStep, names, surfaceForces):
+    if not os.path.isdir('postProcessing'):
+        os.makedirs('postProcessing')
+    if not os.path.isdir('postProcessing/' + str(timeStep)):
+        os.makedirs('postProcessing/' + str(timeStep))
+    writeFile = open('postProcessing/' + str(timeStep) + '/forces.dat', 'w')
+    writeFile.write('surface_ID'.ljust(12) + '\t' +
+                    'surface'.ljust(12) + '\t' +
+                    'F_x'.ljust(12) + '\t' +
+                    'F_y'.ljust(12) + '\n')
+    for itr in range(len(names)):
+        writeFile.write(str(itr).ljust(12) + '\t' +
+                        (names[itr]).ljust(12) + '\t' +
+                        str(round(surfaceForces[itr, 0], 10)).ljust(12) + '\t'
+                        + str(round(surfaceForces[itr, 1], 10)).ljust(12)
+                        + '\n')

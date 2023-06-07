@@ -4,9 +4,11 @@ import numpy as np
 import numba
 
 
-from pylabolt.base import mesh, lattice, boundary, schemeLB, fields, initFields
+from pylabolt.base import (mesh, lattice, boundary, schemeLB, fields,
+                           initFields, obstacle)
 from pylabolt.parallel.MPI_decompose import (decompose, distributeSolid_mpi,
                                              distributeInitialFields_mpi)
+from pylabolt.base.forceSetup import forceSetup
 
 
 @numba.njit
@@ -61,6 +63,15 @@ class simulation:
             if rank == 0:
                 print('ERROR! Keyword ' + str(e) + ' missing in controlDict')
             os._exit(1)
+        try:
+            from simulation import options
+            self.computeForces = options['computeForces']
+        except ImportError:
+            self.computeForces = False
+            print('No options specified!')
+        except KeyError:
+            self.computeForces = False
+            raise Warning('No valid option specified, check documentation!')
         if rank == 0:
             self.writeControlLog()
             print('Setting control parameters done!\n', flush=True)
@@ -84,9 +95,20 @@ class simulation:
                                                         self.rank,
                                                         self.precision)
         if rank == 0:
-            self.schemeLog()
             print('Setting collision scheme and equilibrium model done!\n',
                   flush=True)
+
+        if rank == 0:
+            print('Setting forcing scheme...', flush=True)
+        self.forcingScheme = schemeLB.forcingScheme(self.precision,
+                                                    self.lattice)
+        self.forcingScheme.setForcingScheme(self.lattice,
+                                            self.collisionScheme,
+                                            self.rank,
+                                            self.precision)
+        if rank == 0:
+            self.schemeLog()
+            print('Setting forcing scheme done!\n', flush=True)
 
         if size > 1:
             if rank == 0:
@@ -116,14 +138,18 @@ class simulation:
                                     self.initialFields,
                                     self.precision, size, rank)
 
-        solid = fields.setObstacle(self.mesh, self.rank)
+        self.obstacle = obstacle.obstacleSetup()
+        solid = self.obstacle.setObstacle(self.mesh, self.rank)
         comm.Barrier()
+        if self.computeForces is True and rank == 0:
+            self.obstacle.computeFluidNb(solid, self.mesh, self.lattice,
+                                         self.size)
+        # self.obstacle.details()
         if size == 1 and solid is not None:
-            fields.solid = solid
+            self.fields.solid = solid
         elif size > 1 and solid is not None:
             distributeSolid_mpi(solid, self.fields, self.mpiParams, self.mesh,
                                 self.rank, self.size, comm)
-
         if rank == 0:
             print('Initializing fields done!\n', flush=True)
 
@@ -131,13 +157,19 @@ class simulation:
             print('Reading boundary conditions...', flush=True)
         self.boundary = boundary.boundary(boundaryDict)
         if rank == 0:
-            self.boundary.readBoundaryDict()
+            self.boundary.readBoundaryDict(self.rank)
             self.boundary.initializeBoundary(self.lattice, self.mesh,
                                              self.fields)
             # self.boundary.details()
         if rank == 0:
             self.writeDomainLog(meshDict)
             print('Reading boundary conditions done...\n', flush=True)
+        if self.computeForces is True:
+            self.forces = forceSetup()
+            if rank == 0:
+                self.forces.gatherObstacleNodes(self.obstacle)
+                self.forces.gatherBoundaryNodes(self.boundary)
+                # self.forces.details(self.rank, self.mesh, flag='all')
 
         # initialize functions
         self.equilibriumFunc = self.collisionScheme.equilibriumFunc
@@ -152,7 +184,8 @@ class simulation:
             self.fields.solid, self.collisionFunc, self.equilibriumFunc,
             self.collisionScheme.preFactor,
             self.collisionScheme.equilibriumArgs,
-            self.fields.procBoundary
+            self.fields.procBoundary, self.forcingScheme.forceFunc_force,
+            self.forcingScheme.forceArgs_force, self.lattice.noOfDirections
         )
 
         self.streamArgs = (
@@ -165,7 +198,9 @@ class simulation:
             self.mesh.Nx, self.mesh.Ny, self.fields.f_new,
             self.fields.u, self.fields.rho, self.fields.solid,
             self.lattice.c, self.lattice.noOfDirections,
-            self.fields.procBoundary, self.size
+            self.fields.procBoundary, self.size,
+            self.forcingScheme.forceFunc_vel,
+            self.forcingScheme.forceArgs_vel
         )
 
         if size > 1:
@@ -255,4 +290,12 @@ class simulation:
                          str(self.lattice.deltaX) + '\n')
         schemeFile.write('\tdeltaT in lattice units : ' +
                          str(self.lattice.deltaT) + '\n')
+        schemeFile.write('\nForcing Information...\n')
+        try:
+            schemeFile.write('\tModel : ' + self.forcingScheme.
+                             forcingModel + '\n')
+            schemeFile.write('\tValue : ' + str(self.forcingScheme.
+                             forcingValue) + '\n')
+        except AttributeError:
+            schemeFile.write('\tNo Forcing scheme selected\n')
         schemeFile.close()
