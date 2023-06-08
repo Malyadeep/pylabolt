@@ -68,10 +68,13 @@ class simulation:
             self.computeForces = options['computeForces']
         except ImportError:
             self.computeForces = False
-            print('No options specified!')
+            if rank == 0:
+                print('No options specified!')
         except KeyError:
             self.computeForces = False
-            raise Warning('No valid option specified, check documentation!')
+            if rank == 0:
+                raise Warning('No valid option specified,' +
+                              'check documentation!')
         if rank == 0:
             self.writeControlLog()
             print('Setting control parameters done!\n', flush=True)
