@@ -141,7 +141,7 @@ class forcingScheme:
             self.c = lattice.c
             self.w = lattice.w
             self.noOfDirections = lattice.noOfDirections
-            self.tau = collisionScheme.tau
+            self.omega = collisionScheme.preFactor
 
             self.forcingModel = forcingDict['model']
             self.forcingValue = forcingDict['value']
@@ -161,7 +161,7 @@ class forcingScheme:
                 self.forceArgs_vel = (self.F, self.A)
                 self.forceArgs_force = (self.F, self.c, self.w,
                                         self.noOfDirections, self.cs_2,
-                                        self.cs_4, self.tau)
+                                        self.cs_4, self.omega)
             else:
                 if rank == 0:
                     print("ERROR! Unsupported forcing model : " +

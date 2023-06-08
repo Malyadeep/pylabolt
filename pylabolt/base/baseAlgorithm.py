@@ -15,10 +15,10 @@ from pylabolt.parallel.MPI_comm import (computeResiduals, proc_boundary,
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
                           collisionFunc, equilibriumFunc, preFactor,
                           equilibriumArgs, procBoundary, forceFunc_force,
-                          forceArgs_force, noOfDirections):
+                          forceArgs_force, noOfDirections, precision):
     for ind in prange(Nx * Ny):
         if solid[ind, 0] != 1 and procBoundary[ind] != 1:
-            source = np.zeros(noOfDirections, dtype=np.float64)
+            source = np.zeros(noOfDirections, dtype=precision)
             if forceFunc_force is not None:
                 forceFunc_force(u[ind, :], source, *forceArgs_force)
             equilibriumFunc(f_eq[ind, :], u[ind, :],

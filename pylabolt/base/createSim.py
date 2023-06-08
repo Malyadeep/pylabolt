@@ -185,7 +185,8 @@ class simulation:
             self.collisionScheme.preFactor,
             self.collisionScheme.equilibriumArgs,
             self.fields.procBoundary, self.forcingScheme.forceFunc_force,
-            self.forcingScheme.forceArgs_force, self.lattice.noOfDirections
+            self.forcingScheme.forceArgs_force, self.lattice.noOfDirections,
+            self.precision
         )
 
         self.streamArgs = (
