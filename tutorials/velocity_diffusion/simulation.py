@@ -29,18 +29,14 @@ internalFields = {
 }
 
 boundaryDict = {
-    'outlet': {
+    'all': {
         'type': 'periodic',
-        'points_0': [[1, 0], [1, 1]]
-    },
-    'walls': {
-        'type': 'periodic',
-        'points_0': [[0, 0], [1, 0]],
-        'points_1': [[0, 1], [1, 1]]
-    },
-    'inlet': {
-        'type': 'periodic',
-        'points_0': [[0, 0], [0, 1]]
+        'entity': 'wall',
+        'points_0': [[1, 0], [1, 1]],
+        'points_1': [[0, 0], [1, 0]],
+        'points_2': [[0, 1], [1, 1]],
+        'points_3': [[0, 0], [0, 1]],
+
     }
 }
 
@@ -58,15 +54,4 @@ latticeDict = {
 meshDict = {
     'grid': [101, 101],
     'boundingBox': [[0, 0], [1, 1]]
-}
-
-obstacle = {
-    # 'type': 'circle',
-    # 'center': [2, 0.5],
-    # 'radius': 0.25
-}
-
-decomposeDict = {
-    'nx': 3,
-    'ny': 2
 }

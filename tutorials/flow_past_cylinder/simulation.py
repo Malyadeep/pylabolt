@@ -10,6 +10,7 @@ controlDict = {
     'precision': 'double'
 }
 
+
 internalFields = {
     'default': {
         'u': 0,
@@ -21,18 +22,21 @@ internalFields = {
 boundaryDict = {
     'outlet': {
         'type': 'zeroGradient',
-        'points_2': [[10, 0], [10, 1]]
+        'entity': 'patch',
+        'points_0': [[10, 0], [10, 1]]
     },
     'periodic': {
         'type': 'periodic',
+        'entity': 'patch',
         'value': 0.,
         'points_0': [[0, 0], [10, 0]],
         'points_1': [[0, 1], [10, 1]]
     },
     'inlet': {
         'type': 'fixedU',
+        'entity': 'patch',
         'value': [0.1, 0],
-        'points_1': [[0, 0], [0, 1]]
+        'points_0': [[0, 0], [0, 1]]
     }
 }
 
@@ -52,12 +56,14 @@ meshDict = {
 }
 
 obstacle = {
-    'type': 'circle',
-    'center': [2, 0.5],
-    'radius': 0.25
+    'cylinder': {
+        'type': 'circle',
+        'center': [2, 0.5],
+        'radius': 0.25
+    }
 }
 
 decomposeDict = {
-    'nx': 9,
-    'ny': 1
+    'nx': 5,
+    'ny': 2
 }

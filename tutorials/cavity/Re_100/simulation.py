@@ -21,12 +21,14 @@ internalFields = {
 boundaryDict = {
     'walls': {
         'type': 'bounceBack',
+        'entity': 'wall',
         'points_2': [[1, 0], [1, 1]],
         'points_0': [[0, 0], [1, 0]],
         'points_1': [[0, 0], [0, 1]]
     },
     'lid': {
         'type': 'fixedU',
+        'entity': 'wall',
         'value': [0.1, 0],
         'points_1': [[0, 1], [1, 1]]
     }

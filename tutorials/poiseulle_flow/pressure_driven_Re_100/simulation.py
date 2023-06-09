@@ -1,6 +1,6 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 50000,
+    'endTime': 70000,
     'stdOutputInterval': 100,
     'saveInterval': 10000,
     'saveStateInterval': None,
@@ -19,30 +19,30 @@ internalFields = {
 }
 
 boundaryDict = {
+    'outlet': {
+        'type': 'fixedPressure',
+        'entity': 'patch',
+        'value': 0.3333333,
+        'points_0': [[3, 0], [3, 1]]
+    },
     'walls': {
         'type': 'bounceBack',
         'entity': 'wall',
-        'points_1': [[0, 0], [1, 0]]
+        'points_0': [[0, 0], [3, 0]],
+        'points_1': [[0, 1], [3, 1]]
     },
-    'movingWall': {
-        'type': 'fixedU',
-        'entity': 'wall',
-        'value': [0.1, 0],
-        'points_0': [[0, 1], [1, 1]]
-    },
-    'Periodic': {
-        'type': 'periodic',
+    'inlet': {
+        'type': 'fixedPressure',
         'entity': 'patch',
-        'value': 0,
-        'points_0': [[0, 0], [0, 1]],
-        'points_1': [[1, 0], [1, 1]]
+        'value': 0.3383333,
+        'points_0': [[0, 0], [0, 1]]
     }
 }
 
 collisionDict = {
     'model': 'BGK',
     'tau': 0.8,
-    'equilibrium': 'incompressible',
+    'equilibrium': 'secondOrder',
     'rho_ref': 1
 }
 
@@ -51,6 +51,11 @@ latticeDict = {
 }
 
 meshDict = {
-    'grid': [101, 101],
-    'boundingBox': [[0, 0], [1, 1]]
+    'grid': [121, 41],
+    'boundingBox': [[0, 0], [3, 1]]
+}
+
+decomposeDict = {
+    'nx': 3,
+    'ny': 1
 }
