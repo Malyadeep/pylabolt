@@ -193,6 +193,21 @@ def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
         comm.Recv(solid_temp, source=0, tag=rank)
         solidCopy(solid, fields, mpiParams, Nx_local, Ny_local, mesh)
     comm.Barrier()
+    solid_send_topBottom = np.zeros((mesh.Nx + 2, 2),
+                                    dtype=np.int32)
+    solid_recv_topBottom = np.zeros((mesh.Nx + 2, 2),
+                                    dtype=np.int32)
+    solid_send_leftRight = np.zeros((mesh.Ny + 2, 2),
+                                    dtype=np.int32)
+    solid_recv_leftRight = np.zeros((mesh.Ny + 2, 2),
+                                    dtype=np.int32)
+    args = (mesh.Nx, mesh.Ny,
+            fields.solid, solid_send_topBottom,
+            solid_recv_topBottom, solid_send_leftRight,
+            solid_recv_leftRight, mpiParams.nx,
+            mpiParams.ny, mpiParams.nProc_x,
+            mpiParams.nProc_y, comm)
+    proc_boundary(*args)
     if rank == 0:
         print('Done distributing obstacle!', flush=True)
 
@@ -343,20 +358,5 @@ def distributeForceNodes_mpi(simulation, rank, size, comm):
         simulation.forces.surfaceOutList = dataFromRoot[4]
         simulation.forces.obstacleFlag = dataFromRoot[5]
     comm.Barrier()
-    solid_send_topBottom = np.zeros((simulation.mesh.Nx + 2, 2),
-                                    dtype=np.int32)
-    solid_recv_topBottom = np.zeros((simulation.mesh.Nx + 2, 2),
-                                    dtype=np.int32)
-    solid_send_leftRight = np.zeros((simulation.mesh.Ny + 2, 2),
-                                    dtype=np.int32)
-    solid_recv_leftRight = np.zeros((simulation.mesh.Ny + 2, 2),
-                                    dtype=np.int32)
-    args = (simulation.mesh.Nx, simulation.mesh.Ny,
-            simulation.fields.solid, solid_send_topBottom,
-            solid_recv_topBottom, solid_send_leftRight,
-            solid_recv_leftRight, simulation.mpiParams.nx,
-            simulation.mpiParams.ny, simulation.mpiParams.nProc_x,
-            simulation.mpiParams.nProc_y, comm)
-    proc_boundary(*args)
     if rank == 0:
         print('Distributing nodes to sub-domains done!', flush=True)
