@@ -204,7 +204,9 @@ class simulation:
             self.lattice.c, self.lattice.noOfDirections,
             self.fields.procBoundary, self.size,
             self.forcingScheme.forceFunc_vel,
-            self.forcingScheme.forceArgs_vel
+            self.forcingScheme.forceArgs_vel,
+            self.fields.f_eq, self.collisionScheme.preFactor,
+            self.fields.sigma, self.precision
         )
 
         if size > 1:

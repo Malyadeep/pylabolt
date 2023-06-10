@@ -15,7 +15,11 @@ def writeFields(timeStep, fields, mesh):
                         str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
                         str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
                         str(round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
-                        str(round(fields.solid[ind, 0], 10)).ljust(12) + '\n')
+                        str(round(fields.solid[ind, 0], 10)).ljust(12) + '\t' +
+                        str(round(fields.sigma[ind, 0], 10)).ljust(12) + '\t' +
+                        str(round(fields.sigma[ind, 1], 10)).ljust(12) + '\t' +
+                        str(round(fields.sigma[ind, 2], 10)).ljust(12) + '\t' +
+                        str(round(fields.sigma[ind, 3], 10)).ljust(12) + '\n')
     writeFile.close()
 
 
