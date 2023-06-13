@@ -73,7 +73,8 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
     return u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq
 
 
-def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid, size):
+def stream(Nx, Ny, f, f_new, solid, rho, u, c, w, noOfDirections,
+           cs_2, invList, size):
     for ind in prange(Nx * Ny):
         i, j = int(ind / Ny), int(ind % Ny)
         for k in range(noOfDirections):
@@ -85,7 +86,11 @@ def stream(Nx, Ny, f, f_new, c, noOfDirections, invList, solid, size):
             if solid[i_old * Ny + j_old, 0] != 1:
                 f_new[ind, k] = f[i_old * Ny + j_old, k]
             elif solid[i_old * Ny + j_old, 0] == 1:
-                f_new[ind, k] = f[ind, invList[k]]
+                ind_old = i_old * Ny + j_old
+                preFactor = 2 * w[invList[k]] * rho[ind] * \
+                    (c[invList[k], 0] * u[ind_old, 0] +
+                     c[invList[k], 1] * u[ind_old, 1]) * cs_2
+                f_new[ind, k] = f[ind, invList[k]] - preFactor
 
 
 class baseAlgorithm:

@@ -1,6 +1,7 @@
 import numpy as np
 import numba
 from numba import prange
+import matplotlib.pyplot as plt
 
 
 class forceSetup:
@@ -52,7 +53,7 @@ class forceSetup:
                            mesh.Nx, mesh.Ny, temp, lattice.noOfDirections)
             self.forces.append(np.sum(temp, axis=0))
 
-    def details(self, rank, mesh, flag):
+    def details(self, rank, mesh, solid, u, flag):
         print('\n\n\n')
         print(rank, self.surfaceNames)
         print(rank, self.surfaceNamesGlobal)
@@ -70,8 +71,22 @@ class forceSetup:
         print('\n')
         if flag == 'all':
             print(check.T)
+            print()
+            print(solid.reshape(mesh.Nx, mesh.Ny, 2)[:, :, 0].T)
+            print()
+            u_temp = u.reshape(mesh.Nx, mesh.Ny, 2)
+            plt.figure(figsize=(6, 6))
+            X = np.linspace(0, mesh.Nx - 1, mesh.Nx)
+            Y = np.linspace(0, mesh.Ny - 1, mesh.Ny)
+            x, y = np.meshgrid(X, Y)
+            plt.quiver(x, y, u_temp[:, :, 0].T, u_temp[:, :, 1].T)
+            plt.show()
         else:
             print(check[1:-1, 1:-1].T)
+            print()
+            print(solid.reshape(mesh.Nx, mesh.Ny, 2)[1:-1, 1:-1, 0])
+            print()
+            print(u.reshape(mesh.Nx, mesh.Ny, 2)[1:-1, 1:-1, 0])
 
     def setupForcesParallel_cpu(self, parallel):
         self.forceFunc = numba.njit(self.forceFunc,
@@ -93,7 +108,7 @@ def force(f, f_new, solid, procBoundary, surfaceNodes, surfaceInvList,
                                        (f_new[ind, surfaceInvList[k]]
                                        * c[surfaceInvList[k], 0]))
                     forces[itr, 1] += ((- f[ind, surfaceOutList[k]] *
-                                       c[surfaceOutList[k], 1]) +
+                                       c[surfaceOutList[k], 1]) * 2 +
                                        (f_new[ind, surfaceInvList[k]]
                                        * c[surfaceInvList[k], 1]))
             elif obstacleFlag == 1:

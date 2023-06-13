@@ -4,9 +4,11 @@ import numba
 import numpy as np
 
 
-def circle(center, radius, solid, mesh, obsNo):
-    center_idx = np.int32(np.divide(center, mesh.delX))
-    radius_idx = int(radius/mesh.delX)
+def circle(center, radius, solid, u, mesh, obsNo, velType='fixedTranslational',
+           velValue=[0.0, 0.0], velOrigin=0, velOmega=0):
+    center_idx = np.int64(np.divide(center, mesh.delX))
+    radius_idx = np.int64(radius/mesh.delX)
+    origin_idx = np.int64(np.divide(velOrigin, mesh.delX))
     for i in range(mesh.Nx_global):
         for j in range(mesh.Ny_global):
             if ((i - center_idx[0])*(i - center_idx[0]) +
@@ -15,6 +17,16 @@ def circle(center, radius, solid, mesh, obsNo):
                 ind = i * mesh.Ny_global + j
                 solid[ind, 0] = 1
                 solid[ind, 1] = obsNo
+                if velType == 'fixedTranslational':
+                    u[ind, 0] = velValue[0]
+                    u[ind, 1] = velValue[1]
+                elif velType == 'fixedRotational':
+                    x = i - origin_idx[0]
+                    y = j - origin_idx[1]
+                    theta = np.arctan2(y, x)
+                    r = np.sqrt(x**2 + y**2)
+                    u[ind, 0] = - r * velOmega * np.sin(theta)
+                    u[ind, 1] = r * velOmega * np.cos(theta)
 
 
 def rectangle(boundingBox, solid, mesh, obsNo):
@@ -27,6 +39,32 @@ def rectangle(boundingBox, solid, mesh, obsNo):
                 ind = i * mesh.Ny_global + j
                 solid[ind, 0] = 1
                 solid[ind, 1] = obsNo
+
+
+def circularConfinement(center, radius, solid, u, mesh, obsNo,
+                        velType='fixedTranslational', velValue=[0.0, 0.0],
+                        velOrigin=0, velOmega=0):
+    center_idx = np.int64(np.divide(center, mesh.delX))
+    radius_idx = np.int64(radius/mesh.delX)
+    origin_idx = np.int64(np.divide(velOrigin, mesh.delX))
+    for i in range(mesh.Nx_global):
+        for j in range(mesh.Ny_global):
+            if ((i - center_idx[0])*(i - center_idx[0]) +
+                    (j - center_idx[1])*(j - center_idx[1]) >=
+                    radius_idx*radius_idx):
+                ind = i * mesh.Ny_global + j
+                solid[ind, 0] = 1
+                solid[ind, 1] = obsNo
+                if velType == 'fixedTranslational':
+                    u[ind, 0] = velValue[0]
+                    u[ind, 1] = velValue[1]
+                elif velType == 'fixedRotational':
+                    x = i - origin_idx[0]
+                    y = j - origin_idx[1]
+                    theta = np.arctan2(y, x)
+                    r = np.sqrt(x**2 + y**2)
+                    u[ind, 0] = - r * velOmega * np.sin(theta)
+                    u[ind, 1] = r * velOmega * np.cos(theta)
 
 
 @numba.njit
@@ -54,7 +92,7 @@ class obstacleSetup:
         self.noOfObstacles = 0
         self.fluidNbObstacle = []
 
-    def setObstacle(self, mesh, rank):
+    def setObstacle(self, mesh, precision, u, rank):
         workingDir = os.getcwd()
         sys.path.append(workingDir)
         try:
@@ -84,12 +122,49 @@ class obstacleSetup:
                         center = np.array(center, dtype=np.float64)
                         radius = np.float64(radius)
                     else:
-                        print("ERROR!", flush=True)
-                        print("For 'circle' type obstacle center must"
-                              + " be a list and radius must be a float",
-                              flush=True)
+                        if rank == 0:
+                            print("ERROR!", flush=True)
+                            print("For 'circle' type obstacle center must"
+                                  + " be a list and radius must be a float",
+                                  flush=True)
                         os._exit(1)
-                    circle(center, radius, solid, mesh, obsNo)
+                    static = obstacle[obsName]['static']
+                    if static is True:
+                        circle(center, radius, solid, u, mesh, obsNo)
+                    else:
+                        velDict = obstacle[obsName]['U_def']
+                        if velDict['type'] == 'fixedTranslational':
+                            velType = 'fixedTranslational'
+                            velValue = velDict['value']
+                            if not isinstance(velValue, list):
+                                if rank == 0:
+                                    print("ERROR!", flush=True)
+                                    print("For 'fixedTranslational' type "
+                                          + "velocity, value must be a list",
+                                          flush=True)
+                                os._exit(1)
+                            velValue = np.array(velValue, dtype=precision)
+                            circle(center, radius, solid, u, mesh, obsNo,
+                                   velType=velType, velValue=velValue)
+                        elif velDict['type'] == 'fixedRotational':
+                            velType = 'fixedRotational'
+                            velOrigin = velDict['origin']
+                            velOmega = velDict['angularVelocity']
+                            if (not isinstance(velOrigin, list) and not
+                                    isinstance(velOmega, float)):
+                                if rank == 0:
+                                    print("ERROR!", flush=True)
+                                    print("For 'fixedRotational' type " +
+                                          "velocity, origin must be " +
+                                          "a list and angular velocity " +
+                                          "must be a float",
+                                          flush=True)
+                                os._exit(1)
+                            velOrigin = np.array(velOrigin, dtype=precision)
+                            velOmega = precision(velOmega)
+                            circle(center, radius, solid, u, mesh, obsNo,
+                                   velType=velType, velOrigin=velOrigin,
+                                   velOmega=velOmega)
                 elif obstacleType == 'rectangle':
                     boundingBox = obstacle[obsName]['boundingBox']
                     if isinstance(boundingBox, list):
@@ -100,6 +175,59 @@ class obstacleSetup:
                               + "  must be a list", flush=True)
                         os._exit(1)
                     rectangle(boundingBox, solid, mesh, obsNo)
+                elif obstacleType == 'circularConfinement':
+                    center = obstacle[obsName]['center']
+                    radius = obstacle[obsName]['radius']
+                    if isinstance(center, list) and isinstance(radius, float):
+                        center = np.array(center, dtype=np.float64)
+                        radius = np.float64(radius)
+                    else:
+                        print("ERROR!", flush=True)
+                        print("For 'circularConfinement' type obstacle center"
+                              + " must be a list and radius must be a float",
+                              flush=True)
+                        os._exit(1)
+                    static = obstacle[obsName]['static']
+                    if static is True:
+                        circularConfinement(center, radius, solid, u,
+                                            mesh, obsNo)
+                    else:
+                        velDict = obstacle[obsName]['U_def']
+                        if velDict['type'] == 'fixedTranslational':
+                            velType = 'fixedTranslational'
+                            velValue = velDict['value']
+                            if not isinstance(velValue, list):
+                                if rank == 0:
+                                    print("ERROR!", flush=True)
+                                    print("For 'circle' type obstacle center "
+                                          + " must be a list and radius must" +
+                                          " be a float",
+                                          flush=True)
+                                os._exit(1)
+                            velValue = np.array(velValue, dtype=precision)
+                            circularConfinement(center, radius, solid, u,
+                                                mesh, obsNo, velType=velType,
+                                                velValue=velValue)
+                        elif velDict['type'] == 'fixedRotational':
+                            velType = 'fixedRotational'
+                            velOrigin = velDict['origin']
+                            velOmega = velDict['angularVelocity']
+                            if (not isinstance(velOrigin, list) and not
+                                    isinstance(velOmega, float)):
+                                if rank == 0:
+                                    print("ERROR!", flush=True)
+                                    print("For 'fixedRotational' type " +
+                                          "velocity, origin must be " +
+                                          "a list and angular velocity " +
+                                          "must be a float",
+                                          flush=True)
+                                os._exit(1)
+                            velOrigin = np.array(velOrigin, dtype=precision)
+                            velOmega = precision(velOmega)
+                            circularConfinement(center, radius, solid, u, mesh,
+                                                obsNo, velType=velType,
+                                                velOrigin=velOrigin,
+                                                velOmega=velOmega)
                 else:
                     print("ERROR!")
                     print("Unsupported obstacle type!", flush=True)

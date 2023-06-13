@@ -177,9 +177,9 @@ def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,
                 sum_u_sq += temp_sum_u_sq
                 sum_v_sq += temp_sum_v_sq
                 sum_rho_sq += temp_sum_rho_sq
-            resU = np.sqrt(sum_u_sq/(sum_u + 1e-9))
-            resV = np.sqrt(sum_v_sq/(sum_v + 1e-9))
-            resRho = np.sqrt(sum_rho_sq/(sum_rho + 1e-9))
+            resU = np.sqrt(sum_u_sq/(sum_u + 1e-10))
+            resV = np.sqrt(sum_v_sq/(sum_v + 1e-10))
+            resRho = np.sqrt(sum_rho_sq/(sum_rho + 1e-10))
             return resU, resV, resRho
         else:
             comm.send(u_sq, dest=0, tag=1*rank)
@@ -190,9 +190,9 @@ def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,
             comm.send(rho_err_sq, dest=0, tag=6*rank)
             return 0, 0, 0
     else:
-        resU = np.sqrt(u_err_sq/(u_sq + 1e-8))
-        resV = np.sqrt(v_err_sq/(v_sq + 1e-8))
-        resRho = np.sqrt(rho_err_sq/(rho_sq + 1e-8))
+        resU = np.sqrt(u_err_sq/(u_sq + 1e-10))
+        resV = np.sqrt(v_err_sq/(v_sq + 1e-10))
+        resRho = np.sqrt(rho_err_sq/(rho_sq + 1e-10))
         return resU, resV, resRho
 
 

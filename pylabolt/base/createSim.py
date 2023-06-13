@@ -142,7 +142,8 @@ class simulation:
                                     self.precision, size, rank)
 
         self.obstacle = obstacle.obstacleSetup()
-        solid = self.obstacle.setObstacle(self.mesh, self.rank)
+        solid = self.obstacle.setObstacle(self.mesh, self.precision,
+                                          self.fields.u, self.rank)
         comm.Barrier()
         if self.computeForces is True and rank == 0:
             self.obstacle.computeFluidNb(solid, self.mesh, self.lattice,
@@ -172,7 +173,8 @@ class simulation:
             if rank == 0:
                 self.forces.gatherObstacleNodes(self.obstacle)
                 self.forces.gatherBoundaryNodes(self.boundary)
-                # self.forces.details(self.rank, self.mesh, flag='all')
+                # self.forces.details(self.rank, self.mesh, self.fields.solid,
+                #                     self.fields.u, flag='all')
 
         # initialize functions
         self.equilibriumFunc = self.collisionScheme.equilibriumFunc
@@ -194,8 +196,10 @@ class simulation:
 
         self.streamArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f, self.fields.f_new,
-            self.lattice.c, self.lattice.noOfDirections,
-            self.lattice.invList, self.fields.solid, self.size
+            self.fields.solid, self.fields.rho, self.fields.u, self.lattice.c,
+            self.lattice.w, self.lattice.noOfDirections,
+            self.collisionScheme.cs_2,
+            self.lattice.invList, self.size
         )
 
         self.computeFieldsArgs = (
