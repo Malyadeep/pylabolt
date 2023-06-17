@@ -42,13 +42,13 @@ the working directory::
 The ``output_<time-step>.vtk`` files are stored in ``output/VTK`` directory which can be opened in
 Paraview/Mayavi. Sample results for lid driven cavity, plane Poiseuille flow, and flow past a cylinder are shown below.
 
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/Re_100/cavity_Vcontour.png
+.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/cavity_Vcontour.png
    :width: 550px
    :alt: lid driven cavity (Re = 100)
 
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/Re_100/V_contour.png
+.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/gravity_driven/U_contour.png
    :width: 550px
-   :alt: Plane Poiseuille flow (Re = 100)
+   :alt: Gravity driven plane Poiseuille flow (Re = 100)
 
 .. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png
    :width: 550px
