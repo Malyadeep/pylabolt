@@ -1,6 +1,6 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 50000,
+    'endTime': 100000,
     'stdOutputInterval': 100,
     'saveInterval': 10000,
     'saveStateInterval': None,
@@ -42,7 +42,7 @@ boundaryDict = {
 collisionDict = {
     'model': 'BGK',
     'tau': 0.8,
-    'equilibrium': 'incompressible',
+    'equilibrium': 'secondOrder',
     'rho_ref': 1
 }
 

@@ -92,7 +92,7 @@ class obstacleSetup:
         self.noOfObstacles = 0
         self.fluidNbObstacle = []
 
-    def setObstacle(self, mesh, precision, u, rank):
+    def setObstacle(self, mesh, precision, initialFields, rank):
         workingDir = os.getcwd()
         sys.path.append(workingDir)
         try:
@@ -104,8 +104,12 @@ class obstacleSetup:
                 print('No obstacle defined!', flush=True)
             return
         try:
-            solid = np.full((mesh.Nx_global * mesh.Ny_global, 2), fill_value=0,
-                            dtype=np.int32)
+            if rank == 0:
+                solid = np.full((mesh.Nx_global * mesh.Ny_global, 2),
+                                fill_value=0, dtype=np.int32)
+                u = initialFields.u
+            else:
+                return 0, 0
             if len(obstacle.keys()) == 0:
                 if rank == 0:
                     print('Reading Obstacle data done!', flush=True)

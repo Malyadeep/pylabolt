@@ -59,7 +59,8 @@ obstacle = {
     'cylinder': {
         'type': 'circle',
         'center': [2, 0.5],
-        'radius': 0.25
+        'radius': 0.25,
+        'static': True
     }
 }
 

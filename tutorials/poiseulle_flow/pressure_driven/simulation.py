@@ -1,6 +1,6 @@
 controlDict = {
     'startTime': 0,
-    'endTime': 50000,
+    'endTime': 100000,
     'stdOutputInterval': 100,
     'saveInterval': 10000,
     'saveStateInterval': None,
@@ -8,10 +8,6 @@ controlDict = {
     'relTolV': 1e-9,
     'relTolRho': 1e-7,
     'precision': 'double'
-}
-
-options = {
-    'computeForces': True
 }
 
 internalFields = {
@@ -24,8 +20,9 @@ internalFields = {
 
 boundaryDict = {
     'outlet': {
-        'type': 'periodic',
+        'type': 'fixedPressure',
         'entity': 'patch',
+        'value': 0.3333333,
         'points_0': [[3, 0], [3, 1]]
     },
     'walls': {
@@ -35,21 +32,17 @@ boundaryDict = {
         'points_1': [[0, 1], [3, 1]]
     },
     'inlet': {
-        'type': 'periodic',
+        'type': 'fixedPressure',
         'entity': 'patch',
+        'value': 0.3383333,
         'points_0': [[0, 0], [0, 1]]
     }
-}
-
-forcingDict = {
-    'model': 'Guo',
-    'value': [8e-6, 0]
 }
 
 collisionDict = {
     'model': 'BGK',
     'tau': 0.8,
-    'equilibrium': 'incompressible',
+    'equilibrium': 'secondOrder',
     'rho_ref': 1
 }
 
@@ -58,11 +51,11 @@ latticeDict = {
 }
 
 meshDict = {
-    'grid': [301, 101],
+    'grid': [121, 41],
     'boundingBox': [[0, 0], [3, 1]]
 }
 
 decomposeDict = {
     'nx': 3,
-    'ny': 2
+    'ny': 1
 }

@@ -116,7 +116,7 @@ def fieldCopy(fields_temp, fields, mpiParams, Nx_local, Ny_local, mesh):
 
 
 def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
-                                rank, size, comm):
+                                rank, size, comm, precision):
     if rank == 0:
         print('MPI option selected', flush=True)
         print('Distributing fields to sub-domains...', flush=True)
@@ -141,6 +141,40 @@ def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
     else:
         fields_temp = comm.recv(source=0, tag=rank)
         fieldCopy(fields_temp, fields, mpiParams, Nx_local, Ny_local, mesh)
+    comm.Barrier()
+    initial_send_topBottom = np.zeros((mesh.Nx + 2, 2),
+                                      dtype=precision)
+    initial_recv_topBottom = np.zeros((mesh.Nx + 2, 2),
+                                      dtype=precision)
+    initial_send_leftRight = np.zeros((mesh.Ny + 2, 2),
+                                      dtype=precision)
+    initial_recv_leftRight = np.zeros((mesh.Ny + 2, 2),
+                                      dtype=precision)
+    args = (mesh.Nx, mesh.Ny,
+            fields.u, initial_send_topBottom,
+            initial_recv_topBottom, initial_send_leftRight,
+            initial_recv_leftRight, mpiParams.nx,
+            mpiParams.ny, mpiParams.nProc_x,
+            mpiParams.nProc_y, comm)
+    proc_boundary(*args)
+    comm.Barrier()
+    initial_send_topBottom = np.zeros((mesh.Nx + 2, 1),
+                                      dtype=precision)
+    initial_recv_topBottom = np.zeros((mesh.Nx + 2, 1),
+                                      dtype=precision)
+    initial_send_leftRight = np.zeros((mesh.Ny + 2, 1),
+                                      dtype=precision)
+    initial_recv_leftRight = np.zeros((mesh.Ny + 2, 1),
+                                      dtype=precision)
+    rho_temp = fields.rho.reshape(mesh.Nx * mesh.Ny, 1)
+    args = (mesh.Nx, mesh.Ny,
+            rho_temp, initial_send_topBottom,
+            initial_recv_topBottom, initial_send_leftRight,
+            initial_recv_leftRight, mpiParams.nx,
+            mpiParams.ny, mpiParams.nProc_x,
+            mpiParams.nProc_y, comm)
+    fields.rho = rho_temp.reshape(mesh.Nx * mesh.Ny)
+    proc_boundary(*args)
     comm.Barrier()
     if rank == 0:
         print('Done distributing fields!', flush=True)
@@ -191,7 +225,7 @@ def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
         solid_temp = np.zeros((mesh.Nx_global * mesh.Ny_global, 2),
                               dtype=np.int32)
         comm.Recv(solid_temp, source=0, tag=rank)
-        solidCopy(solid, fields, mpiParams, Nx_local, Ny_local, mesh)
+        solidCopy(solid_temp, fields, mpiParams, Nx_local, Ny_local, mesh)
     comm.Barrier()
     solid_send_topBottom = np.zeros((mesh.Nx + 2, 2),
                                     dtype=np.int32)
@@ -208,6 +242,7 @@ def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
             mpiParams.ny, mpiParams.nProc_x,
             mpiParams.nProc_y, comm)
     proc_boundary(*args)
+    comm.Barrier()
     if rank == 0:
         print('Done distributing obstacle!', flush=True)
 
@@ -291,8 +326,9 @@ def distributeForceNodes_mpi(simulation, rank, size, comm):
     if rank == 0:
         print('\nMPI option with force computation selected', flush=True)
         print('Distributing nodes to sub-domains...', flush=True)
+    N_local = computeLocalSize(simulation.mpiParams, simulation.mesh)
+    simulation.options.N_local = N_local
     if rank == 0:
-        N_local = computeLocalSize(simulation.mpiParams, simulation.mesh)
         for nx in range(simulation.mpiParams.nProc_x - 1, -1, -1):
             for ny in range(simulation.mpiParams.nProc_y - 1, -1, -1):
                 Nx_local = N_local[nx, ny, 0]
@@ -303,10 +339,10 @@ def distributeForceNodes_mpi(simulation, rank, size, comm):
                 surfaceInvList = []
                 surfaceOutList = []
                 obstacleFlag = []
-                for itr in range(simulation.forces.noOfSurfaces):
+                for itr in range(simulation.options.noOfSurfaces):
                     flag = 0
                     tempFaces = []
-                    for ind in simulation.forces.surfaceNodes[itr]:
+                    for ind in simulation.options.surfaceNodes[itr]:
                         i = int(ind / simulation.mesh.Ny_global)
                         j = int(ind % simulation.mesh.Ny_global)
                         if nx == simulation.mpiParams.nProc_x - 1:
@@ -329,34 +365,34 @@ def distributeForceNodes_mpi(simulation, rank, size, comm):
                         noOfSurfaces += 1
                         surfaceNodes.append(np.array(tempFaces,
                                             dtype=np.int64))
-                        surfaceNames.append(simulation.forces.
+                        surfaceNames.append(simulation.options.
                                             surfaceNames[itr])
-                        surfaceInvList.append(simulation.forces.
+                        surfaceInvList.append(simulation.options.
                                               surfaceInvList[itr])
-                        surfaceOutList.append(simulation.forces.
+                        surfaceOutList.append(simulation.options.
                                               surfaceOutList[itr])
-                        obstacleFlag.append(simulation.forces.
+                        obstacleFlag.append(simulation.options.
                                             obstacleFlag[itr])
                 dataToProc = (noOfSurfaces, surfaceNames, surfaceNodes,
                               surfaceInvList, surfaceOutList, obstacleFlag)
                 rank_send = nx * simulation.mpiParams.nProc_y + ny
                 if rank_send == 0:
-                    simulation.forces.noOfSurfaces = dataToProc[0]
-                    simulation.forces.surfaceNames = dataToProc[1]
-                    simulation.forces.surfaceNodes = dataToProc[2]
-                    simulation.forces.surfaceInvList = dataToProc[3]
-                    simulation.forces.surfaceOutList = dataToProc[4]
-                    simulation.forces.obstacleFlag = dataToProc[5]
+                    simulation.options.noOfSurfaces = dataToProc[0]
+                    simulation.options.surfaceNames = dataToProc[1]
+                    simulation.options.surfaceNodes = dataToProc[2]
+                    simulation.options.surfaceInvList = dataToProc[3]
+                    simulation.options.surfaceOutList = dataToProc[4]
+                    simulation.options.obstacleFlag = dataToProc[5]
                 else:
                     comm.send(dataToProc, dest=rank_send, tag=rank_send)
     else:
         dataFromRoot = comm.recv(source=0, tag=rank)
-        simulation.forces.noOfSurfaces = dataFromRoot[0]
-        simulation.forces.surfaceNames = dataFromRoot[1]
-        simulation.forces.surfaceNodes = dataFromRoot[2]
-        simulation.forces.surfaceInvList = dataFromRoot[3]
-        simulation.forces.surfaceOutList = dataFromRoot[4]
-        simulation.forces.obstacleFlag = dataFromRoot[5]
+        simulation.options.noOfSurfaces = dataFromRoot[0]
+        simulation.options.surfaceNames = dataFromRoot[1]
+        simulation.options.surfaceNodes = dataFromRoot[2]
+        simulation.options.surfaceInvList = dataFromRoot[3]
+        simulation.options.surfaceOutList = dataFromRoot[4]
+        simulation.options.obstacleFlag = dataFromRoot[5]
     comm.Barrier()
     if rank == 0:
         print('Distributing nodes to sub-domains done!', flush=True)

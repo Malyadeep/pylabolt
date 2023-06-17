@@ -58,6 +58,7 @@ def main():
     y_sim, u_all = extract_data_poiseuille(Nx, Ny)
     y_an, u_an = analytical(Nx, Ny)
     plot_U_poiseuille(Nx, Ny, y_sim, u_all, y_an, u_an)
+    print(np.max(u_all[0]))
 
 
 if __name__ == '__main__':

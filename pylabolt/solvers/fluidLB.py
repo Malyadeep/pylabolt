@@ -33,9 +33,14 @@ def main(parallelization, n_threads):
         if size > 1:
             distributeBoundaries_mpi(simulation.boundary, simulation.mpiParams,
                                      simulation.mesh, rank, size, comm)
-            if simulation.computeForces is True:
+            if (simulation.options.computeForces is True or
+                    simulation.options.computeTorque is True):
                 distributeForceNodes_mpi(simulation,
                                          rank, size, comm)
+            # if rank == 3:
+            #     simulation.options.details(simulation.rank, simulation.mesh,
+            #                                simulation.fields.solid,
+            #                                simulation.fields.u, flag='local')
         base.jitWarmUp(simulation, size, rank, comm)
     if parallel.mode == 'cuda':
         start = time.perf_counter()

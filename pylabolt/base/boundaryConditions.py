@@ -72,6 +72,6 @@ def zeroGradient(f, f_new, rho, u, solid, faceList, outDirections,
                 f[faceList[ind], k] = f[ind_nb, k]
 
 
-def periodic(f, f_new, rho, u, faceList, outDirections, invDirections,
+def periodic(f, f_new, rho, u, solid, faceList, outDirections, invDirections,
              boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
     pass

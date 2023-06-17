@@ -208,7 +208,7 @@ class boundary:
     def setBoundary(self, fields, lattice, mesh):
         for itr in range(self.noOfBoundaries):
             args = (fields.f, fields.f_new, fields.rho, fields.u,
-                    self.faceList[itr], self.outDirections[itr],
+                    fields.solid, self.faceList[itr], self.outDirections[itr],
                     self.invDirections[itr], self.boundaryVector[itr],
                     self.boundaryScalar[itr], lattice.c, lattice.w,
                     lattice.cs, mesh.Nx, mesh.Ny)

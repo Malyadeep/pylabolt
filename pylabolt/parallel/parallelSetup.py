@@ -135,5 +135,6 @@ class parallelSetup:
                                                  cache=False,
                                                  nogil=True)
         simulation.boundary.setupBoundary_cpu(parallel)
-        if simulation.computeForces is True:
-            simulation.forces.setupForcesParallel_cpu(parallel)
+        if (simulation.options.computeForces is True or
+                simulation.options.computeTorque is True):
+            simulation.options.setupForcesParallel_cpu(parallel)

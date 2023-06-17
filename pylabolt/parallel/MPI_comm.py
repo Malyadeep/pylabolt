@@ -177,9 +177,15 @@ def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,
                 sum_u_sq += temp_sum_u_sq
                 sum_v_sq += temp_sum_v_sq
                 sum_rho_sq += temp_sum_rho_sq
-            resU = np.sqrt(sum_u_sq/(sum_u + 1e-10))
-            resV = np.sqrt(sum_v_sq/(sum_v + 1e-10))
-            resRho = np.sqrt(sum_rho_sq/(sum_rho + 1e-10))
+            if np.isclose(sum_u, 0, rtol=1e-10):
+                sum_u += 1e-10
+            if np.isclose(sum_v, 0, rtol=1e-10):
+                sum_v += 1e-10
+            if np.isclose(sum_rho, 0, rtol=1e-10):
+                sum_rho += 1e-10
+            resU = np.sqrt(sum_u_sq/(sum_u))
+            resV = np.sqrt(sum_v_sq/(sum_v))
+            resRho = np.sqrt(sum_rho_sq/(sum_rho))
             return resU, resV, resRho
         else:
             comm.send(u_sq, dest=0, tag=1*rank)
@@ -190,35 +196,47 @@ def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,
             comm.send(rho_err_sq, dest=0, tag=6*rank)
             return 0, 0, 0
     else:
-        resU = np.sqrt(u_err_sq/(u_sq + 1e-10))
-        resV = np.sqrt(v_err_sq/(v_sq + 1e-10))
-        resRho = np.sqrt(rho_err_sq/(rho_sq + 1e-10))
+        if np.isclose(u_sq, 0, rtol=1e-10):
+            u_sq += 1e-10
+        if np.isclose(v_sq, 0, rtol=1e-10):
+            v_sq += 1e-10
+        if np.isclose(rho_sq, 0, rtol=1e-10):
+            rho_sq += 1e-10
+        resU = np.sqrt(u_err_sq/(u_sq))
+        resV = np.sqrt(v_err_sq/(v_sq))
+        resRho = np.sqrt(rho_err_sq/(rho_sq))
         return resU, resV, resRho
 
 
-def gatherForces_mpi(forces, comm, rank, size, precision):
+def gatherForcesTorque_mpi(options, comm, rank, size, precision):
     if rank == 0:
-        sumF = np.zeros((len(forces.surfaceNamesGlobal), 2),
+        sumF = np.zeros((len(options.surfaceNamesGlobal), 2),
+                        dtype=precision)
+        sumT = np.zeros((len(options.surfaceNamesGlobal)),
                         dtype=precision)
         for i in range(size):
             if i == 0:
-                for itr, name in enumerate(forces.surfaceNamesGlobal):
+                for itr, name in enumerate(options.surfaceNamesGlobal):
                     for itr_local, local_name in \
-                            enumerate(forces.surfaceNames):
+                            enumerate(options.surfaceNames):
                         if name == local_name:
-                            sumF[itr, 0] += forces.forces[itr_local][0]
-                            sumF[itr, 1] += forces.forces[itr_local][1]
+                            sumF[itr, 0] += options.forces[itr_local][0]
+                            sumF[itr, 1] += options.forces[itr_local][1]
+                            sumT[itr] += options.torque[itr_local]
             else:
                 surfaceNames_local = comm.recv(source=i, tag=1*i)
                 forces_local = comm.recv(source=i, tag=2*i)
-                for itr, name in enumerate(forces.surfaceNamesGlobal):
+                torque_local = comm.recv(source=i, tag=3*i)
+                for itr, name in enumerate(options.surfaceNamesGlobal):
                     for itr_local, local_name in \
                             enumerate(surfaceNames_local):
                         if name == local_name:
                             sumF[itr, 0] += forces_local[itr_local][0]
                             sumF[itr, 1] += forces_local[itr_local][1]
-        return forces.surfaceNamesGlobal, sumF
+                            sumT[itr] += torque_local[itr_local]
+        return options.surfaceNamesGlobal, sumF, sumT
     else:
-        comm.send(forces.surfaceNames, dest=0, tag=1*rank)
-        comm.send(forces.forces, dest=0, tag=2*rank)
-        return 0, 0
+        comm.send(options.surfaceNames, dest=0, tag=1*rank)
+        comm.send(options.forces, dest=0, tag=2*rank)
+        comm.send(options.torque, dest=0, tag=3*rank)
+        return 0, 0, 0

@@ -41,7 +41,7 @@ def plot_all(x_all, v_all, v_ana, t, nu):
     ax.set_ylabel('v')
     ax.set_xlim([0, 1])
     ax.set_title('v vs x (time = ' + str(t) + ')')
-    plt.savefig('v_vs_x_' + str(t) + '.png')
+    plt.savefig('figures/v_vs_x_' + str(t) + '.png')
     plt.close()
 
 

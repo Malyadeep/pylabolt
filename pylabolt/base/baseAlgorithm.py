@@ -3,13 +3,12 @@ from numba import prange, cuda
 import copy
 
 from pylabolt.utils.inputOutput import (writeFields, saveState,
-                                        copyFields_cuda, writeFields_mpi,
-                                        writeForces)
+                                        copyFields_cuda, writeFields_mpi)
 from pylabolt.base.cuda.kernels import (equilibriumRelaxation_cuda,
                                         computeFields_cuda, stream_cuda,
                                         computeResiduals_cuda)
 from pylabolt.parallel.MPI_comm import (computeResiduals, proc_boundary,
-                                        gatherForces_mpi)
+                                        gatherForcesTorque_mpi)
 
 
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
@@ -52,45 +51,46 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
                             * c[k, m] * c[k, n] * (f_new[ind, k] -
                                                    f_eq[ind, k])
             rho[ind] = rhoSum
-            u[ind, 0] = uSum/(rho[ind] + 1e-9)
-            u[ind, 1] = vSum/(rho[ind] + 1e-9)
+            u[ind, 0] = uSum/rho[ind]
+            u[ind, 1] = vSum/rho[ind]
             sigma[ind, :] = sigmaSum
             if forceFunc_vel is not None:
                 forceFunc_vel(u[ind, :], rho[ind], *forceArgs_vel)
-            # Residue calculation
-            u_err_sq += (u[ind, 0] - u_old[ind, 0]) * \
-                (u[ind, 0] - u_old[ind, 0])
-            u_sq += u_old[ind, 0] * u_old[ind, 0]
-            v_err_sq += (u[ind, 1] - u_old[ind, 1]) * \
-                (u[ind, 1] - u_old[ind, 1])
-            v_sq += u_old[ind, 1] * u_old[ind, 1]
-            rho_err_sq += (rho[ind] - rho_old[ind]) * \
-                (rho[ind] - rho_old[ind])
-            rho_sq += rho_old[ind] * rho_old[ind]
-            u_old[ind, 0] = u[ind, 0]
-            u_old[ind, 1] = u[ind, 1]
-            rho_old[ind] = rho[ind]
+        # Residue calculation
+        u_err_sq += (u[ind, 0] - u_old[ind, 0]) * \
+            (u[ind, 0] - u_old[ind, 0])
+        u_sq += u_old[ind, 0] * u_old[ind, 0]
+        v_err_sq += (u[ind, 1] - u_old[ind, 1]) * \
+            (u[ind, 1] - u_old[ind, 1])
+        v_sq += u_old[ind, 1] * u_old[ind, 1]
+        rho_err_sq += (rho[ind] - rho_old[ind]) * \
+            (rho[ind] - rho_old[ind])
+        rho_sq += rho_old[ind] * rho_old[ind]
+        u_old[ind, 0] = u[ind, 0]
+        u_old[ind, 1] = u[ind, 1]
+        rho_old[ind] = rho[ind]
     return u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq
 
 
-def stream(Nx, Ny, f, f_new, solid, rho, u, c, w, noOfDirections,
-           cs_2, invList, size):
+def stream(Nx, Ny, f, f_new, solid, rho, u, procBoundary, c, w,
+           noOfDirections, cs_2, invList, size):
     for ind in prange(Nx * Ny):
-        i, j = int(ind / Ny), int(ind % Ny)
-        for k in range(noOfDirections):
-            i_old = i - int(c[k, 0])
-            j_old = j - int(c[k, 1])
-            if size == 1:
-                i_old = (i_old + Nx) % Nx
-                j_old = (j_old + Ny) % Ny
-            if solid[i_old * Ny + j_old, 0] != 1:
-                f_new[ind, k] = f[i_old * Ny + j_old, k]
-            elif solid[i_old * Ny + j_old, 0] == 1:
-                ind_old = i_old * Ny + j_old
-                preFactor = 2 * w[invList[k]] * rho[ind] * \
-                    (c[invList[k], 0] * u[ind_old, 0] +
-                     c[invList[k], 1] * u[ind_old, 1]) * cs_2
-                f_new[ind, k] = f[ind, invList[k]] - preFactor
+        if procBoundary[ind] != 1:
+            i, j = int(ind / Ny), int(ind % Ny)
+            for k in range(noOfDirections):
+                i_old = i - int(c[k, 0])
+                j_old = j - int(c[k, 1])
+                if size == 1:
+                    i_old = (i_old + Nx) % Nx
+                    j_old = (j_old + Ny) % Ny
+                if solid[i_old * Ny + j_old, 0] != 1:
+                    f_new[ind, k] = f[i_old * Ny + j_old, k]
+                elif solid[i_old * Ny + j_old, 0] == 1:
+                    ind_old = i_old * Ny + j_old
+                    preFactor = 2 * w[invList[k]] * rho[ind] * \
+                        (c[invList[k], 0] * u[ind_old, 0] +
+                         c[invList[k], 1] * u[ind_old, 1]) * cs_2
+                    f_new[ind, k] = f[ind, invList[k]] - preFactor
 
 
 class baseAlgorithm:
@@ -142,16 +142,30 @@ class baseAlgorithm:
                 else:
                     writeFields_mpi(timeStep, simulation.fields,
                                     simulation.mesh, rank, comm)
-                if simulation.computeForces is True:
-                    simulation.forces.forceCalc(simulation.fields,
-                                                simulation.lattice,
-                                                simulation.mesh,
-                                                simulation.precision)
-                    names, surfaceForces = \
-                        gatherForces_mpi(simulation.forces, comm, rank,
-                                         size, simulation.precision)
+                if (simulation.options.computeForces is True
+                        or simulation.options.computeTorque is True):
+                    args = (simulation.fields, simulation.lattice,
+                            simulation.mesh, simulation.precision,
+                            size)
+                    if size > 1:
+                        simulation.options. \
+                            forceTorqueCalc(*args, mpiParams=simulation.
+                                            mpiParams)
+                        names, forces, torque = \
+                            gatherForcesTorque_mpi(simulation.options,
+                                                   comm, rank, size,
+                                                   simulation.precision)
+                    else:
+                        simulation.options. \
+                            forceTorqueCalc(*args, mpiParams=None)
+                        names = simulation.options.surfaceNamesGlobal
+                        forces = np.array(simulation.options.forces,
+                                          dtype=simulation.precision)
+                        torque = np.array(simulation.options.torque,
+                                          dtype=simulation.precision)
                     if rank == 0:
-                        writeForces(timeStep, names, surfaceForces)
+                        simulation.options.writeForces(timeStep, names,
+                                                       forces, torque)
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     saveState(timeStep, simulation)
@@ -168,32 +182,39 @@ class baseAlgorithm:
                     if size == 1:
                         writeFields(timeStep, simulation.fields,
                                     simulation.mesh)
-                        if simulation.computeForces is True:
-                            simulation.forces.forceCalc(simulation.fields,
-                                                        simulation.lattice,
-                                                        simulation.mesh,
-                                                        simulation.precision)
-                            names, surfaceForces = \
-                                gatherForces_mpi(simulation.forces, comm, rank,
-                                                 size, simulation.precision)
+                        if (simulation.options.computeForces is True or
+                                simulation.options.computeTorque is True):
+                            args = (simulation.fields, simulation.lattice,
+                                    simulation.mesh, simulation.precision,
+                                    size)
+                            simulation.options. \
+                                forceTorqueCalc(*args, mpiParams=None)
+                            names = simulation.options.surfaceNamesGlobal
+                            forces = np.array(simulation.options.forces,
+                                              dtype=simulation.precision)
+                            torque = np.array(simulation.options.torque,
+                                              dtype=simulation.precision)
                             if rank == 0:
-                                writeForces(timeStep, names, surfaceForces)
+                                simulation.options.writeForces(timeStep, names,
+                                                               forces, torque)
                         break
                     else:
                         for proc in range(size):
                             comm.send(1, dest=proc, tag=1*proc)
                         writeFields_mpi(timeStep, simulation.fields,
                                         simulation.mesh, rank, comm)
-                        if simulation.computeForces is True:
-                            simulation.forces.forceCalc(simulation.fields,
-                                                        simulation.lattice,
-                                                        simulation.mesh,
-                                                        simulation.precision)
-                            names, surfaceForces = \
-                                gatherForces_mpi(simulation.forces, comm, rank,
-                                                 size, simulation.precision)
+                        if (simulation.options.computeForces is True or
+                                simulation.options.computeTorque is True):
+                            simulation.options. \
+                                forceTorqueCalc(*args, mpiParams=simulation.
+                                                mpiParams)
+                            names, forces, torque = \
+                                gatherForcesTorque_mpi(simulation.options,
+                                                       comm, rank, size,
+                                                       simulation.precision)
                             if rank == 0:
-                                writeForces(timeStep, names, surfaceForces)
+                                simulation.options.writeForces(timeStep, names,
+                                                               forces, torque)
                         break
                 else:
                     if size > 1:
@@ -204,16 +225,18 @@ class baseAlgorithm:
                 if flag == 1:
                     writeFields_mpi(timeStep, simulation.fields,
                                     simulation.mesh, rank, comm)
-                    if simulation.computeForces is True:
-                        simulation.forces.forceCalc(simulation.fields,
-                                                    simulation.lattice,
-                                                    simulation.mesh,
-                                                    simulation.precision)
-                        names, surfaceForces = \
-                            gatherForces_mpi(simulation.forces, comm, rank,
-                                             size, simulation.precision)
-                        if rank == 0:
-                            writeForces(timeStep, names, surfaceForces)
+                    if (simulation.options.computeForces is True or
+                            simulation.options.computeTorque is True):
+                        args = (simulation.fields, simulation.lattice,
+                                simulation.mesh, simulation.precision,
+                                size)
+                        simulation.options. \
+                            forceTorqueCalc(*args, mpiParams=simulation.
+                                            mpiParams)
+                        names, forces, torque = \
+                            gatherForcesTorque_mpi(simulation.options,
+                                                   comm, rank, size,
+                                                   simulation.precision)
                     break
             comm.Barrier()
             self.equilibriumRelaxation(*simulation.collisionArgs)
