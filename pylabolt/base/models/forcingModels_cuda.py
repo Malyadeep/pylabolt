@@ -1,7 +1,7 @@
-import numba
+from numba import cuda
 
 
-@numba.njit
+@cuda.jit(device=True)
 def Guo_force(u, source, F, c, w, noOfDirections, cs_2, cs_4, tau_1):
     for k in range(noOfDirections):
         cu = c[k, 0] * u[0] + c[k, 1] * u[1]
@@ -11,7 +11,7 @@ def Guo_force(u, source, F, c, w, noOfDirections, cs_2, cs_4, tau_1):
                                                 preFactor_1 * F[1])
 
 
-@numba.njit
+@cuda.jit(device=True)
 def Guo_vel(u, rho, F, A):
     u[0] = u[0] + F[0] * A / (rho)
     u[1] = u[1] + F[1] * A / (rho)

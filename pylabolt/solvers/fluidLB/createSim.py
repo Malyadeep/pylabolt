@@ -4,11 +4,12 @@ import numpy as np
 import numba
 
 
-from pylabolt.base import (mesh, lattice, boundary, schemeLB, fields,
-                           initFields, obstacle)
+from pylabolt.base import (mesh, lattice, boundary, schemeLB,
+                           obstacle)
+from pylabolt.solvers.fluidLB import (initFields, fields)
 from pylabolt.parallel.MPI_decompose import (decompose, distributeSolid_mpi,
                                              distributeInitialFields_mpi)
-from pylabolt.base.options import options
+from pylabolt.utils.options import options
 
 
 @numba.njit
@@ -180,8 +181,7 @@ class simulation:
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq,
             self.fields.f, self.fields.f_new, self.fields.u, self.fields.rho,
             self.fields.solid, self.collisionFunc, self.equilibriumFunc,
-            self.collisionScheme.preFactor,
-            self.collisionScheme.equilibriumArgs,
+            self.collisionScheme.tau_1, self.collisionScheme.equilibriumArgs,
             self.fields.procBoundary, self.forcingScheme.forceFunc_force,
             self.forcingScheme.forceArgs_force, self.lattice.noOfDirections,
             self.precision
@@ -202,7 +202,7 @@ class simulation:
             self.fields.procBoundary, self.size,
             self.forcingScheme.forceFunc_vel,
             self.forcingScheme.forceArgs_vel,
-            self.fields.f_eq, self.collisionScheme.preFactor,
+            self.fields.f_eq, self.collisionScheme.tau_1,
             self.fields.sigma, self.precision
         )
 

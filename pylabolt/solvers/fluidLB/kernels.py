@@ -1,19 +1,21 @@
 import numpy as np
 from numba import cuda
-from pylabolt.base.cuda.models.equilibriumModels_cuda import (stokesLinear,
-                                                              secondOrder,
-                                                              incompressible,
-                                                              oseen)
-from pylabolt.base.cuda.models.collisionModels_cuda import BGK
+from pylabolt.base.models.equilibriumModels_cuda import (stokesLinear,
+                                                         secondOrder,
+                                                         incompressible,
+                                                         oseen)
+from pylabolt.base.models.collisionModels_cuda import BGK
+from pylabolt.base.models.forcingModels_cuda import (Guo_force, Guo_vel)
 
 
 @cuda.jit
 def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
-                               preFactor, rho_0, U_0, cs_2, cs_4, c, w,
-                               equilibriumType, collisionType):
+                               tau_1, rho_0, U_0, cs_2, cs_4, c, w,
+                               source, noOfDirections, F, equilibriumType,
+                               collisionType, forcingType):
     ind = cuda.grid(1)
     if ind < Nx * Ny:
-        if solid[ind] != 1:
+        if solid[ind, 0] != 1:
             if equilibriumType == 1:
                 stokesLinear(f_eq[ind, :], u[ind, :],
                              rho[ind], rho_0, cs_2, c, w)
@@ -27,9 +29,13 @@ def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
                 oseen(f_eq[ind, :], u[ind, :],
                       rho[ind], rho_0, U_0, cs_2, cs_4, c, w)
 
+            if forcingType == 1:
+                Guo_force(u[ind, :], source[ind, :], F, c, w,
+                          noOfDirections, cs_2, cs_4, tau_1)
+
             if collisionType == 1:
                 BGK(f[ind, :], f_new[ind, :],
-                    f_eq[ind, :], preFactor)
+                    f_eq[ind, :], tau_1, source[ind, :])
     else:
         return
 
@@ -57,11 +63,11 @@ def computeResiduals_cuda(u_sq, u_err_sq, rho_sq, rho_err_sq):
 
 @cuda.jit
 def computeFields_cuda(Nx, Ny, f_new, u, rho, solid, c,
-                       noOfDirections, u_old, rho_old, u_sq,
-                       u_err_sq, rho_sq, rho_err_sq):
+                       noOfDirections, forcingType, F, A, u_old,
+                       rho_old, u_sq, u_err_sq, rho_sq, rho_err_sq):
     ind = cuda.grid(1)
     if ind < Nx * Ny:
-        if solid[ind] != 1:
+        if solid[ind, 0] != 1:
             rhoSum = 0.
             uSum = 0.
             vSum = 0.
@@ -70,8 +76,11 @@ def computeFields_cuda(Nx, Ny, f_new, u, rho, solid, c,
                 uSum += c[k, 0] * f_new[ind, k]
                 vSum += c[k, 1] * f_new[ind, k]
             rho[ind] = rhoSum
-            u[ind, 0] = uSum/(rho[ind] + 1e-9)
-            u[ind, 1] = vSum/(rho[ind] + 1e-9)
+            u[ind, 0] = uSum/(rho[ind])
+            u[ind, 1] = vSum/(rho[ind])
+
+            if forcingType == 1:
+                Guo_vel(u[ind, :], rho[ind], F, A)
 
             u_err_sq[ind, 0] = (u[ind, 0] - u_old[ind, 0]) * \
                 (u[ind, 0] - u_old[ind, 0])
@@ -90,18 +99,22 @@ def computeFields_cuda(Nx, Ny, f_new, u, rho, solid, c,
 
 
 @cuda.jit
-def stream_cuda(Nx, Ny, f, f_new, c, noOfDirections, invList, solid):
+def stream_cuda(Nx, Ny, f, f_new, solid, rho, u, c, w,
+                noOfDirections, cs_2, invList):
     ind = cuda.grid(1)
     if ind < Nx * Ny:
-        i, j = np.int32(ind / Ny), np.int32(ind % Ny)
-        for k in range(noOfDirections):
-            i_old = (i - np.int32(c[k, 0])
-                     + Nx) % Nx
-            j_old = (j - np.int32(c[k, 1])
-                     + Ny) % Ny
-            if solid[i_old * Ny + j_old] != 1:
-                f_new[ind, k] = f[i_old * Ny + j_old, k]
-            elif solid[i_old * Ny + j_old] == 1:
-                f_new[ind, k] = f[ind, invList[k]]
+        if solid[ind, 0] != 1:
+            i, j = np.int64(ind / Ny), np.int64(ind % Ny)
+            for k in range(noOfDirections):
+                i_old = (i - np.int64(c[k, 0]) + Nx) % Nx
+                j_old = (j - np.int64(c[k, 1]) + Ny) % Ny
+                if solid[i_old * Ny + j_old, 0] != 1:
+                    f_new[ind, k] = f[i_old * Ny + j_old, k]
+                elif solid[i_old * Ny + j_old, 0] == 1:
+                    ind_old = i_old * Ny + j_old
+                    preFactor = 2 * w[invList[k]] * rho[ind] * \
+                        (c[invList[k], 0] * u[ind_old, 0] +
+                         c[invList[k], 1] * u[ind_old, 1]) * cs_2
+                    f_new[ind, k] = f[ind, invList[k]] - preFactor
     else:
         return

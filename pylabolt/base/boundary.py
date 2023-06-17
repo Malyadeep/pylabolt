@@ -3,8 +3,7 @@ import os
 import numba
 from numba import cuda
 
-from pylabolt.base import boundaryConditions
-from pylabolt.base.cuda import boundaryConditions_cuda
+from pylabolt.base import (boundaryConditions, boundaryConditions_cuda)
 
 
 @numba.njit
@@ -71,7 +70,6 @@ class boundary:
         self.faceList_device = []
         self.invDirections_device = []
         self.outDirections_device = []
-        self.noOfBoundaries_device = np.zeros(1, np.int32)
 
     def readBoundaryDict(self, rank):
         for item in self.nameList:
@@ -244,6 +242,5 @@ class boundary:
                     self.invDirections_device[itr],
                     self.boundaryVector_device[itr],
                     self.boundaryScalar_device[itr], device.c, device.w,
-                    device.cs[0], device.Nx[0], device.Ny[0],
-                    device.computeForces[0])
+                    device.cs[0], device.Nx[0], device.Ny[0])
             self.boundaryFunc[itr][blocks, n_threads](*args)

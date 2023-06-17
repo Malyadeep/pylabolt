@@ -10,7 +10,7 @@ def analytical(Nx, Ny):
     return y_an, u_an
 
 
-def extract_data_poiseuille(Nx, Ny):
+def extract_data_couette(Nx, Ny):
     cases = ['incompressible', 'compressible']
     u_all = []
     for case in cases:
@@ -34,7 +34,7 @@ def extract_data_poiseuille(Nx, Ny):
     return y_sim, u_all
 
 
-def plot_U_poiseuille(Nx, Ny, y_sim, u_all, y_an, u_an):
+def plot_U_couette(Nx, Ny, y_sim, u_all, y_an, u_an):
     cases = ['incompressible', 'compressible']
     markers = ['d', 's', '^']
     colors = ['green', 'blue', 'orange']
@@ -54,9 +54,9 @@ def plot_U_poiseuille(Nx, Ny, y_sim, u_all, y_an, u_an):
 
 def main():
     Nx, Ny = 101, 101
-    y_sim, u_all = extract_data_poiseuille(Nx, Ny)
+    y_sim, u_all = extract_data_couette(Nx, Ny)
     y_an, u_an = analytical(Nx, Ny)
-    plot_U_poiseuille(Nx, Ny, y_sim, u_all, y_an, u_an)
+    plot_U_couette(Nx, Ny, y_sim, u_all, y_an, u_an)
 
 
 if __name__ == '__main__':
