@@ -16,6 +16,20 @@ def fixedU(f, f_new, rho, u, solid, faceList, outDirections, invDirections,
                     f[faceList[ind], outDirections[dir]] - preFactor
 
 
+def variableU(f, f_new, rho, u, solid, faceList, outDirections, invDirections,
+              boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
+    cs_2 = 1/(cs * cs)
+    for ind in prange(faceList.shape[0]):
+        if solid[faceList[ind], 0] != 1:
+            rhoWall = rho[faceList[ind]]
+            for dir in range(invDirections.shape[0]):
+                preFactor = 2 * w[outDirections[dir]] * rhoWall *\
+                    ((c[outDirections[dir], 0] * boundaryVector[ind, 0] +
+                     c[outDirections[dir], 1] * boundaryVector[ind, 1])) * cs_2
+                f_new[faceList[ind], invDirections[dir]] = \
+                    f[faceList[ind], outDirections[dir]] - preFactor
+
+
 def fixedPressure(f, f_new, rho, u, solid, faceList, outDirections,
                   invDirections, boundaryVector, boundaryScalar, c, w, cs,
                   Nx, Ny):

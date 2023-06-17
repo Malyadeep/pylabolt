@@ -157,7 +157,7 @@ class simulation:
         if rank == 0:
             self.boundary.readBoundaryDict(self.rank)
             self.boundary.initializeBoundary(self.lattice, self.mesh,
-                                             self.fields)
+                                             self.fields, self.precision)
             # self.boundary.details()
         if rank == 0:
             self.writeDomainLog(meshDict)
