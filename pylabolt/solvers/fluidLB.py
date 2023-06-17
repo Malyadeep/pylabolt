@@ -6,7 +6,8 @@ from pylabolt.utils.inputOutput import loadState, saveState
 import pylabolt.base.createSim as createSim
 from pylabolt.base.baseAlgorithm import baseAlgorithm
 from pylabolt.parallel.parallelSetup import parallelSetup
-from pylabolt.parallel.MPI_decompose import distributeBoundaries_mpi
+from pylabolt.parallel.MPI_decompose import (distributeBoundaries_mpi,
+                                             distributeForceNodes_mpi)
 
 
 def main(parallelization, n_threads):
@@ -32,8 +33,14 @@ def main(parallelization, n_threads):
         if size > 1:
             distributeBoundaries_mpi(simulation.boundary, simulation.mpiParams,
                                      simulation.mesh, rank, size, comm)
-            # if rank == 1:
-            #     simulation.boundary.details()
+            if (simulation.options.computeForces is True or
+                    simulation.options.computeTorque is True):
+                distributeForceNodes_mpi(simulation,
+                                         rank, size, comm)
+            # if rank == 3:
+            #     simulation.options.details(simulation.rank, simulation.mesh,
+            #                                simulation.fields.solid,
+            #                                simulation.fields.u, flag='local')
         base.jitWarmUp(simulation, size, rank, comm)
     if parallel.mode == 'cuda':
         start = time.perf_counter()

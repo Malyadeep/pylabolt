@@ -25,9 +25,11 @@ like::
     }
 
     internalFields = {
-        'u': 0,
-        'v': 0,
-        'rho': 1
+        'default': {
+            'u': 0,
+            'v': 0,
+            'rho': 1
+        }
     }
 
     boundaryDict = {
@@ -101,17 +103,40 @@ All timestep and time interval values must be integers.
 +++++++++++++++++++
 ``internalFields``
 +++++++++++++++++++
-This dictionary defines the initial values of the velocity and density fields.
+This dictionary defines the initial values of the velocity and density fields. The mandatory keyword is ``default`` under 
+which the fields are defined. Custom initialization of a certain region in the domain is possible using keys other than ``default``. 
+Currently only ``line`` is supported for custom initialization. Other types of regions will be incorporated in future releases.
+For more information on defining regions look at the ``velocity_diffusion`` tutorial.
 
 - ``u`` - ``float`` entry that denotes initial value of x-component of velocity
 - ``v`` - ``float`` entry that denotes initial value of y-component of velocity
 - ``rho`` - ``float`` entry that denotes initial value of density
 
-All the fields are initialized to the specified uniformly.
+All the fields are initialized to the specified values uniformly.
 
 ++++++++++++++++
 ``boundaryDict``
 ++++++++++++++++
+This dictionary defines the boundaries of the domain and the boundary conditions on them. 
+You can define multiple dictionaries inside this dictionary which represents a particular 
+boundary region. A sample entry defining a wall boundary is as follows::
+  
+  'walls': {
+            'type': 'bounceBack',
+            'points_0': [[1, 0], [1, 1]]
+  }
+
+Here, the key ``walls`` is a user-specified name. Inside the ``walls`` dictionary, there is 
+a mandatory entry ``type``, which denotes the boundary condition to be applied. For example, 
+here since the boundary is a wall, we apply ``bounceBack`` boundary condition. The next entries 
+following the ``type`` keyword are the points that define the region of the boundary under 
+consideration. Points must be a 2-Dimensional list entry that defines the starting and ending 
+coordinates of the region on the boundary. 
+
+.. note::
+  * Note that the coordinates must be positive for now. This issue will be resolved in later releases.
+  * Make sure the coordinates in the first row of the point lists are less than or equal to 
+    the ones on the next row.
 
 
 +++++++++++++++++
@@ -127,10 +152,13 @@ This dictionary defines the collision and equilibrium scheme to be used
 - ``equilibrium`` - Keyword entry denoting the type of equilbrium distribution functions
   to be used. Currently, provides two operations
   
-  * ``firstOrder`` - equilibrium distribution function which is first order in velocity.
-    Useful in advection of scalar fields.
+  * ``stokesLinear`` - equilibrium distribution function which is first order in velocity.
+    Useful in modelling Stokes' flow. For this type of equilibrium another keyword is required 
+    called ``rho_ref`` which denotes the reference density for incompressible flows.
   * ``secondOrder`` - equilibrium distribution function which is second order in velocity.
     Used in most fluid flow simulations.
+  * ``incompressible`` - equilibrium distribution function which is second order in velocity for 
+    incompressible flow. For this model, ``rho_ref`` keyword is required. 
 
 ++++++++++++++++
 ``latticeDict``
@@ -149,6 +177,16 @@ is also planned which shall see the inclusion of 3D lattices as well.
 ++++++++++++++++
 ``meshDict``
 ++++++++++++++++
+This dictionary defines the computational domain. The entire domain is supposed to take a rectangular shape. 
+Following keywords are required to define the dictionary
+
+  * ``boundingBox`` - A 2-Dimensional list entry that defines two ends of the diagonal of the rectangular domain. 
+    Note that the coordinates must be positive for now. This issue will be resolved in later releases. 
+    Also, the coordinates must be defined in a way that the slope of the diagonal is positive.
+  * ``grid`` - A list entry that defines the resolution of the computational domain, or in other words the no. of 
+    lattice points. The lattices must be square; accordingly the no. of grid points must be set.
+
+
 
 
 

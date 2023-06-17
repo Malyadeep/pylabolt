@@ -1,5 +1,6 @@
 import os
 import pickle
+import numpy as np
 
 
 def writeFields(timeStep, fields, mesh):
@@ -9,13 +10,14 @@ def writeFields(timeStep, fields, mesh):
         os.makedirs('output/' + str(timeStep))
     writeFile = open('output/' + str(timeStep) + '/fields.dat', 'w')
     for ind in range(fields.u.shape[0]):
-        writeFile.write(str(round(ind, 10)).ljust(12) + '\t' +
-                        str(round(mesh.x[ind], 10)).ljust(12) + '\t' +
-                        str(round(mesh.y[ind], 10)).ljust(12) + '\t' +
-                        str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
-                        str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
-                        str(round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
-                        str(round(fields.solid[ind], 10)).ljust(12) + '\n')
+        writeFile.write(str(np.round(ind, 10)).ljust(12) + '\t' +
+                        str(np.round(mesh.x[ind], 10)).ljust(12) + '\t' +
+                        str(np.round(mesh.y[ind], 10)).ljust(12) + '\t' +
+                        str(np.round(fields.rho[ind], 10)).ljust(12) + '\t' +
+                        str(np.round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
+                        str(np.round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
+                        str(np.round(fields.solid[ind, 0], 10)).ljust(12) +
+                        '\n')
     writeFile.close()
 
 
@@ -66,9 +68,11 @@ def writeFields_mpi(timeStep, fields, mesh, rank, comm):
     for i in range(mesh.Nx):
         for j in range(mesh.Ny):
             ind = i * mesh.Ny + j
-            writeFile.write(str(round(ind, 10)).ljust(12) + '\t' +
-                            str(round(fields.rho[ind], 10)).ljust(12) + '\t' +
-                            str(round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
-                            str(round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
-                            str(round(fields.solid[ind], 10)).ljust(12) + '\n')
+            writeFile.write(str(np.round(ind, 10)).ljust(12) + '\t' +
+                            str(np.round(fields.rho[ind], 10)).ljust(12) + '\t'
+                            + str(np.round(fields.u[ind, 0], 10)).ljust(12) +
+                            '\t' + str(np.round(fields.u[ind, 1], 10)).
+                            ljust(12) + '\t' +
+                            str(np.round(fields.solid[ind, 0], 10)).ljust(12)
+                            + '\n')
     writeFile.close()

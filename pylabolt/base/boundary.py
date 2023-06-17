@@ -54,6 +54,7 @@ class boundary:
         self.boundaryVector = []
         self.boundaryScalar = []
         self.boundaryType = []
+        self.boundaryEntity = []
         self.boundaryFunc = []
         self.points = {}
         self.nameList = list(boundaryDict.keys())
@@ -72,10 +73,22 @@ class boundary:
         self.outDirections_device = []
         self.noOfBoundaries_device = np.zeros(1, np.int32)
 
-    def readBoundaryDict(self):
+    def readBoundaryDict(self, rank):
         for item in self.nameList:
             dataList = list(self.boundaryDict[item].keys())
             tempPoints = []
+            try:
+                entity = self.boundaryDict[item]['entity']
+                if entity != 'wall' and entity != 'patch':
+                    if rank == 0:
+                        print("ERROR! Invalid 'entity' type. Must be 'wall'" +
+                              " or 'patch'", flush=True)
+                    os._exit(0)
+            except KeyError:
+                if rank == 0:
+                    print("ERROR! Missing keyword 'entity' " +
+                          "in boundaryDict!")
+                os._exit(0)
             flag = False
             for data in dataList:
                 if data == 'type':
@@ -84,18 +97,20 @@ class boundary:
                         try:
                             self.boundaryDict[item]['value']
                         except Exception:
-                            print('Key Error!')
-                            print("'value' keyword required for type " +
-                                  "'fixedU'")
+                            if rank == 0:
+                                print('Key Error!')
+                                print("'value' keyword required for type " +
+                                      "'fixedU'", flush=True)
                             os._exit(1)
                         if isinstance(self.boundaryDict[item]['value'], list):
                             vectorValue = np.array(self.boundaryDict[item]
                                                    ['value'], dtype=np.float64)
                             scalarValue = 0.0
                         else:
-                            print("ERROR!")
-                            print("For 'fixedU' value must be a list of"
-                                  + " components: [x1, x2]")
+                            if rank == 0:
+                                print("ERROR!")
+                                print("For 'fixedU' value must be a list of"
+                                      + " components: [x1, x2]", flush=True)
                             os._exit(1)
                     elif self.boundaryDict[item][data] == 'fixedPressure':
                         try:
@@ -105,14 +120,16 @@ class boundary:
                                 scalarValue = np.float64(self.boundaryDict
                                                          [item]['value'])
                             else:
-                                print("ERROR!")
-                                print("For 'fixedPressure' value must be a " +
-                                      "float")
+                                if rank == 0:
+                                    print("ERROR!")
+                                    print("For 'fixedPressure' value must be" +
+                                          " a float", flush=True)
                                 os._exit(0)
                         except Exception:
-                            print("ERROR!")
-                            print("'value' keyword required for type " +
-                                  "'fixedPressure'")
+                            if rank == 0:
+                                print("ERROR!")
+                                print("'value' keyword required for type " +
+                                      "'fixedPressure'", flush=True)
                             os._exit(0)
                     elif self.boundaryDict[item][data] == 'bounceBack':
                         vectorValue = np.zeros(2, dtype=np.float64)
@@ -124,20 +141,26 @@ class boundary:
                         vectorValue = np.zeros(2, dtype=np.float64)
                         scalarValue = np.float64(0.0)
                     else:
-                        print("ERROR! " + self.boundaryDict[item][data] +
-                              " is not a valid boundary condition!")
-                        print('Please check boundary conditions available')
-                        print('Refer to the tutorials and documentation')
+                        if rank == 0:
+                            print("ERROR! " + self.boundaryDict[item][data] +
+                                  " is not a valid boundary condition!",
+                                  flush=True)
+                            print('Please check boundary conditions available',
+                                  flush=True)
+                            print('Refer to the tutorials and documentation',
+                                  flush=True)
                         os._exit(0)
-                elif data != 'value':
+                elif data != 'value' and data != 'entity':
                     tempPoints.append(self.boundaryDict[item][data])
                     self.boundaryType.append(self.boundaryDict[item]
                                              ['type'])
+                    self.boundaryEntity.append(entity)
                     self.boundaryVector.append(vectorValue)
                     self.boundaryScalar.append(scalarValue)
                 self.points[item] = tempPoints
                 if flag is False:
-                    print("ERROR! 'type' keyword not defined")
+                    if rank == 0:
+                        print("ERROR! 'type' keyword not defined", flush=True)
                     os._exit(0)
         self.noOfBoundaries = len(self.boundaryType)
 
@@ -163,6 +186,7 @@ class boundary:
     def details(self):
         print(self.nameList)
         print(self.boundaryType)
+        print(self.boundaryEntity)
         print(self.boundaryVector)
         print(self.boundaryScalar)
         print(self.boundaryIndices)
@@ -184,7 +208,7 @@ class boundary:
     def setBoundary(self, fields, lattice, mesh):
         for itr in range(self.noOfBoundaries):
             args = (fields.f, fields.f_new, fields.rho, fields.u,
-                    self.faceList[itr], self.outDirections[itr],
+                    fields.solid, self.faceList[itr], self.outDirections[itr],
                     self.invDirections[itr], self.boundaryVector[itr],
                     self.boundaryScalar[itr], lattice.c, lattice.w,
                     lattice.cs, mesh.Nx, mesh.Ny)
@@ -220,5 +244,6 @@ class boundary:
                     self.invDirections_device[itr],
                     self.boundaryVector_device[itr],
                     self.boundaryScalar_device[itr], device.c, device.w,
-                    device.cs[0], device.Nx[0], device.Ny[0])
+                    device.cs[0], device.Nx[0], device.Ny[0],
+                    device.computeForces[0])
             self.boundaryFunc[itr][blocks, n_threads](*args)
