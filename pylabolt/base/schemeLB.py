@@ -118,7 +118,7 @@ class collisionScheme:
                 print("ERROR! Keyword: " + str(e) +
                       " missing in 'collisionDict'")
             os._exit(1)
-        self.preFactor = self.deltaT/self.tau
+        self.tau_1 = self.deltaT/self.tau
 
 
 class forcingScheme:
@@ -127,6 +127,7 @@ class forcingScheme:
         self.forceArgs_force = None
         self.forceFunc_vel = None
         self.forceArgs_vel = None
+        self.forcingFlag = 0
 
     def setForcingScheme(self, lattice, collisionScheme, rank, precision):
         try:
@@ -135,13 +136,14 @@ class forcingScheme:
             if len(keyList) == 0:
                 if rank == 0:
                     print("No forcing scheme selected!")
+                self.forcingFlag = 0
                 return
             self.cs_2 = 1/(lattice.cs*lattice.cs)
             self.cs_4 = self.cs_2/(lattice.cs*lattice.cs)
             self.c = lattice.c
             self.w = lattice.w
             self.noOfDirections = lattice.noOfDirections
-            self.omega = collisionScheme.preFactor
+            self.tau_1 = collisionScheme.tau_1
 
             self.forcingModel = forcingDict['model']
             self.forcingValue = forcingDict['value']
@@ -155,13 +157,14 @@ class forcingScheme:
                 os._exit(1)
             if self.forcingModel == 'Guo':
                 self.forcingType = 1      # Stands for Guo
+                self.forcingFlag = 1
                 self.forceFunc_vel = forcingModels.Guo_vel
                 self.forceFunc_force = forcingModels.Guo_force
                 self.A = 0.5
                 self.forceArgs_vel = (self.F, self.A)
                 self.forceArgs_force = (self.F, self.c, self.w,
                                         self.noOfDirections, self.cs_2,
-                                        self.cs_4, self.omega)
+                                        self.cs_4, self.tau_1)
             else:
                 if rank == 0:
                     print("ERROR! Unsupported forcing model : " +

@@ -2,121 +2,105 @@ import numba
 import numpy as np
 from numba import cuda
 
-from pylabolt.base.cuda.deviceFields import deviceData
-
 
 class parallelSetup:
-    def __init__(self, parallelization, n_threads, baseAlgorithm, simulation):
+    def __init__(self, parallelization, n_threads):
         self.mode = parallelization
         self.n_threads = n_threads
         self.blocks = 0
-        if self.mode is None:
-            self.setupParallel(baseAlgorithm, simulation, parallel=False)
-        elif self.mode == 'openmp':
-            self.setupParallel(baseAlgorithm, simulation, parallel=True)
-        elif self.mode == 'cuda':
-            self.device = self.setupCuda(simulation)
+        self.device = None
 
-    def setupCuda(self, simulation):
+    def setupCuda(self, simulation, device):
+        self.device = device
         self.blocks = int(np.ceil(simulation.mesh.Nx * simulation.mesh.Ny /
                                   self.n_threads))
-        device = deviceData(simulation.mesh, simulation.lattice,
-                            simulation.precision)
 
         # Copy grid data
-        device.Nx = cuda.to_device(np.array([simulation.mesh.Nx],
-                                   dtype=np.int32))
-        device.Ny = cuda.to_device(np.array([simulation.mesh.Ny],
-                                   dtype=np.int32))
+        self.device.Nx = cuda.to_device(np.array([simulation.mesh.Nx],
+                                        dtype=np.int32))
+        self.device.Ny = cuda.to_device(np.array([simulation.mesh.Ny],
+                                        dtype=np.int32))
 
         # Copy lattice data
-        device.noOfDirections = cuda.to_device(np.array([simulation.lattice.
-                                               noOfDirections],
-                                               dtype=np.int32))
-        device.c = cuda.to_device(simulation.lattice.c)
-        device.w = cuda.to_device(simulation.lattice.w)
-        device.invList = cuda.to_device(simulation.lattice.invList)
-        device.cs = cuda.to_device(np.array([simulation.lattice.
-                                            cs], dtype=simulation.precision))
-        device.cs_2 = cuda.to_device(np.array([simulation.collisionScheme.
-                                               cs_2], dtype=simulation.
-                                     precision))
-        device.cs_4 = cuda.to_device(np.array([simulation.collisionScheme.
-                                               cs_4], dtype=simulation.
-                                     precision))
+        self.device.noOfDirections = cuda.to_device(np.array([simulation.
+                                                    lattice.
+                                                    noOfDirections],
+                                                    dtype=np.int32))
+        self.device.c = cuda.to_device(simulation.lattice.c)
+        self.device.w = cuda.to_device(simulation.lattice.w)
+        self.device.invList = cuda.to_device(simulation.lattice.invList)
+        self.device.cs = cuda.to_device(np.array([simulation.lattice.
+                                                 cs], dtype=simulation.
+                                                 precision))
+        self.device.cs_2 = cuda.to_device(np.array([simulation.collisionScheme.
+                                                   cs_2], dtype=simulation.
+                                                   precision))
+        self.device.cs_4 = cuda.to_device(np.array([simulation.collisionScheme.
+                                                   cs_4], dtype=simulation.
+                                                   precision))
 
         # Copy scheme data
-        device.preFactor = cuda.to_device(np.array([simulation.collisionScheme.
-                                          preFactor], dtype=simulation.
-                                          precision))
-        device.collisionType = cuda.to_device(np.array([simulation.
-                                              collisionScheme.collisionType],
-                                              dtype=np.int32))
-        device.equilibriumType = cuda.to_device(np.array([simulation.
-                                                collisionScheme.
-                                                equilibriumType],
-                                                dtype=np.int32))
+        self.device.tau_1 = cuda.to_device(np.array([simulation.
+                                                    collisionScheme.
+                                                    tau_1],
+                                                    dtype=simulation.
+                                                    precision))
+        self.device.collisionType = cuda.to_device(np.array([simulation.
+                                                   collisionScheme.
+                                                   collisionType],
+                                                   dtype=np.int32))
+        self.device.equilibriumType = cuda.to_device(np.array([simulation.
+                                                     collisionScheme.
+                                                     equilibriumType],
+                                                     dtype=np.int32))
         if simulation.collisionScheme.equilibriumType == 1:
-            device.equilibriumArgs = (device.cs_2[0], device.c, device.w)
-            device.rho_0 = cuda.to_device(np.array([simulation.
-                                          collisionScheme.
-                                          rho_0],
-                                          dtype=simulation.precision))
-            device.U_0 = cuda.to_device(np.array([0, 0],
-                                        dtype=simulation.precision))
+            self.device.rho_0 = cuda.to_device(np.array([simulation.
+                                               collisionScheme.rho_0],
+                                               dtype=simulation.precision))
+            self.device.U_0 = cuda.to_device(np.array([0, 0],
+                                             dtype=simulation.precision))
         elif simulation.collisionScheme.equilibriumType == 2:
-            device.rho_0 = cuda.to_device(np.array(0,
-                                          dtype=simulation.precision))
-            device.U_0 = cuda.to_device(np.array([0, 0],
-                                        dtype=simulation.precision))
-            device.equilibriumArgs = (device.cs_2[0], device.cs_4[0],
-                                      device.c, device.w)
+            self.device.rho_0 = cuda.to_device(np.array([0],
+                                               dtype=simulation.precision))
+            self.device.U_0 = cuda.to_device(np.array([0, 0],
+                                             dtype=simulation.precision))
         elif simulation.collisionScheme.equilibriumType == 3:
-            device.rho_0 = cuda.to_device(np.array([simulation.
-                                          collisionScheme.
-                                          rho_0],
-                                          dtype=simulation.precision))
-            device.U_0 = cuda.to_device(np.array([0, 0],
-                                        dtype=simulation.precision))
-            device.equilibriumArgs = (device.rho_0[0], device.cs_2[0],
-                                      device.cs_4[0], device.c, device.w)
+            self.device.rho_0 = cuda.to_device(np.array([simulation.
+                                               collisionScheme.rho_0],
+                                               dtype=simulation.precision))
+            self.device.U_0 = cuda.to_device(np.array([0, 0],
+                                             dtype=simulation.precision))
         elif simulation.collisionScheme.equilibriumType == 4:
-            device.rho_0 = cuda.to_device(np.array([simulation.
-                                          collisionScheme.
-                                          rho_0],
-                                          dtype=simulation.precision))
-            device.U_0 = cuda.to_device(simulation.
-                                        collisionScheme.U_0)
-            device.equilibriumArgs = (device.rho_0[0], device.U_0,
-                                      device.cs_2[0], device.cs_4[0],
-                                      device.c, device.w)
+            self.device.rho_0 = cuda.to_device(np.array([simulation.
+                                               collisionScheme.rho_0],
+                                               dtype=simulation.precision))
+            self.device.U_0 = cuda.to_device(simulation.
+                                             collisionScheme.U_0)
+
+        self.device.source = cuda.to_device(self.device.source)
+        if simulation.forcingScheme.forcingFlag != 0:
+            self.device.forcingType = cuda.to_device(np.array([simulation.
+                                                     forcingScheme.
+                                                     forcingType],
+                                                     dtype=np.int32))
+            self.device.F = cuda.to_device(np.array(simulation.forcingScheme.F,
+                                           dtype=simulation.precision))
+            self.device.A = cuda.to_device(np.array([simulation.
+                                           forcingScheme.A],
+                                           dtype=simulation.
+                                           precision))
 
         # Copy fields data
-        device.f = cuda.to_device(simulation.fields.f)
-        device.f_eq = cuda.to_device(simulation.fields.f_eq)
-        device.f_new = cuda.to_device(simulation.fields.f_new)
-        device.u = cuda.to_device(simulation.fields.u)
-        device.rho = cuda.to_device(simulation.fields.rho)
-        device.solid = cuda.to_device(simulation.fields.solid)
+        self.device.copyFields(simulation)
 
         # Create function arguments
-        device.collisionArgs = (
-            device.Nx[0], device.Ny[0], device.f_eq, device.f, device.f_new,
-            device.u, device.rho, device.solid, device.preFactor[0],
-            device.rho_0[0], device.U_0, device.cs_2[0], device.cs_4[0],
-            device.c, device.w, device.equilibriumType[0],
-            device.collisionType[0]
-        )
-        device.streamArgs = (
-            device.Nx[0], device.Ny[0], device.f, device.f_new, device.c,
-            device.noOfDirections[0], device.invList, device.solid
-        )
-        device.computeFieldsArgs = (
-            device.Nx[0], device.Ny[0], device.f_new, device.u, device.rho,
-            device.solid, device.c, device.noOfDirections[0]
-        )
+        self.device.setFuncArgs(simulation)
+
         simulation.boundary.setupBoundary_cuda()
-        return device
+
+        if (simulation.options.computeForces is True
+                or simulation.options.computeTorque is True):
+            simulation.options.setupForcesParallel_cuda()
 
     def setupParallel(self, baseAlgorithm, simulation, parallel):
         if parallel is True:

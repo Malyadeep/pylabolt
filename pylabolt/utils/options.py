@@ -2,7 +2,7 @@ import numpy as np
 import numba
 import os
 import sys
-from numba import prange
+from numba import (prange, cuda)
 
 
 class options:
@@ -58,6 +58,17 @@ class options:
         self.forceTorqueFunc = forceTorque
         self.surfaceNamesGlobal = []
         self.N_local = np.zeros((2, 2, 0), dtype=np.int32)
+
+        # Cuda device data
+        self.surfaceNodes_device = []
+        self.surfaceInvList_device = []
+        self.surfaceOutList_device = []
+        self.obstacleFlag_device = []
+        self.x_ref_idx_device = []
+        self.computeForces_device = np.full(1, fill_value=False,
+                                            dtype=np.bool_)
+        self.computeTorque_device = np.full(1, fill_value=False,
+                                            dtype=np.bool_)
 
     def gatherObstacleNodes(self, obstacle):
         for itr in range(obstacle.noOfObstacles):
@@ -144,6 +155,47 @@ class options:
                                           parallel=parallel,
                                           cache=False,
                                           nogil=True)
+
+    def setupForcesParallel_cuda(self):
+        self.x_ref_idx_device = cuda.to_device(self.x_ref_idx)
+        self.computeForces_device = \
+            cuda.to_device(np.array([self.computeForces], dtype=np.bool_))
+        self.computeTorque_device = \
+            cuda.to_device(np.array([self.computeTorque], dtype=np.bool_))
+        self.obstacleFlag_device = np.array(self.obstacleFlag, dtype=np.int32)
+        for itr in range(self.noOfSurfaces):
+            self.surfaceNodes_device.append(cuda.to_device(self.
+                                            surfaceNodes[itr]))
+            self.surfaceInvList_device.append(cuda.to_device(self.
+                                              surfaceInvList[itr]))
+            self.surfaceOutList_device.append(cuda.to_device(self.
+                                              surfaceOutList[itr]))
+
+    def forceTorqueCalc_cuda(self, device, precision, n_threads, blocks):
+        self.forces = []
+        self.torque = []
+        tempSum = np.zeros(2, dtype=precision)
+        for itr in range(self.noOfSurfaces):
+            tempForces = np.zeros((self.surfaceNodes[itr].shape[0], 2),
+                                  dtype=precision)
+            tempTorque = np.zeros((self.surfaceNodes[itr].shape[0]),
+                                  dtype=precision)
+            tempForces_device = cuda.to_device(tempForces)
+            tempTorque_device = cuda.to_device(tempTorque)
+            args = (device.f, device.f_new, device.solid,
+                    self.surfaceNodes_device[itr], self.surfaceInvList[itr],
+                    self.surfaceOutList_device[itr], device.c, device.invList,
+                    self.obstacleFlag_device[itr], device.Nx[0], device.Ny[0],
+                    tempForces_device, tempTorque_device,
+                    device.noOfDirections[0], self.computeForces_device[0],
+                    self.computeTorque_device[0], self.x_ref_idx_device)
+            forceTorque_cuda[blocks, n_threads](*args)
+            temp = []
+            temp.append(forceTorqueReduce(tempForces_device[:, 0]))
+            temp.append(forceTorqueReduce(tempForces_device[:, 1]))
+            self.forces.append(np.array(temp, dtype=precision))
+            tempSum = forceTorqueReduce(tempTorque_device)
+            self.torque.append(tempSum)
 
     def writeForces(self, timeStep, names, forces, torque):
         if not os.path.isdir('postProcessing'):
@@ -244,3 +296,61 @@ def forceTorque(f, f_new, solid, procBoundary, surfaceNodes, surfaceInvList,
                             r_0 = i_global - x_ref[0]
                             r_1 = j_global - x_ref[1]
                             torque[itr] += (r_0 * value_1 - r_1 * value_0)
+
+
+@cuda.reduce
+def forceTorqueReduce(a, b):
+    return a + b
+
+
+@cuda.jit
+def forceTorque_cuda(f, f_new, solid, surfaceNodes, surfaceInvList,
+                     surfaceOutList, c, invList, obstacleFlag, Nx, Ny, forces,
+                     torque, noOfDirections, computeForces, computeTorque,
+                     x_ref):
+    ind = cuda.grid(1)
+    if ind < Nx * Ny:
+        for itr in range(surfaceNodes.shape[0]):
+            if ind == surfaceNodes[itr]:
+                if obstacleFlag == 0:
+                    for k in range(surfaceOutList.shape[0]):
+                        value_0 = ((- f[ind, surfaceOutList[k]] *
+                                   c[surfaceOutList[k], 0]) +
+                                   (f_new[ind, surfaceInvList[k]]
+                                   * c[surfaceInvList[k], 0]))
+                        value_1 = ((- f[ind, surfaceOutList[k]] *
+                                   c[surfaceOutList[k], 1]) +
+                                   (f_new[ind, surfaceInvList[k]]
+                                   * c[surfaceInvList[k], 1]))
+                        if computeForces is True:
+                            forces[itr, 0] += value_0
+                            forces[itr, 1] += value_1
+                        if computeTorque is True:
+                            i, j = np.int64(ind / Ny), np.int64(ind % Ny)
+                            r_0 = i - x_ref[0]
+                            r_1 = j - x_ref[1]
+                            torque[itr] += (r_0 * value_1 - r_1 * value_0)
+                elif obstacleFlag == 1:
+                    i, j = int(ind / Ny), int(ind % Ny)
+                    for k in range(noOfDirections):
+                        i_nb = int(i + c[k, 0] + Nx) % Nx
+                        j_nb = int(j + c[k, 1] + Ny) % Ny
+                        ind_nb = i_nb * Ny + j_nb
+                        if solid[ind_nb, 0] == 1:
+                            value_0 = ((- f[ind, k] * c[k, 0]) +
+                                       (f_new[ind, invList[k]]
+                                       * c[invList[k], 0]))
+                            value_1 = ((- f[ind, k] * c[k, 1]) +
+                                       (f_new[ind, invList[k]]
+                                       * c[invList[k], 1]))
+                            if computeForces is True:
+                                forces[itr, 0] += value_0
+                                forces[itr, 1] += value_1
+                            if computeTorque is True:
+                                r_0 = i - x_ref[0]
+                                r_1 = j - x_ref[1]
+                                torque[itr] += (r_0 * value_1 - r_1 * value_0)
+            else:
+                continue
+    else:
+        return

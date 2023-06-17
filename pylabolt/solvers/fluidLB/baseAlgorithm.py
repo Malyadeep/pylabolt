@@ -4,15 +4,15 @@ import copy
 
 from pylabolt.utils.inputOutput import (writeFields, saveState,
                                         copyFields_cuda, writeFields_mpi)
-from pylabolt.base.cuda.kernels import (equilibriumRelaxation_cuda,
-                                        computeFields_cuda, stream_cuda,
-                                        computeResiduals_cuda)
+from pylabolt.solvers.fluidLB.kernels import (equilibriumRelaxation_cuda,
+                                              computeFields_cuda, stream_cuda,
+                                              computeResiduals_cuda)
 from pylabolt.parallel.MPI_comm import (computeResiduals, proc_boundary,
                                         gatherForcesTorque_mpi)
 
 
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
-                          collisionFunc, equilibriumFunc, preFactor,
+                          collisionFunc, equilibriumFunc, tau_1,
                           equilibriumArgs, procBoundary, forceFunc_force,
                           forceArgs_force, noOfDirections, precision):
     for ind in prange(Nx * Ny):
@@ -24,7 +24,7 @@ def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
                             rho[ind], *equilibriumArgs)
 
             collisionFunc(f[ind, :], f_new[ind, :],
-                          f_eq[ind, :], preFactor, source)
+                          f_eq[ind, :], tau_1, source)
 
 
 def computeFields(Nx, Ny, f_new, u, rho, solid, c,
@@ -289,6 +289,20 @@ class baseAlgorithm:
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')
                 writeFields(timeStep, simulation.fields, simulation.mesh)
+                if (simulation.options.computeForces is True or
+                        simulation.options.computeTorque is True):
+                    simulation.options.forceTorqueCalc_cuda(parallel.device,
+                                                            simulation.
+                                                            precision,
+                                                            parallel.n_threads,
+                                                            parallel.blocks)
+                    names = simulation.options.surfaceNamesGlobal
+                    forces = np.array(simulation.options.forces,
+                                      dtype=simulation.precision)
+                    torque = np.array(simulation.options.torque,
+                                      dtype=simulation.precision)
+                    simulation.options.writeForces(timeStep, names,
+                                                   forces, torque)
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     copyFields_cuda(parallel.device, simulation.fields,
@@ -305,6 +319,20 @@ class baseAlgorithm:
                 copyFields_cuda(parallel.device, simulation.fields,
                                 flag='standard')
                 writeFields(timeStep, simulation.fields, simulation.mesh)
+                if (simulation.options.computeForces is True or
+                        simulation.options.computeTorque is True):
+                    simulation.options.forceTorqueCalc_cuda(parallel.device,
+                                                            simulation.
+                                                            precision,
+                                                            parallel.n_threads,
+                                                            parallel.blocks)
+                    names = simulation.options.surfaceNamesGlobal
+                    forces = np.array(simulation.options.forces,
+                                      dtype=simulation.precision)
+                    torque = np.array(simulation.options.torque,
+                                      dtype=simulation.precision)
+                    simulation.options.writeForces(timeStep, names,
+                                                   forces, torque)
                 break
             equilibriumRelaxation_cuda[parallel.blocks,
                                        parallel.n_threads](*parallel.device.

@@ -3,8 +3,7 @@ import os
 import numba
 from numba import cuda
 
-from pylabolt.base import boundaryConditions
-from pylabolt.base.cuda import boundaryConditions_cuda
+from pylabolt.base import (boundaryConditions, boundaryConditions_cuda)
 
 
 @numba.njit
@@ -71,7 +70,6 @@ class boundary:
         self.faceList_device = []
         self.invDirections_device = []
         self.outDirections_device = []
-        self.noOfBoundaries_device = np.zeros(1, np.int32)
 
     def readBoundaryDict(self, rank):
         for item in self.nameList:
@@ -140,6 +138,27 @@ class boundary:
                     elif self.boundaryDict[item][data] == 'zeroGradient':
                         vectorValue = np.zeros(2, dtype=np.float64)
                         scalarValue = np.float64(0.0)
+                    elif self.boundaryDict[item][data] == 'variableU':
+                        import simulation
+                        try:
+                            funcName = \
+                                self.boundaryDict[item]['func']
+                            self.variableU_func = \
+                                getattr(simulation, funcName)
+                        except KeyError:
+                            if rank == 0:
+                                print("ERROR!")
+                                print("'func' keyword required for type " +
+                                      "'variableU'", flush=True)
+                            os._exit(0)
+                        except AttributeError:
+                            if rank == 0:
+                                print("ERROR!")
+                                print(funcName + " is not defined in " +
+                                      "simulation.py", flush=True)
+                            os._exit(0)
+                        vectorValue = np.zeros(2, dtype=np.float64)
+                        scalarValue = np.float64(0.0)
                     else:
                         if rank == 0:
                             print("ERROR! " + self.boundaryDict[item][data] +
@@ -150,7 +169,7 @@ class boundary:
                             print('Refer to the tutorials and documentation',
                                   flush=True)
                         os._exit(0)
-                elif data != 'value' and data != 'entity':
+                elif data != 'value' and data != 'entity' and data != 'func':
                     tempPoints.append(self.boundaryDict[item][data])
                     self.boundaryType.append(self.boundaryDict[item]
                                              ['type'])
@@ -164,7 +183,7 @@ class boundary:
                     os._exit(0)
         self.noOfBoundaries = len(self.boundaryType)
 
-    def initializeBoundary(self, lattice, mesh, fields):
+    def initializeBoundary(self, lattice, mesh, fields, precision):
         for name in self.nameList:
             pointArray = np.array(self.points[name])
             for k in range(pointArray.shape[0]):
@@ -182,6 +201,15 @@ class boundary:
             self.faceList.append(tempFaceList)
             self.invDirections.append(tempInvDirections)
             self.outDirections.append(tempOutDirections)
+            if self.boundaryType[itr] == 'variableU':
+                boundaryVectorTemp = []
+                for ind in tempFaceList:
+                    x, y = int(ind / mesh.Ny_global), int(ind % mesh.Ny_global)
+                    value = np.array(self.variableU_func(x + 1, y + 1),
+                                     dtype=precision)
+                    boundaryVectorTemp.append(value)
+                self.boundaryVector[itr] = np.array(boundaryVectorTemp,
+                                                    dtype=precision)
 
     def details(self):
         print(self.nameList)
@@ -244,6 +272,5 @@ class boundary:
                     self.invDirections_device[itr],
                     self.boundaryVector_device[itr],
                     self.boundaryScalar_device[itr], device.c, device.w,
-                    device.cs[0], device.Nx[0], device.Ny[0],
-                    device.computeForces[0])
+                    device.cs[0], device.Nx[0], device.Ny[0])
             self.boundaryFunc[itr][blocks, n_threads](*args)

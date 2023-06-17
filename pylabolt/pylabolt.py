@@ -40,7 +40,7 @@ def main():
         parallelization = None
 
     if args.solver == 'fluidLB':
-        from pylabolt.solvers import fluidLB
+        from pylabolt.solvers.fluidLB import fluidLB
         fluidLB.main(parallelization, n_threads=args.n_threads)
 
     if args.reconstruct is not None:
