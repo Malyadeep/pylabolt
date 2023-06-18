@@ -41,7 +41,10 @@ def main(parallelization, n_threads):
     if parallel.mode != 'cuda':
         if size > 1:
             distributeBoundaries_mpi(simulation.boundary, simulation.mpiParams,
-                                     simulation.mesh, rank, size, comm)
+                                     simulation.mesh, rank, size,
+                                     simulation.precision, comm)
+            # if rank == 1:
+            #     simulation.boundary.details()
             if (simulation.options.computeForces is True or
                     simulation.options.computeTorque is True):
                 distributeForceNodes_mpi(simulation,

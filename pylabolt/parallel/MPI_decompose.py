@@ -247,7 +247,8 @@ def distributeSolid_mpi(solid, fields, mpiParams, mesh, rank, size, comm):
         print('Done distributing obstacle!', flush=True)
 
 
-def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
+def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size,
+                             precision, comm):
     if rank == 0:
         print('MPI option selected', flush=True)
         print('Distributing boundaries to sub-domains...', flush=True)
@@ -267,7 +268,8 @@ def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
                 for itr in range(boundary.noOfBoundaries):
                     flag = 0
                     tempFaces = []
-                    for ind in boundary.faceList[itr]:
+                    tempVector = []
+                    for numFace, ind in enumerate(boundary.faceList[itr]):
                         i = int(ind / mesh.Ny_global)
                         j = int(ind % mesh.Ny_global)
                         if nx == mpiParams.nProc_x - 1:
@@ -286,10 +288,17 @@ def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size, comm):
                                 Ny_local = N_local[nx, ny, 1]
                             tempFaces.append((i_local + 1) * (Ny_local + 2)
                                              + (j_local + 1))
+                            if boundary.boundaryType[itr] == 'variableU':
+                                tempVector.append(boundary.boundaryVector
+                                                  [itr][numFace])
                     if flag != 0:
                         noOfBoundaries += 1
                         faceList.append(np.array(tempFaces, dtype=np.int64))
-                        boundaryVector.append(boundary.boundaryVector[itr])
+                        if boundary.boundaryType[itr] == 'variableU':
+                            boundaryVector.append(np.array(tempVector,
+                                                           dtype=precision))
+                        else:
+                            boundaryVector.append(boundary.boundaryVector[itr])
                         boundaryScalar.append(boundary.boundaryScalar[itr])
                         outDirections.append(boundary.outDirections[itr])
                         invDirections.append(boundary.invDirections[itr])
