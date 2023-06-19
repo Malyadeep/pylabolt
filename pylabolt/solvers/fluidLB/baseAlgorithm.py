@@ -39,21 +39,13 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
             rhoSum = precision(0)
             uSum = precision(0)
             vSum = precision(0)
-            sigmaSum = np.zeros(4, dtype=precision)
             for k in range(noOfDirections):
                 rhoSum += f_new[ind, k]
                 uSum += c[k, 0] * f_new[ind, k]
                 vSum += c[k, 1] * f_new[ind, k]
-                for m in range(2):
-                    for n in range(2):
-                        component = m * 2 + n
-                        sigmaSum[component] -= (1 - 0.5 * preFactor) \
-                            * c[k, m] * c[k, n] * (f_new[ind, k] -
-                                                   f_eq[ind, k])
             rho[ind] = rhoSum
             u[ind, 0] = uSum/rho[ind]
             u[ind, 1] = vSum/rho[ind]
-            sigma[ind, :] = sigmaSum
             if forceFunc_vel is not None:
                 forceFunc_vel(u[ind, :], rho[ind], *forceArgs_vel)
         # Residue calculation
