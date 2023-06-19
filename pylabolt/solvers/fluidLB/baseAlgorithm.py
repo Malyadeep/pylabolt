@@ -61,7 +61,8 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
         u_old[ind, 0] = u[ind, 0]
         u_old[ind, 1] = u[ind, 1]
         rho_old[ind] = rho[ind]
-    return u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq
+    return np.array([u_sq, v_sq, rho_sq, u_err_sq, v_err_sq, rho_err_sq],
+                    dtype=precision)
 
 
 def stream(Nx, Ny, f, f_new, solid, rho, u, procBoundary, c, w,
@@ -112,15 +113,14 @@ class baseAlgorithm:
                          dtype=simulation.precision)
         rho_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny),
                            dtype=simulation.precision)
+        residues = np.zeros(6, dtype=simulation.precision)
+        tempResidues = np.zeros(6, dtype=simulation.precision)
 
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
-            u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq = \
-                self.computeFields(*simulation.
-                                   computeFieldsArgs,
-                                   u_old, rho_old)
-            resU, resV, resRho = computeResiduals(u_err_sq, u_sq, v_err_sq,
-                                                  v_sq, rho_err_sq, rho_sq,
+            residues = self.computeFields(*simulation.computeFieldsArgs,
+                                          u_old, rho_old)
+            resU, resV, resRho = computeResiduals(residues, tempResidues,
                                                   comm, rank, size)
             if timeStep % simulation.stdOutputInterval == 0 and rank == 0:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +

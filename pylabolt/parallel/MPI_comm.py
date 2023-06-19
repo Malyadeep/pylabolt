@@ -156,27 +156,22 @@ def recvCopy(data, data_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
             itr += 1
 
 
-def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,
-                     rho_err_sq, rho_sq, comm, rank, size):
+def computeResiduals(residues, tempResidues, comm, rank, size):
+    np.array(residues)
     if size > 1:
         if rank == 0:
-            sum_u, sum_v = u_sq, v_sq
-            sum_rho = rho_sq
-            sum_u_sq, sum_v_sq = u_err_sq, v_err_sq
-            sum_rho_sq = rho_err_sq
+            sum_u, sum_v = residues[0], residues[1]
+            sum_rho = residues[2]
+            sum_u_sq, sum_v_sq = residues[3], residues[4]
+            sum_rho_sq = residues[5]
             for i in range(1, size):
-                temp_sum_u = comm.recv(source=i, tag=1*i)
-                temp_sum_v = comm.recv(source=i, tag=2*i)
-                temp_sum_rho = comm.recv(source=i, tag=3*i)
-                temp_sum_u_sq = comm.recv(source=i, tag=4*i)
-                temp_sum_v_sq = comm.recv(source=i, tag=5*i)
-                temp_sum_rho_sq = comm.recv(source=i, tag=6*i)
-                sum_u += temp_sum_u
-                sum_v += temp_sum_v
-                sum_rho += temp_sum_rho
-                sum_u_sq += temp_sum_u_sq
-                sum_v_sq += temp_sum_v_sq
-                sum_rho_sq += temp_sum_rho_sq
+                comm.Recv(tempResidues, source=i, tag=1*i)
+                sum_u += tempResidues[0]
+                sum_v += tempResidues[1]
+                sum_rho += tempResidues[2]
+                sum_u_sq += tempResidues[3]
+                sum_v_sq += tempResidues[4]
+                sum_rho_sq += tempResidues[5]
             if np.isclose(sum_u, 0, rtol=1e-10):
                 sum_u += 1e-10
             if np.isclose(sum_v, 0, rtol=1e-10):
@@ -188,23 +183,18 @@ def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,
             resRho = np.sqrt(sum_rho_sq/(sum_rho))
             return resU, resV, resRho
         else:
-            comm.send(u_sq, dest=0, tag=1*rank)
-            comm.send(v_sq, dest=0, tag=2*rank)
-            comm.send(rho_sq, dest=0, tag=3*rank)
-            comm.send(u_err_sq, dest=0, tag=4*rank)
-            comm.send(v_err_sq, dest=0, tag=5*rank)
-            comm.send(rho_err_sq, dest=0, tag=6*rank)
+            comm.Send(residues, dest=0, tag=1*rank)
             return 0, 0, 0
     else:
-        if np.isclose(u_sq, 0, rtol=1e-10):
-            u_sq += 1e-10
-        if np.isclose(v_sq, 0, rtol=1e-10):
-            v_sq += 1e-10
-        if np.isclose(rho_sq, 0, rtol=1e-10):
-            rho_sq += 1e-10
-        resU = np.sqrt(u_err_sq/(u_sq))
-        resV = np.sqrt(v_err_sq/(v_sq))
-        resRho = np.sqrt(rho_err_sq/(rho_sq))
+        if np.isclose(residues[0], 0, rtol=1e-10):
+            residues[0] += 1e-10
+        if np.isclose(residues[1], 0, rtol=1e-10):
+            residues[1] += 1e-10
+        if np.isclose(residues[2], 0, rtol=1e-10):
+            residues[2] += 1e-10
+        resU = np.sqrt(residues[3]/(residues[0]))
+        resV = np.sqrt(residues[4]/(residues[1]))
+        resRho = np.sqrt(residues[5]/(residues[2]))
         return resU, resV, resRho
 
 
