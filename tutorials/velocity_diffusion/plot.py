@@ -51,9 +51,7 @@ def main():
     args = parser.parse_args()
     t = args.time
     v_max = float(internalFields['region_0']['fields']['v'])
-    tau = float(collisionDict['tau'])
-    cs = 1/np.sqrt(3)
-    nu = (tau - 0.5) * cs * cs
+    nu = float(collisionDict['nu'])
     # Ma = np.round(v_max/cs, 2)
     Nx, Ny = 101, 101
     v_all, x_all = extract(t, Nx, Ny, v_max)

@@ -12,25 +12,29 @@ from pylabolt.parallel.MPI_comm import (computeResiduals, proc_boundary,
 
 
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
-                          collisionFunc, equilibriumFunc, tau_1,
+                          collisionFunc, equilibriumFunc, preFactor,
                           equilibriumArgs, procBoundary, forceFunc_force,
-                          forceArgs_force, noOfDirections, precision):
+                          forceArgs_force, forcingPreFactor,
+                          noOfDirections, precision):
     for ind in prange(Nx * Ny):
         if solid[ind, 0] != 1 and procBoundary[ind] != 1:
+            force = False
             source = np.zeros(noOfDirections, dtype=precision)
             if forceFunc_force is not None:
+                force = True
                 forceFunc_force(u[ind, :], source, *forceArgs_force)
             equilibriumFunc(f_eq[ind, :], u[ind, :],
                             rho[ind], *equilibriumArgs)
 
             collisionFunc(f[ind, :], f_new[ind, :],
-                          f_eq[ind, :], tau_1, source)
+                          f_eq[ind, :], preFactor, forcingPreFactor,
+                          source, force=force)
 
 
 def computeFields(Nx, Ny, f_new, u, rho, solid, c,
                   noOfDirections, procBoundary, size,
                   forceFunc_vel, forceArgs_vel, f_eq,
-                  preFactor, sigma, precision, u_old, rho_old):
+                  precision, u_old, rho_old):
     u_sq, u_err_sq = 0., 0.
     v_sq, v_err_sq = 0., 0.
     rho_sq, rho_err_sq = 0., 0.
@@ -61,6 +65,8 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
         u_old[ind, 0] = u[ind, 0]
         u_old[ind, 1] = u[ind, 1]
         rho_old[ind] = rho[ind]
+    # np.set_printoptions(precision=4, suppress=True)
+    # print(rho.reshape(11, 11))
     return np.array([u_sq, v_sq, rho_sq, u_err_sq, v_err_sq, rho_err_sq],
                     dtype=precision)
 

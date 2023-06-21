@@ -181,10 +181,11 @@ class simulation:
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq,
             self.fields.f, self.fields.f_new, self.fields.u, self.fields.rho,
             self.fields.solid, self.collisionFunc, self.equilibriumFunc,
-            self.collisionScheme.tau_1, self.collisionScheme.equilibriumArgs,
-            self.fields.procBoundary, self.forcingScheme.forceFunc_force,
-            self.forcingScheme.forceArgs_force, self.lattice.noOfDirections,
-            self.precision
+            self.collisionScheme.preFactor, self.collisionScheme.
+            equilibriumArgs, self.fields.procBoundary, self.forcingScheme.
+            forceFunc_force, self.forcingScheme.forceArgs_force,
+            self.forcingScheme.forcingPreFactor,
+            self.lattice.noOfDirections, self.precision
         )
 
         self.streamArgs = (
@@ -202,8 +203,7 @@ class simulation:
             self.fields.procBoundary, self.size,
             self.forcingScheme.forceFunc_vel,
             self.forcingScheme.forceArgs_vel,
-            self.fields.f_eq, self.collisionScheme.tau_1,
-            self.fields.sigma, self.precision
+            self.fields.f_eq, self.precision
         )
 
         if size > 1:
@@ -283,7 +283,7 @@ class simulation:
         schemeFile.write('\tcollision scheme : ' +
                          str(self.collisionScheme.collisionModel) + '\n')
         schemeFile.write('\trelaxation time : ' +
-                         str(self.collisionScheme.tau) + '\n')
+                         str(self.collisionScheme.nu) + '\n')
         schemeFile.write('\tcollision scheme : ' +
                          str(self.collisionScheme.equilibriumModel) + '\n')
         schemeFile.write('\nLattice Information...\n')

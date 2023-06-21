@@ -41,8 +41,11 @@ boundaryDict = {
 }
 
 collisionDict = {
-    'model': 'BGK',
-    'tau': 0.65,
+    'model': 'MRT',
+    'nu': 0.01,
+    'nu_B': 0.1,
+    'S_q': 1.,
+    'S_epsilon': 1.,
     'equilibrium': 'secondOrder'
 }
 

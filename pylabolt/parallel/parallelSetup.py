@@ -40,15 +40,20 @@ class parallelSetup:
                                                    precision))
 
         # Copy scheme data
-        self.device.tau_1 = cuda.to_device(np.array([simulation.
-                                                    collisionScheme.
-                                                    tau_1],
-                                                    dtype=simulation.
-                                                    precision))
         self.device.collisionType = cuda.to_device(np.array([simulation.
                                                    collisionScheme.
                                                    collisionType],
                                                    dtype=np.int32))
+        if simulation.collisionScheme.collisionType == 1:
+            simulation.collisionScheme.preFactor = np.diag(simulation.
+                                                           collisionScheme.
+                                                           preFactor,
+                                                           k=0)
+            self.device.preFactor = cuda.to_device(simulation.collisionScheme.
+                                                   preFactor)
+        elif simulation.collisionScheme.collisionType == 2:
+            self.device.preFactor = cuda.to_device(simulation.collisionScheme.
+                                                   preFactor)
         self.device.equilibriumType = cuda.to_device(np.array([simulation.
                                                      collisionScheme.
                                                      equilibriumType],
@@ -89,6 +94,8 @@ class parallelSetup:
                                            forcingScheme.A],
                                            dtype=simulation.
                                            precision))
+            self.device.forcingPreFactor = \
+                cuda.to_device(simulation.forcingScheme.forcingPreFactor)
 
         # Copy fields data
         self.device.copyFields(simulation)

@@ -42,7 +42,7 @@ boundaryDict = {
 
 collisionDict = {
     'model': 'BGK',
-    'tau': 0.8,
+    'nu': 0.1,
     'equilibrium': 'stokesLinear',
     'rho_ref': 1
 }

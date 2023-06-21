@@ -4,15 +4,15 @@ from pylabolt.base.models.equilibriumModels_cuda import (stokesLinear,
                                                          secondOrder,
                                                          incompressible,
                                                          oseen)
-from pylabolt.base.models.collisionModels_cuda import BGK
+from pylabolt.base.models.collisionModels_cuda import (BGK, MRT)
 from pylabolt.base.models.forcingModels_cuda import (Guo_force, Guo_vel)
 
 
 @cuda.jit
 def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
-                               tau_1, rho_0, U_0, cs_2, cs_4, c, w,
+                               preFactor, rho_0, U_0, cs_2, cs_4, c, w,
                                source, noOfDirections, F, equilibriumType,
-                               collisionType, forcingType):
+                               collisionType, forcingType, forcingPreFactor):
     ind = cuda.grid(1)
     if ind < Nx * Ny:
         if solid[ind, 0] != 1:
@@ -30,12 +30,18 @@ def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
                       rho[ind], rho_0, U_0, cs_2, cs_4, c, w)
 
             if forcingType == 1:
+                force = True
                 Guo_force(u[ind, :], source[ind, :], F, c, w,
-                          noOfDirections, cs_2, cs_4, tau_1)
+                          noOfDirections, cs_2, cs_4)
 
             if collisionType == 1:
                 BGK(f[ind, :], f_new[ind, :],
-                    f_eq[ind, :], tau_1, source[ind, :])
+                    f_eq[ind, :], preFactor, forcingPreFactor,
+                    source[ind, :], force)
+            elif collisionType == 2:
+                MRT(f[ind, :], f_new[ind, :],
+                    f_eq[ind, :], preFactor, forcingPreFactor,
+                    source[ind, :], force)
     else:
         return
 

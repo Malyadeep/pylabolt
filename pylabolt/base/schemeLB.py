@@ -21,7 +21,43 @@ class collisionScheme:
                     self.collisionFunc = collisionModels.BGK
                 else:
                     self.collisionFunc = collisionModels.BGK
-
+                try:
+                    self.nu = collisionDict['nu']
+                    self.tau = self.cs_2 * self.nu + 0.5
+                except KeyError as e:
+                    if rank == 0:
+                        print("ERROR! Keyword: " + str(e) +
+                              " missing in 'collisionDict'")
+                    os._exit(1)
+                self.preFactor = \
+                    np.full(lattice.noOfDirections,
+                            fill_value=(self.deltaT/self.tau),
+                            dtype=precision)
+            elif collisionDict['model'] == 'MRT':
+                if parallelization == 'cuda':
+                    self.collisionType = 2      # Stands for MRT
+                    self.collisionFunc = collisionModels.MRT
+                else:
+                    self.collisionFunc = collisionModels.MRT
+                try:
+                    from pylabolt.base.models.MRT_params import MRT_def
+                    self.nu = collisionDict['nu']
+                    self.nu_bulk = collisionDict['nu_B']
+                    self.tau_nu = self.cs_2 * self.nu + 0.5
+                    self.tau_bulk = self.cs_2 * (self.nu/3 + self.nu_bulk) +\
+                        0.5
+                    self.S_nu = self.deltaT/self.tau_nu
+                    self.S_bulk = self.deltaT/self.tau_bulk
+                    self.S_q = collisionDict['S_q']
+                    self.S_epsilon = collisionDict['S_epsilon']
+                    self.MRT = MRT_def(precision, self.S_nu, self.S_bulk,
+                                       self.S_q, self.S_epsilon)
+                except KeyError as e:
+                    if rank == 0:
+                        print("ERROR! Keyword: " + str(e) +
+                              " missing in 'collisionDict'")
+                    os._exit(1)
+                self.preFactor = self.MRT.preFactorMat
             else:
                 if rank == 0:
                     print("ERROR! Unsupported collision model : " +
@@ -111,14 +147,6 @@ class collisionScheme:
                 print("ERROR! Keyword: " + str(e) +
                       " missing in 'collisionDict'")
             os._exit(1)
-        try:
-            self.tau = collisionDict['tau']
-        except KeyError as e:
-            if rank == 0:
-                print("ERROR! Keyword: " + str(e) +
-                      " missing in 'collisionDict'")
-            os._exit(1)
-        self.tau_1 = self.deltaT/self.tau
 
 
 class forcingScheme:
@@ -127,6 +155,9 @@ class forcingScheme:
         self.forceArgs_force = None
         self.forceFunc_vel = None
         self.forceArgs_vel = None
+        self.forcingPreFactor = np.zeros((lattice.noOfDirections,
+                                         lattice.noOfDirections),
+                                         dtype=precision)
         self.forcingFlag = 0
 
     def setForcingScheme(self, lattice, collisionScheme, rank, precision):
@@ -143,7 +174,7 @@ class forcingScheme:
             self.c = lattice.c
             self.w = lattice.w
             self.noOfDirections = lattice.noOfDirections
-            self.tau_1 = collisionScheme.tau_1
+            self.preFactor = collisionScheme.preFactor
 
             self.forcingModel = forcingDict['model']
             self.forcingValue = forcingDict['value']
@@ -161,10 +192,15 @@ class forcingScheme:
                 self.forceFunc_vel = forcingModels.Guo_vel
                 self.forceFunc_force = forcingModels.Guo_force
                 self.A = 0.5
+                if collisionScheme.collisionModel == 'BGK':
+                    diagVec = (1 - 0.5 * self.preFactor)
+                    self.forcingPreFactor = np.diag(diagVec, k=0)
+                elif collisionScheme.collisionModel == 'MRT':
+                    self.forcingPreFactor = collisionScheme.MRT.setForcingGuo()
                 self.forceArgs_vel = (self.F, self.A)
                 self.forceArgs_force = (self.F, self.c, self.w,
                                         self.noOfDirections, self.cs_2,
-                                        self.cs_4, self.tau_1)
+                                        self.cs_4)
             else:
                 if rank == 0:
                     print("ERROR! Unsupported forcing model : " +

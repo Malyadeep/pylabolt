@@ -18,7 +18,7 @@ class deviceData:
         self.cs_4 = np.zeros(1, dtype=precision)
 
         # Scheme data
-        self.tau_1 = np.zeros(1, dtype=precision)
+        self.preFactor = np.zeros(1, dtype=precision)
         self.equilibriumArgs = ()
         self.equilibriumType = np.zeros(1, dtype=np.int32)
         self.collisionType = np.zeros(1, dtype=np.int32)
@@ -27,6 +27,8 @@ class deviceData:
                                dtype=precision)
         self.F = np.zeros(2, dtype=precision)
         self.A = np.zeros(1, dtype=precision)
+        self.forcingPreFactor = np.zeros(lattice.noOfDirections,
+                                         dtype=precision)
 
         # Fields data
         self.f = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
@@ -55,11 +57,11 @@ class deviceData:
     def setFuncArgs(self, simulation):
         self.collisionArgs = (
             self.Nx[0], self.Ny[0], self.f_eq, self.f, self.f_new,
-            self.u, self.rho, self.solid, self.tau_1[0],
+            self.u, self.rho, self.solid, self.preFactor,
             self.rho_0[0], self.U_0, self.cs_2[0], self.cs_4[0],
             self.c, self.w, self.source, self.noOfDirections[0], self.F,
             self.equilibriumType[0], self.collisionType[0],
-            self.forcingType[0]
+            self.forcingType[0], self.forcingPreFactor
         )
         self.streamArgs = (
             self.Nx[0], self.Ny[0], self.f, self.f_new, self.solid,
