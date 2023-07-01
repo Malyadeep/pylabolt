@@ -27,7 +27,8 @@ class deviceData:
                                dtype=precision)
         self.F = np.zeros(2, dtype=precision)
         self.A = np.zeros(1, dtype=precision)
-        self.forcingPreFactor = np.zeros(lattice.noOfDirections,
+        self.forcingPreFactor = np.zeros((lattice.noOfDirections,
+                                          lattice.noOfDirections),
                                          dtype=precision)
 
         # Fields data

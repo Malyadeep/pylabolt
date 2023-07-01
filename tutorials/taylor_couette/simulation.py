@@ -60,6 +60,7 @@ obstacle = {
         'type': 'circle',
         'center': [0.5, 0.5],
         'radius': 0.2,
+        'rho_s': 0.01,
         'static': False,
         'U_def': {
             'type': 'fixedRotational',
@@ -71,6 +72,7 @@ obstacle = {
         'type': 'circularConfinement',
         'center': [0.5, 0.5],
         'radius': 0.4,
+        'rho_s': 0.01,
         'static': False,
         'U_def': {
             'type': 'fixedRotational',
@@ -81,6 +83,6 @@ obstacle = {
 }
 
 decomposeDict = {
-    'nx': 2,
+    'nx': 5,
     'ny': 2
 }

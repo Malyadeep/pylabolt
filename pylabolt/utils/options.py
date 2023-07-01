@@ -57,7 +57,7 @@ class options:
         self.torque = []
         self.forceTorqueFunc = forceTorque
         self.surfaceNamesGlobal = []
-        self.N_local = np.zeros((2, 2, 0), dtype=np.int32)
+        self.N_local = np.zeros((2, 2, 0), dtype=np.int64)
 
         # Cuda device data
         self.surfaceNodes_device = []
@@ -96,7 +96,7 @@ class options:
                 itr += 1
 
     def forceTorqueCalc(self, fields, lattice, mesh, precision,
-                        size, mpiParams=None):
+                        size, mpiParams=None, ref_index=None):
         self.forces = []
         self.torque = []
         for itr in range(self.noOfSurfaces):
@@ -104,19 +104,24 @@ class options:
                                   dtype=precision)
             tempTorque = np.zeros((self.surfaceNodes[itr].shape[0]),
                                   dtype=precision)
+            idx = self.x_ref_idx
+            if ref_index is not None and self.obstacleFlag[itr] == 1:
+                idx = ref_index[itr]
             if size == 1:
                 nx, ny = 0, 0
                 nProc_x, nProc_y = 1, 1
+                N_local = self.N_local
             else:
                 nx, ny = mpiParams.nx, mpiParams.ny
                 nProc_x, nProc_y = mpiParams.nProc_x, mpiParams.nProc_y
+                N_local = mpiParams.N_local
             args = (fields.f, fields.f_new, fields.solid,
                     fields.procBoundary, self.surfaceNodes[itr],
                     self.surfaceInvList[itr], self.surfaceOutList[itr],
                     lattice.c, lattice.invList, self.obstacleFlag[itr],
                     mesh.Nx, mesh.Ny, tempForces, tempTorque,
                     lattice.noOfDirections, self.computeForces,
-                    self.computeTorque, self.x_ref_idx, self.N_local,
+                    self.computeTorque, idx, N_local,
                     nx, ny, nProc_x, nProc_y, size)
             self.forceTorqueFunc(*args)
             self.forces.append(np.sum(tempForces, axis=0))
@@ -138,17 +143,17 @@ class options:
                 i, j = int(ind / ny), int(ind % ny)
                 check[i, j] = itr + 1
         print('\n')
-        if flag == 'all':
-            print(check.T)
-            print()
-            print(solid.reshape(mesh.Nx, mesh.Ny, 2)[:, :, 0].T)
-            print()
+        # if flag == 'all':
+        #     print(check.T)
+        #     print()
+        #     print(solid.reshape(mesh.Nx, mesh.Ny, 2)[:, :, 0].T)
+        #     print()
 
-        else:
-            print(check[1:-1, 1:-1].T)
-            print()
-            print(solid.reshape(mesh.Nx, mesh.Ny, 2)[:, :, 0])
-            print()
+        # else:
+        #     print(check[1:-1, 1:-1].T)
+        #     print()
+        #     print(solid.reshape(mesh.Nx, mesh.Ny, 2)[:, :, 0])
+        #     print()
 
     def setupForcesParallel_cpu(self, parallel):
         self.forceTorqueFunc = numba.njit(self.forceTorqueFunc,
@@ -171,11 +176,15 @@ class options:
             self.surfaceOutList_device.append(cuda.to_device(self.
                                               surfaceOutList[itr]))
 
-    def forceTorqueCalc_cuda(self, device, precision, n_threads, blocks):
+    def forceTorqueCalc_cuda(self, device, precision, n_threads, blocks,
+                             ref_index=None):
         self.forces = []
         self.torque = []
         tempSum = np.zeros(2, dtype=precision)
         for itr in range(self.noOfSurfaces):
+            ref_index_device = self.x_ref_idx_device
+            if ref_index is not None and self.obstacleFlag[itr] == 1:
+                ref_index_device = ref_index[itr]
             tempForces = np.zeros((self.surfaceNodes[itr].shape[0], 2),
                                   dtype=precision)
             tempTorque = np.zeros((self.surfaceNodes[itr].shape[0]),
@@ -188,7 +197,7 @@ class options:
                     self.obstacleFlag_device[itr], device.Nx[0], device.Ny[0],
                     tempForces_device, tempTorque_device,
                     device.noOfDirections[0], self.computeForces_device[0],
-                    self.computeTorque_device[0], self.x_ref_idx_device)
+                    self.computeTorque_device[0], ref_index_device)
             forceTorque_cuda[blocks, n_threads](*args)
             temp = []
             temp.append(forceTorqueReduce(tempForces_device[:, 0]))
@@ -239,12 +248,12 @@ def forceTorque(f, f_new, solid, procBoundary, surfaceNodes, surfaceInvList,
         if procBoundary[ind] != 1:
             if obstacleFlag == 0:
                 for k in range(surfaceOutList.shape[0]):
-                    value_0 = ((- f[ind, surfaceOutList[k]] *
-                               c[surfaceOutList[k], 0]) +
+                    value_0 = ((f[ind, surfaceOutList[k]] *
+                               c[surfaceOutList[k], 0]) -
                                (f_new[ind, surfaceInvList[k]]
                                * c[surfaceInvList[k], 0]))
-                    value_1 = ((- f[ind, surfaceOutList[k]] *
-                               c[surfaceOutList[k], 1]) +
+                    value_1 = ((f[ind, surfaceOutList[k]] *
+                               c[surfaceOutList[k], 1]) -
                                (f_new[ind, surfaceInvList[k]]
                                * c[surfaceInvList[k], 1]))
                     if computeForces is True:
@@ -272,10 +281,10 @@ def forceTorque(f, f_new, solid, procBoundary, surfaceNodes, surfaceInvList,
                     j_nb = int(j + c[k, 1] + Ny) % Ny
                     ind_nb = i_nb * Ny + j_nb
                     if solid[ind_nb, 0] == 1:
-                        value_0 = ((- f[ind, k] * c[k, 0]) +
+                        value_0 = ((f[ind, k] * c[k, 0]) -
                                    (f_new[ind, invList[k]]
                                    * c[invList[k], 0]))
-                        value_1 = ((- f[ind, k] * c[k, 1]) +
+                        value_1 = ((f[ind, k] * c[k, 1]) -
                                    (f_new[ind, invList[k]]
                                    * c[invList[k], 1]))
                         if computeForces is True:
@@ -314,12 +323,12 @@ def forceTorque_cuda(f, f_new, solid, surfaceNodes, surfaceInvList,
             if ind == surfaceNodes[itr]:
                 if obstacleFlag == 0:
                     for k in range(surfaceOutList.shape[0]):
-                        value_0 = ((- f[ind, surfaceOutList[k]] *
-                                   c[surfaceOutList[k], 0]) +
+                        value_0 = ((f[ind, surfaceOutList[k]] *
+                                   c[surfaceOutList[k], 0]) -
                                    (f_new[ind, surfaceInvList[k]]
                                    * c[surfaceInvList[k], 0]))
-                        value_1 = ((- f[ind, surfaceOutList[k]] *
-                                   c[surfaceOutList[k], 1]) +
+                        value_1 = ((f[ind, surfaceOutList[k]] *
+                                   c[surfaceOutList[k], 1]) -
                                    (f_new[ind, surfaceInvList[k]]
                                    * c[surfaceInvList[k], 1]))
                         if computeForces is True:
@@ -337,10 +346,10 @@ def forceTorque_cuda(f, f_new, solid, surfaceNodes, surfaceInvList,
                         j_nb = int(j + c[k, 1] + Ny) % Ny
                         ind_nb = i_nb * Ny + j_nb
                         if solid[ind_nb, 0] == 1:
-                            value_0 = ((- f[ind, k] * c[k, 0]) +
+                            value_0 = ((f[ind, k] * c[k, 0]) -
                                        (f_new[ind, invList[k]]
                                        * c[invList[k], 0]))
-                            value_1 = ((- f[ind, k] * c[k, 1]) +
+                            value_1 = ((f[ind, k] * c[k, 1]) -
                                        (f_new[ind, invList[k]]
                                        * c[invList[k], 1]))
                             if computeForces is True:

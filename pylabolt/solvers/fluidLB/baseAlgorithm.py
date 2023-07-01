@@ -124,10 +124,14 @@ class baseAlgorithm:
 
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
+            # Compute macroscopic fields and residues #
             residues = self.computeFields(*simulation.computeFieldsArgs,
                                           u_old, rho_old)
             resU, resV, resRho = computeResiduals(residues, tempResidues,
                                                   comm, rank, size)
+            # Compute macroscopic fields and residues done #
+
+            # Write data #
             if timeStep % simulation.stdOutputInterval == 0 and rank == 0:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
                       ' | resU = ' + str(round(resU, 10)).ljust(16) +
@@ -148,14 +152,15 @@ class baseAlgorithm:
                     if size > 1:
                         simulation.options. \
                             forceTorqueCalc(*args, mpiParams=simulation.
-                                            mpiParams)
+                                            mpiParams, ref_index=None)
                         names, forces, torque = \
                             gatherForcesTorque_mpi(simulation.options,
                                                    comm, rank, size,
                                                    simulation.precision)
                     else:
                         simulation.options. \
-                            forceTorqueCalc(*args, mpiParams=None)
+                            forceTorqueCalc(*args, mpiParams=None,
+                                            ref_index=None)
                         names = simulation.options.surfaceNamesGlobal
                         forces = np.array(simulation.options.forces,
                                           dtype=simulation.precision)
@@ -167,6 +172,9 @@ class baseAlgorithm:
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     saveState(timeStep, simulation)
+            # Write data #
+
+            # Check for convergence #
             if rank == 0:
                 if (resU < simulation.relTolU and
                         resV < simulation.relTolV and
@@ -186,7 +194,8 @@ class baseAlgorithm:
                                     simulation.mesh, simulation.precision,
                                     size)
                             simulation.options. \
-                                forceTorqueCalc(*args, mpiParams=None)
+                                forceTorqueCalc(*args, mpiParams=None,
+                                                ref_index=None)
                             names = simulation.options.surfaceNamesGlobal
                             forces = np.array(simulation.options.forces,
                                               dtype=simulation.precision)
@@ -205,7 +214,7 @@ class baseAlgorithm:
                                 simulation.options.computeTorque is True):
                             simulation.options. \
                                 forceTorqueCalc(*args, mpiParams=simulation.
-                                                mpiParams)
+                                                mpiParams, ref_index=None)
                             names, forces, torque = \
                                 gatherForcesTorque_mpi(simulation.options,
                                                        comm, rank, size,
@@ -230,19 +239,60 @@ class baseAlgorithm:
                                 size)
                         simulation.options. \
                             forceTorqueCalc(*args, mpiParams=simulation.
-                                            mpiParams)
+                                            mpiParams, ref_index=None)
                         names, forces, torque = \
                             gatherForcesTorque_mpi(simulation.options,
                                                    comm, rank, size,
                                                    simulation.precision)
                     break
             comm.Barrier()
+            # Check for convergence done!#
+
+            # Obstacle modification #
+            if simulation.obstacle.obsModifiable is True:
+                args = (simulation.fields, simulation.lattice,
+                        simulation.mesh, simulation.precision,
+                        size)
+                if size == 1:
+                    simulation.options. \
+                        forceTorqueCalc(*args, mpiParams=None,
+                                        ref_index=simulation.obstacle.
+                                        obsOrigin)
+                    torque = np.array(simulation.options.torque,
+                                      dtype=simulation.precision)
+                    forces = np.array(simulation.options.forces,
+                                      dtype=simulation.precision)
+                    simulation.obstacle.\
+                        modifyObstacle(torque, simulation.fields,
+                                       simulation.mesh, size, comm,
+                                       timeStep, rank, simulation.precision,
+                                       mpiParams=None)
+                elif size > 1:
+                    simulation.options. \
+                        forceTorqueCalc(*args, mpiParams=simulation.
+                                        mpiParams, ref_index=simulation.
+                                        obstacle.obsOrigin)
+                    names, forces, torque = \
+                        gatherForcesTorque_mpi(simulation.options,
+                                               comm, rank, size,
+                                               simulation.precision)
+                    simulation.obstacle.\
+                        modifyObstacle(torque, simulation.fields,
+                                       simulation.mesh, size, comm,
+                                       timeStep, rank, simulation.precision,
+                                       mpiParams=simulation.mpiParams)
+            # Obstacle modification done #
+
+            # Equilibrium and Collision
             self.equilibriumRelaxation(*simulation.collisionArgs)
+            # Share data between processors
             if size > 1:
                 comm.Barrier()
                 proc_boundary(*simulation.proc_boundaryArgs, comm)
                 comm.Barrier()
+            # Streaming
             self.stream(*simulation.streamArgs)
+            # Boundary condition
             simulation.setBoundaryFunc(simulation.fields, simulation.lattice,
                                        simulation.mesh)
 
@@ -257,7 +307,6 @@ class baseAlgorithm:
         u_err_sq = np.zeros_like(u_old)
         rho_sq = np.zeros_like(rho_old)
         rho_err_sq = np.zeros_like(rho_old)
-
         # Copy to device
         u_sq_device = cuda.to_device(u_sq)
         u_err_sq_device = cuda.to_device(u_err_sq)
@@ -332,6 +381,21 @@ class baseAlgorithm:
                     simulation.options.writeForces(timeStep, names,
                                                    forces, torque)
                 break
+            if simulation.obstacle.obsModifiable is True:
+                simulation.options.forceTorqueCalc_cuda(parallel.device,
+                                                        simulation.
+                                                        precision,
+                                                        parallel.n_threads,
+                                                        parallel.blocks,
+                                                        ref_index=simulation.
+                                                        obstacle.
+                                                        obsOrigin_device)
+                simulation.obstacle.modifyObstacle_cuda(simulation.options.
+                                                        torque, parallel.
+                                                        device, timeStep,
+                                                        parallel.blocks,
+                                                        parallel.n_threads)
+
             equilibriumRelaxation_cuda[parallel.blocks,
                                        parallel.n_threads](*parallel.device.
                                                            collisionArgs)

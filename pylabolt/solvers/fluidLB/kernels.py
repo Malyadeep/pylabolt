@@ -52,12 +52,21 @@ def residueReduce(a, b):
 
 
 def computeResiduals_cuda(u_sq, u_err_sq, rho_sq, rho_err_sq):
-    resU = np.sqrt(residueReduce(u_err_sq[:, 0])/(residueReduce(u_sq[:, 0])
-                   + 1e-9))
-    resV = np.sqrt(residueReduce(u_err_sq[:, 1])/(residueReduce(u_sq[:, 1])
-                   + 1e-9))
-    resRho = np.sqrt(residueReduce(rho_err_sq)/(residueReduce(rho_sq)
-                     + 1e-9))
+    resU_num = residueReduce(u_err_sq[:, 0])
+    resU_den = residueReduce(u_sq[:, 0])
+    resV_num = residueReduce(u_err_sq[:, 1])
+    resV_den = residueReduce(u_sq[:, 1])
+    resRho_num = residueReduce(rho_err_sq)
+    resRho_den = residueReduce(rho_sq)
+    if np.isclose(resU_den, 0, rtol=1e-10):
+        resU_den += 1e-10
+    if np.isclose(resV_den, 0, rtol=1e-10):
+        resV_den += 1e-10
+    if np.isclose(resRho_den, 0, rtol=1e-10):
+        resRho_den += 1e-10
+    resU = np.sqrt(resU_num/resU_den)
+    resV = np.sqrt(resV_num/resV_den)
+    resRho = np.sqrt(resRho_num/resRho_den)
     # resU = np.sqrt(np.sum(u_err_sq[:, 0])/(np.sum(u_sq[:, 0])
     #                + 1e-9))
     # resV = np.sqrt(np.sum(u_err_sq[:, 1])/(np.sum(u_sq[:, 1])

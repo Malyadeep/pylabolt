@@ -49,7 +49,7 @@ def main(parallelization, n_threads):
                     simulation.options.computeTorque is True):
                 distributeForceNodes_mpi(simulation,
                                          rank, size, comm)
-            # if rank == 3:
+            # if rank == 0:
             #     simulation.options.details(simulation.rank, simulation.mesh,
             #                                simulation.fields.solid,
             #                                simulation.fields.u, flag='local')
@@ -63,7 +63,7 @@ def main(parallelization, n_threads):
         base.solver(simulation, size, rank, comm)
         runTime = time.perf_counter() - start
     if rank == 0:
-        print('\nSimulation completed : Runtime = ' + str(runTime) + '\n',
+        print('\nSimulation completed : Runtime = ' + str(runTime) + ' s \n',
               flush=True)
 
     MPI.Finalize()

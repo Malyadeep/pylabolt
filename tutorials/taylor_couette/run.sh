@@ -1,7 +1,6 @@
 #!/bin/bash
 
 rm -rf figures/ output/ log* __pycache__/ 
-mpirun -np 4 pylabolt --solver fluidLB
-mpirun -np 4 pylabolt --reconstruct time -t 72243
+pylabolt --solver fluidLB --parallel -nt 13
 
-python3 plot.py -t 72243 -Nx 101
+python3 plot.py -t 73278 -Nx 101

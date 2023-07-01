@@ -6,6 +6,13 @@ def proc_boundary(Nx, Ny, data, data_send_topBottom,
                   data_recv_topBottom, data_send_leftRight,
                   data_recv_leftRight, nx, ny, nProc_x, nProc_y, comm):
     current_rank = nx * nProc_y + ny
+    shape = data_recv_leftRight.shape
+    if len(shape) > 1:
+        sendCopy = sendCopy_vector
+        recvCopy = recvCopy_vector
+    else:
+        sendCopy = sendCopy_scalar
+        recvCopy = recvCopy_scalar
     if ny % 2 == 0 and nProc_y > 1:
         # Even top
         nx_send = (nx + nProc_x) % nProc_x
@@ -136,8 +143,8 @@ def proc_boundary(Nx, Ny, data, data_send_topBottom,
     comm.Barrier()
 
 
-@numba.njit
-def sendCopy(data, data_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+# @numba.njit
+def sendCopy_vector(data, data_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
     itr = 0
     for i in range(Nx_i, Nx_f):
         for j in range(Ny_i, Ny_f):
@@ -146,13 +153,33 @@ def sendCopy(data, data_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
             itr += 1
 
 
+# @numba.njit
+def sendCopy_scalar(data, data_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+    itr = 0
+    for i in range(Nx_i, Nx_f):
+        for j in range(Ny_i, Ny_f):
+            ind = i * Ny + j
+            data_send[itr] = data[ind]
+            itr += 1
+
+
 @numba.njit
-def recvCopy(data, data_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+def recvCopy_vector(data, data_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
     itr = 0
     for i in range(Nx_i, Nx_f):
         for j in range(Ny_i, Ny_f):
             ind = i * Ny + j
             data[ind, :] = data_recv[itr, :]
+            itr += 1
+
+
+@numba.njit
+def recvCopy_scalar(data, data_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+    itr = 0
+    for i in range(Nx_i, Nx_f):
+        for j in range(Ny_i, Ny_f):
+            ind = i * Ny + j
+            data[ind] = data_recv[itr]
             itr += 1
 
 
@@ -224,9 +251,14 @@ def gatherForcesTorque_mpi(options, comm, rank, size, precision):
                             sumF[itr, 0] += forces_local[itr_local][0]
                             sumF[itr, 1] += forces_local[itr_local][1]
                             sumT[itr] += torque_local[itr_local]
+        for i in range(1, size):
+            comm.send(sumF, dest=i, tag=1*i)
+            comm.send(sumT, dest=i, tag=2*i)
         return options.surfaceNamesGlobal, sumF, sumT
     else:
         comm.send(options.surfaceNames, dest=0, tag=1*rank)
         comm.send(options.forces, dest=0, tag=2*rank)
         comm.send(options.torque, dest=0, tag=3*rank)
-        return 0, 0, 0
+        sumF = comm.recv(source=0, tag=1*rank)
+        sumT = comm.recv(source=0, tag=2*rank)
+        return options.surfaceNamesGlobal, sumF, sumT

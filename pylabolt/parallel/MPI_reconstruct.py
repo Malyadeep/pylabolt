@@ -3,6 +3,8 @@ import os
 import sys
 import numba
 from mpi4py import MPI
+from time import perf_counter
+
 from pylabolt.base.mesh import createMesh
 
 
@@ -208,11 +210,13 @@ def reconstruct(options, time):
             print(str(e))
             print('Aborting....')
             comm.Abort(1)
+        start = perf_counter()
         if rank == 0:
             print('Reconstructing fields --> time = ' + str(time))
         x, y, u, rho, solid = gather(rank, time, comm)
         if rank == 0:
             writeData(time, x, y, u, rho, solid)
+        runTime = perf_counter() - start
     elif options == 'all':
         try:
             from simulation import controlDict
@@ -238,18 +242,23 @@ def reconstruct(options, time):
             print(str(e))
             print('Aborting....')
             comm.Abort(1)
+        start = perf_counter()
         for time in range(startTime, endTime + 1, interval):
             if rank == 0:
                 print('Reconstructing fields --> time = ' + str(time))
             x, y, u, rho, solid = gather(rank, time, comm)
             if rank == 0:
                 writeData(time, x, y, u, rho, solid)
+        runTime = perf_counter() - start
     elif options == 'time':
+        start = perf_counter()
         if rank == 0:
             print('Reconstructing fields --> time = ' + str(time))
         x, y, u, rho, solid = gather(rank, time, comm)
         if rank == 0:
             writeData(time, x, y, u, rho, solid)
+        runTime = perf_counter() - start
     if rank == 0:
-        print('\nReconstruction of Fields done!\n')
+        print('\nReconstruction of Fields done!')
+        print('\nRun time = ' + str(runTime) + ' s \n')
     MPI.Finalize()

@@ -2,7 +2,7 @@ controlDict = {
     'startTime': 0,
     'endTime': 50000,
     'stdOutputInterval': 100,
-    'saveInterval': 100,
+    'saveInterval': 1000,
     'saveStateInterval': None,
     'relTolU': 1e-9,
     'relTolV': 1e-9,
@@ -42,8 +42,8 @@ boundaryDict = {
 
 collisionDict = {
     'model': 'MRT',
-    'nu': 0.01,
-    'nu_B': 0.1,
+    'nu': 0.05,
+    'nu_B': 1.0,
     'S_q': 1.,
     'S_epsilon': 1.,
     'equilibrium': 'secondOrder'
@@ -63,6 +63,7 @@ obstacle = {
         'type': 'circle',
         'center': [2, 0.5],
         'radius': 0.25,
+        'rho_s': 1,
         'static': True
     }
 }
