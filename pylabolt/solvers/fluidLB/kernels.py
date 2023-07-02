@@ -6,6 +6,7 @@ from pylabolt.base.models.equilibriumModels_cuda import (stokesLinear,
                                                          oseen)
 from pylabolt.base.models.collisionModels_cuda import (BGK, MRT)
 from pylabolt.base.models.forcingModels_cuda import (Guo_force, Guo_vel)
+from pylabolt.parallel.cudaReduce import cudaSum
 
 
 @cuda.jit
@@ -46,18 +47,14 @@ def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
         return
 
 
-@cuda.reduce
-def residueReduce(a, b):
-    return a + b
-
-
-def computeResiduals_cuda(u_sq, u_err_sq, rho_sq, rho_err_sq):
-    resU_num = residueReduce(u_err_sq[:, 0])
-    resU_den = residueReduce(u_sq[:, 0])
-    resV_num = residueReduce(u_err_sq[:, 1])
-    resV_den = residueReduce(u_sq[:, 1])
-    resRho_num = residueReduce(rho_err_sq)
-    resRho_den = residueReduce(rho_sq)
+def computeResiduals_cuda(u_sq, u_err_sq, rho_sq, rho_err_sq,
+                          blocks, n_threads):
+    resU_num = cudaSum(blocks, n_threads, u_err_sq[:, 0])
+    resU_den = cudaSum(blocks, n_threads, u_sq[:, 0])
+    resV_num = cudaSum(blocks, n_threads, u_err_sq[:, 1])
+    resV_den = cudaSum(blocks, n_threads, u_sq[:, 1])
+    resRho_num = cudaSum(blocks, n_threads, rho_err_sq)
+    resRho_den = cudaSum(blocks, n_threads, rho_sq)
     if np.isclose(resU_den, 0, rtol=1e-10):
         resU_den += 1e-10
     if np.isclose(resV_den, 0, rtol=1e-10):

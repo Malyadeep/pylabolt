@@ -4,6 +4,8 @@ import os
 import sys
 from numba import (prange, cuda)
 
+from pylabolt.parallel.cudaReduce import cudaSum
+
 
 class options:
     def __init__(self, rank, precision, mesh):
@@ -200,10 +202,12 @@ class options:
                     self.computeTorque_device[0], ref_index_device)
             forceTorque_cuda[blocks, n_threads](*args)
             temp = []
-            temp.append(forceTorqueReduce(tempForces_device[:, 0]))
-            temp.append(forceTorqueReduce(tempForces_device[:, 1]))
+            temp.append(cudaSum(tempForces_device[:, 0],
+                        tempForces_device[:, 0]))
+            temp.append(cudaSum(tempForces_device[:, 1],
+                        tempForces_device[:, 1]))
             self.forces.append(np.array(temp, dtype=precision))
-            tempSum = forceTorqueReduce(tempTorque_device)
+            tempSum = cudaSum(tempTorque_device, tempTorque_device)
             self.torque.append(tempSum)
 
     def writeForces(self, timeStep, names, forces, torque):
@@ -305,11 +309,6 @@ def forceTorque(f, f_new, solid, procBoundary, surfaceNodes, surfaceInvList,
                             r_0 = i_global - x_ref[0]
                             r_1 = j_global - x_ref[1]
                             torque[itr] += (r_0 * value_1 - r_1 * value_0)
-
-
-@cuda.reduce
-def forceTorqueReduce(a, b):
-    return a + b
 
 
 @cuda.jit

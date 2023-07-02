@@ -315,7 +315,7 @@ class baseAlgorithm:
         u_old_device = cuda.to_device(u_old)
         rho_old_device = cuda.to_device(rho_old)
         residueArgs = (
-            u_sq_device, u_err_sq_device, rho_sq_device, rho_err_sq_device,
+            u_sq_device, u_err_sq_device, rho_sq_device, rho_err_sq_device
         )
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
@@ -325,7 +325,9 @@ class baseAlgorithm:
                                                    u_old_device,
                                                    rho_old_device,
                                                    *residueArgs)
-            resU, resV, resRho = computeResiduals_cuda(*residueArgs)
+            resU, resV, resRho = computeResiduals_cuda(*residueArgs,
+                                                       parallel.blocks,
+                                                       parallel.n_threads)
             if timeStep % simulation.stdOutputInterval == 0:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
                       ' | resU = ' + str(round(resU, 10)).ljust(16) +
