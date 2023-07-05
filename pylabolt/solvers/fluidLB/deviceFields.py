@@ -72,5 +72,5 @@ class deviceData:
         self.computeFieldsArgs = (
             self.Nx[0], self.Ny[0], self.f_new, self.u, self.rho,
             self.solid, self.c, self.noOfDirections[0], self.forcingType[0],
-            self.F, self.A[0],
+            self.F, self.A[0]
         )

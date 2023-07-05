@@ -2,6 +2,8 @@ import numba
 import numpy as np
 from numba import cuda
 
+from pylabolt.parallel.cudaReduce import setBlockSize
+
 
 class parallelSetup:
     def __init__(self, parallelization, n_threads):
@@ -14,6 +16,7 @@ class parallelSetup:
         self.device = device
         self.blocks = int(np.ceil(simulation.mesh.Nx * simulation.mesh.Ny /
                                   self.n_threads))
+        self.blockSize = setBlockSize(self.blocks)
 
         # Copy grid data
         self.device.Nx = cuda.to_device(np.array([simulation.mesh.Nx],
@@ -96,6 +99,12 @@ class parallelSetup:
                                            precision))
             self.device.forcingPreFactor = \
                 cuda.to_device(simulation.forcingScheme.forcingPreFactor)
+        else:
+            self.device.forcingType = cuda.to_device(self.device.forcingType)
+            self.device.F = cuda.to_device(self.device.F)
+            self.device.A = cuda.to_device(self.device.A)
+            self.device.forcingPreFactor = \
+                cuda.to_device(self.device.forcingPreFactor)
 
         # Copy fields data
         self.device.copyFields(simulation)

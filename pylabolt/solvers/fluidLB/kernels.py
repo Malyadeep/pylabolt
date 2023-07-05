@@ -48,13 +48,10 @@ def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
 
 
 def computeResiduals_cuda(u_sq, u_err_sq, rho_sq, rho_err_sq,
-                          blocks, n_threads):
-    resU_num = cudaSum(blocks, n_threads, u_err_sq[:, 0])
-    resU_den = cudaSum(blocks, n_threads, u_sq[:, 0])
-    resV_num = cudaSum(blocks, n_threads, u_err_sq[:, 1])
-    resV_den = cudaSum(blocks, n_threads, u_sq[:, 1])
-    resRho_num = cudaSum(blocks, n_threads, rho_err_sq)
-    resRho_den = cudaSum(blocks, n_threads, rho_sq)
+                          blocks, n_threads, blockSize):
+    resU_num, resU_den, resV_num, resV_den, resRho_num, resRho_den = \
+        cudaSum(blocks, n_threads, u_sq, u_err_sq, rho_sq, rho_err_sq,
+                blockSize)
     if np.isclose(resU_den, 0, rtol=1e-10):
         resU_den += 1e-10
     if np.isclose(resV_den, 0, rtol=1e-10):
@@ -64,12 +61,6 @@ def computeResiduals_cuda(u_sq, u_err_sq, rho_sq, rho_err_sq,
     resU = np.sqrt(resU_num/resU_den)
     resV = np.sqrt(resV_num/resV_den)
     resRho = np.sqrt(resRho_num/resRho_den)
-    # resU = np.sqrt(np.sum(u_err_sq[:, 0])/(np.sum(u_sq[:, 0])
-    #                + 1e-9))
-    # resV = np.sqrt(np.sum(u_err_sq[:, 1])/(np.sum(u_sq[:, 1])
-    #                + 1e-9))
-    # resRho = np.sqrt(np.sum(rho_err_sq)/(np.sum(rho_sq)
-    #                  + 1e-9))
     return resU, resV, resRho
 
 

@@ -327,7 +327,8 @@ class baseAlgorithm:
                                                    *residueArgs)
             resU, resV, resRho = computeResiduals_cuda(*residueArgs,
                                                        parallel.blocks,
-                                                       parallel.n_threads)
+                                                       parallel.n_threads,
+                                                       parallel.blockSize)
             if timeStep % simulation.stdOutputInterval == 0:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
                       ' | resU = ' + str(round(resU, 10)).ljust(16) +
