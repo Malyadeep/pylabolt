@@ -300,23 +300,22 @@ class baseAlgorithm:
         resU, resV = 1e6, 1e6
         resRho = 1e6
         u_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny, 2),
-                         dtype=np.float64)
+                         dtype=simulation.precision)
         rho_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny),
-                           dtype=np.float64)
-        u_sq = np.zeros_like(u_old)
-        u_err_sq = np.zeros_like(u_old)
-        rho_sq = np.zeros_like(rho_old)
-        rho_err_sq = np.zeros_like(rho_old)
+                           dtype=simulation.precision)
+        residues = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny, 6),
+                            dtype=simulation.precision)
         # Copy to device
-        u_sq_device = cuda.to_device(u_sq)
-        u_err_sq_device = cuda.to_device(u_err_sq)
-        rho_sq_device = cuda.to_device(rho_sq)
-        rho_err_sq_device = cuda.to_device(rho_err_sq)
+        residues_device = cuda.to_device(residues)
+        noOfResidueArrays_device = \
+            cuda.to_device(np.array([6], dtype=np.int64))
+        residueArgs = (residues_device, noOfResidueArrays_device[0])
+        # u_sq_device = cuda.to_device(u_sq)
+        # u_err_sq_device = cuda.to_device(u_err_sq)
+        # rho_sq_device = cuda.to_device(rho_sq)
+        # rho_err_sq_device = cuda.to_device(rho_err_sq)
         u_old_device = cuda.to_device(u_old)
         rho_old_device = cuda.to_device(rho_old)
-        residueArgs = (
-            u_sq_device, u_err_sq_device, rho_sq_device, rho_err_sq_device
-        )
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
             computeFields_cuda[parallel.blocks,
@@ -345,7 +344,8 @@ class baseAlgorithm:
                                                             simulation.
                                                             precision,
                                                             parallel.n_threads,
-                                                            parallel.blocks)
+                                                            parallel.blocks,
+                                                            parallel.blockSize)
                     names = simulation.options.surfaceNamesGlobal
                     forces = np.array(simulation.options.forces,
                                       dtype=simulation.precision)
@@ -375,7 +375,8 @@ class baseAlgorithm:
                                                             simulation.
                                                             precision,
                                                             parallel.n_threads,
-                                                            parallel.blocks)
+                                                            parallel.blocks,
+                                                            parallel.blockSize)
                     names = simulation.options.surfaceNamesGlobal
                     forces = np.array(simulation.options.forces,
                                       dtype=simulation.precision)
@@ -390,6 +391,7 @@ class baseAlgorithm:
                                                         precision,
                                                         parallel.n_threads,
                                                         parallel.blocks,
+                                                        parallel.blockSize,
                                                         ref_index=simulation.
                                                         obstacle.
                                                         obsOrigin_device)
