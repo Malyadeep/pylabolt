@@ -28,6 +28,11 @@ Welcome to PyLaBolt's documentation!
 .. toctree::
    :maxdepth: 2
    
+   boundary_conditions.rst
+
+.. toctree::
+   :maxdepth: 2
+   
    Acknowledgements.rst
 
 
