@@ -44,15 +44,15 @@ Paraview/Mayavi. Sample results for lid driven cavity, plane Poiseuille flow, an
 
 .. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/cavity_Vcontour.png
    :width: 550px
-   :alt: lid driven cavity (Re = 100)
+   :alt: `lid driven cavity (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/cavity_Vcontour.png>_`
 
 .. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/gravity_driven/U_contour.png
    :width: 550px
-   :alt: Gravity driven plane Poiseuille flow (Re = 100)
+   :alt: `Gravity driven plane Poiseuille flow (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/gravity_driven/U_contour.png>_`
 
 .. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png
    :width: 550px
-   :alt: Flow past a cylinder (Re = 100)
+   :alt: `Flow past a cylinder (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png>_`
 
 More details on setting up and running simulations can be found in the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
 
