@@ -44,15 +44,15 @@ Paraview/Mayavi. Sample results for lid driven cavity, plane Poiseuille flow, an
 
 .. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/cavity_Vcontour.png
    :width: 550px
-   :alt: lid driven cavity (Re = 100)
+   :alt: `lid driven cavity (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/cavity_Vcontour.png>_`
 
 .. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/gravity_driven/U_contour.png
    :width: 550px
-   :alt: Gravity driven plane Poiseuille flow (Re = 100)
+   :alt: `Gravity driven plane Poiseuille flow (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/gravity_driven/U_contour.png>_`
 
 .. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png
    :width: 550px
-   :alt: Flow past a cylinder (Re = 100)
+   :alt: `Flow past a cylinder (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png>_`
 
 More details on setting up and running simulations can be found in the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
 
@@ -64,9 +64,11 @@ PyLaBolt currently supports the following collision schemes
 
 - Bhatnagar-Gross-Krook (BGK) scheme - `Physical Review, vol. 94, Issue 3, pp. 511-525 
   <https://ui.adsabs.harvard.edu/link_gateway/1954PhRv...94..511B/doi:10.1103/PhysRev.94.511>`_
+- Multiple Relaxation Time (MRT) scheme - `Multiple relaxation time lattice Boltzmann models in three dimensions 
+  <https://doi.org/10.1098/rsta.2001.0955>`_
 
-The `MRT <https://doi.org/10.1098/rsta.2001.0955>`_ and `TRT <https://global-sci.org/intro/article_detail/cicp/7862.html>`_ 
-collision schemes will be added in future releases. 
+It also supports the `Guo's forcing scheme <https://doi.org/10.1103/PhysRevE.65.046308>_` for force-driven 
+flows.
 
 The boundary conditions available are
 
