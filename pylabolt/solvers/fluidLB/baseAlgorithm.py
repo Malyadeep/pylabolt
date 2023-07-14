@@ -12,25 +12,29 @@ from pylabolt.parallel.MPI_comm import (computeResiduals, proc_boundary,
 
 
 def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid,
-                          collisionFunc, equilibriumFunc, tau_1,
+                          collisionFunc, equilibriumFunc, preFactor,
                           equilibriumArgs, procBoundary, forceFunc_force,
-                          forceArgs_force, noOfDirections, precision):
+                          forceArgs_force, forcingPreFactor,
+                          noOfDirections, precision):
     for ind in prange(Nx * Ny):
         if solid[ind, 0] != 1 and procBoundary[ind] != 1:
+            force = False
             source = np.zeros(noOfDirections, dtype=precision)
             if forceFunc_force is not None:
+                force = True
                 forceFunc_force(u[ind, :], source, *forceArgs_force)
             equilibriumFunc(f_eq[ind, :], u[ind, :],
                             rho[ind], *equilibriumArgs)
 
             collisionFunc(f[ind, :], f_new[ind, :],
-                          f_eq[ind, :], tau_1, source)
+                          f_eq[ind, :], preFactor, forcingPreFactor,
+                          source, force=force)
 
 
 def computeFields(Nx, Ny, f_new, u, rho, solid, c,
                   noOfDirections, procBoundary, size,
                   forceFunc_vel, forceArgs_vel, f_eq,
-                  preFactor, sigma, precision, u_old, rho_old):
+                  precision, u_old, rho_old):
     u_sq, u_err_sq = 0., 0.
     v_sq, v_err_sq = 0., 0.
     rho_sq, rho_err_sq = 0., 0.
@@ -39,21 +43,13 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
             rhoSum = precision(0)
             uSum = precision(0)
             vSum = precision(0)
-            sigmaSum = np.zeros(4, dtype=precision)
             for k in range(noOfDirections):
                 rhoSum += f_new[ind, k]
                 uSum += c[k, 0] * f_new[ind, k]
                 vSum += c[k, 1] * f_new[ind, k]
-                for m in range(2):
-                    for n in range(2):
-                        component = m * 2 + n
-                        sigmaSum[component] -= (1 - 0.5 * preFactor) \
-                            * c[k, m] * c[k, n] * (f_new[ind, k] -
-                                                   f_eq[ind, k])
             rho[ind] = rhoSum
             u[ind, 0] = uSum/rho[ind]
             u[ind, 1] = vSum/rho[ind]
-            sigma[ind, :] = sigmaSum
             if forceFunc_vel is not None:
                 forceFunc_vel(u[ind, :], rho[ind], *forceArgs_vel)
         # Residue calculation
@@ -69,7 +65,10 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, c,
         u_old[ind, 0] = u[ind, 0]
         u_old[ind, 1] = u[ind, 1]
         rho_old[ind] = rho[ind]
-    return u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq
+    # np.set_printoptions(precision=4, suppress=True)
+    # print(rho.reshape(11, 11))
+    return np.array([u_sq, v_sq, rho_sq, u_err_sq, v_err_sq, rho_err_sq],
+                    dtype=precision)
 
 
 def stream(Nx, Ny, f, f_new, solid, rho, u, procBoundary, c, w,
@@ -120,16 +119,19 @@ class baseAlgorithm:
                          dtype=simulation.precision)
         rho_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny),
                            dtype=simulation.precision)
+        residues = np.zeros(6, dtype=simulation.precision)
+        tempResidues = np.zeros(6, dtype=simulation.precision)
 
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
-            u_err_sq, u_sq, v_err_sq, v_sq, rho_err_sq, rho_sq = \
-                self.computeFields(*simulation.
-                                   computeFieldsArgs,
-                                   u_old, rho_old)
-            resU, resV, resRho = computeResiduals(u_err_sq, u_sq, v_err_sq,
-                                                  v_sq, rho_err_sq, rho_sq,
+            # Compute macroscopic fields and residues #
+            residues = self.computeFields(*simulation.computeFieldsArgs,
+                                          u_old, rho_old)
+            resU, resV, resRho = computeResiduals(residues, tempResidues,
                                                   comm, rank, size)
+            # Compute macroscopic fields and residues done #
+
+            # Write data #
             if timeStep % simulation.stdOutputInterval == 0 and rank == 0:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
                       ' | resU = ' + str(round(resU, 10)).ljust(16) +
@@ -150,14 +152,15 @@ class baseAlgorithm:
                     if size > 1:
                         simulation.options. \
                             forceTorqueCalc(*args, mpiParams=simulation.
-                                            mpiParams)
+                                            mpiParams, ref_index=None)
                         names, forces, torque = \
                             gatherForcesTorque_mpi(simulation.options,
                                                    comm, rank, size,
                                                    simulation.precision)
                     else:
                         simulation.options. \
-                            forceTorqueCalc(*args, mpiParams=None)
+                            forceTorqueCalc(*args, mpiParams=None,
+                                            ref_index=None)
                         names = simulation.options.surfaceNamesGlobal
                         forces = np.array(simulation.options.forces,
                                           dtype=simulation.precision)
@@ -169,6 +172,9 @@ class baseAlgorithm:
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     saveState(timeStep, simulation)
+            # Write data #
+
+            # Check for convergence #
             if rank == 0:
                 if (resU < simulation.relTolU and
                         resV < simulation.relTolV and
@@ -188,7 +194,8 @@ class baseAlgorithm:
                                     simulation.mesh, simulation.precision,
                                     size)
                             simulation.options. \
-                                forceTorqueCalc(*args, mpiParams=None)
+                                forceTorqueCalc(*args, mpiParams=None,
+                                                ref_index=None)
                             names = simulation.options.surfaceNamesGlobal
                             forces = np.array(simulation.options.forces,
                                               dtype=simulation.precision)
@@ -207,7 +214,7 @@ class baseAlgorithm:
                                 simulation.options.computeTorque is True):
                             simulation.options. \
                                 forceTorqueCalc(*args, mpiParams=simulation.
-                                                mpiParams)
+                                                mpiParams, ref_index=None)
                             names, forces, torque = \
                                 gatherForcesTorque_mpi(simulation.options,
                                                        comm, rank, size,
@@ -232,19 +239,60 @@ class baseAlgorithm:
                                 size)
                         simulation.options. \
                             forceTorqueCalc(*args, mpiParams=simulation.
-                                            mpiParams)
+                                            mpiParams, ref_index=None)
                         names, forces, torque = \
                             gatherForcesTorque_mpi(simulation.options,
                                                    comm, rank, size,
                                                    simulation.precision)
                     break
             comm.Barrier()
+            # Check for convergence done!#
+
+            # Obstacle modification #
+            if simulation.obstacle.obsModifiable is True:
+                args = (simulation.fields, simulation.lattice,
+                        simulation.mesh, simulation.precision,
+                        size)
+                if size == 1:
+                    simulation.options. \
+                        forceTorqueCalc(*args, mpiParams=None,
+                                        ref_index=simulation.obstacle.
+                                        obsOrigin)
+                    torque = np.array(simulation.options.torque,
+                                      dtype=simulation.precision)
+                    forces = np.array(simulation.options.forces,
+                                      dtype=simulation.precision)
+                    simulation.obstacle.\
+                        modifyObstacle(torque, simulation.fields,
+                                       simulation.mesh, size, comm,
+                                       timeStep, rank, simulation.precision,
+                                       mpiParams=None)
+                elif size > 1:
+                    simulation.options. \
+                        forceTorqueCalc(*args, mpiParams=simulation.
+                                        mpiParams, ref_index=simulation.
+                                        obstacle.obsOrigin)
+                    names, forces, torque = \
+                        gatherForcesTorque_mpi(simulation.options,
+                                               comm, rank, size,
+                                               simulation.precision)
+                    simulation.obstacle.\
+                        modifyObstacle(torque, simulation.fields,
+                                       simulation.mesh, size, comm,
+                                       timeStep, rank, simulation.precision,
+                                       mpiParams=simulation.mpiParams)
+            # Obstacle modification done #
+
+            # Equilibrium and Collision
             self.equilibriumRelaxation(*simulation.collisionArgs)
+            # Share data between processors
             if size > 1:
                 comm.Barrier()
                 proc_boundary(*simulation.proc_boundaryArgs, comm)
                 comm.Barrier()
+            # Streaming
             self.stream(*simulation.streamArgs)
+            # Boundary condition
             simulation.setBoundaryFunc(simulation.fields, simulation.lattice,
                                        simulation.mesh)
 
@@ -252,24 +300,22 @@ class baseAlgorithm:
         resU, resV = 1e6, 1e6
         resRho = 1e6
         u_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny, 2),
-                         dtype=np.float64)
+                         dtype=simulation.precision)
         rho_old = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny),
-                           dtype=np.float64)
-        u_sq = np.zeros_like(u_old)
-        u_err_sq = np.zeros_like(u_old)
-        rho_sq = np.zeros_like(rho_old)
-        rho_err_sq = np.zeros_like(rho_old)
-
+                           dtype=simulation.precision)
+        residues = np.zeros((simulation.mesh.Nx * simulation.mesh.Ny, 6),
+                            dtype=simulation.precision)
         # Copy to device
-        u_sq_device = cuda.to_device(u_sq)
-        u_err_sq_device = cuda.to_device(u_err_sq)
-        rho_sq_device = cuda.to_device(rho_sq)
-        rho_err_sq_device = cuda.to_device(rho_err_sq)
+        residues_device = cuda.to_device(residues)
+        noOfResidueArrays_device = \
+            cuda.to_device(np.array([6], dtype=np.int64))
+        residueArgs = (residues_device, noOfResidueArrays_device[0])
+        # u_sq_device = cuda.to_device(u_sq)
+        # u_err_sq_device = cuda.to_device(u_err_sq)
+        # rho_sq_device = cuda.to_device(rho_sq)
+        # rho_err_sq_device = cuda.to_device(rho_err_sq)
         u_old_device = cuda.to_device(u_old)
         rho_old_device = cuda.to_device(rho_old)
-        residueArgs = (
-            u_sq_device, u_err_sq_device, rho_sq_device, rho_err_sq_device,
-        )
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
             computeFields_cuda[parallel.blocks,
@@ -278,7 +324,10 @@ class baseAlgorithm:
                                                    u_old_device,
                                                    rho_old_device,
                                                    *residueArgs)
-            resU, resV, resRho = computeResiduals_cuda(*residueArgs)
+            resU, resV, resRho = computeResiduals_cuda(*residueArgs,
+                                                       parallel.blocks,
+                                                       parallel.n_threads,
+                                                       parallel.blockSize)
             if timeStep % simulation.stdOutputInterval == 0:
                 print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
                       ' | resU = ' + str(round(resU, 10)).ljust(16) +
@@ -295,7 +344,8 @@ class baseAlgorithm:
                                                             simulation.
                                                             precision,
                                                             parallel.n_threads,
-                                                            parallel.blocks)
+                                                            parallel.blocks,
+                                                            parallel.blockSize)
                     names = simulation.options.surfaceNamesGlobal
                     forces = np.array(simulation.options.forces,
                                       dtype=simulation.precision)
@@ -325,7 +375,8 @@ class baseAlgorithm:
                                                             simulation.
                                                             precision,
                                                             parallel.n_threads,
-                                                            parallel.blocks)
+                                                            parallel.blocks,
+                                                            parallel.blockSize)
                     names = simulation.options.surfaceNamesGlobal
                     forces = np.array(simulation.options.forces,
                                       dtype=simulation.precision)
@@ -334,6 +385,22 @@ class baseAlgorithm:
                     simulation.options.writeForces(timeStep, names,
                                                    forces, torque)
                 break
+            if simulation.obstacle.obsModifiable is True:
+                simulation.options.forceTorqueCalc_cuda(parallel.device,
+                                                        simulation.
+                                                        precision,
+                                                        parallel.n_threads,
+                                                        parallel.blocks,
+                                                        parallel.blockSize,
+                                                        ref_index=simulation.
+                                                        obstacle.
+                                                        obsOrigin_device)
+                simulation.obstacle.modifyObstacle_cuda(simulation.options.
+                                                        torque, parallel.
+                                                        device, timeStep,
+                                                        parallel.blocks,
+                                                        parallel.n_threads)
+
             equilibriumRelaxation_cuda[parallel.blocks,
                                        parallel.n_threads](*parallel.device.
                                                            collisionArgs)

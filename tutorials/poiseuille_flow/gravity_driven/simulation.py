@@ -48,7 +48,7 @@ forcingDict = {
 
 collisionDict = {
     'model': 'BGK',
-    'tau': 0.8,
+    'nu': 0.1,
     'equilibrium': 'secondOrder',
     'rho_ref': 1
 }

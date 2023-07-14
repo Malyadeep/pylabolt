@@ -2,6 +2,8 @@ import numba
 import numpy as np
 from numba import cuda
 
+from pylabolt.parallel.cudaReduce import setBlockSize
+
 
 class parallelSetup:
     def __init__(self, parallelization, n_threads):
@@ -14,6 +16,7 @@ class parallelSetup:
         self.device = device
         self.blocks = int(np.ceil(simulation.mesh.Nx * simulation.mesh.Ny /
                                   self.n_threads))
+        self.blockSize = setBlockSize(self.blocks)
 
         # Copy grid data
         self.device.Nx = cuda.to_device(np.array([simulation.mesh.Nx],
@@ -40,15 +43,20 @@ class parallelSetup:
                                                    precision))
 
         # Copy scheme data
-        self.device.tau_1 = cuda.to_device(np.array([simulation.
-                                                    collisionScheme.
-                                                    tau_1],
-                                                    dtype=simulation.
-                                                    precision))
         self.device.collisionType = cuda.to_device(np.array([simulation.
                                                    collisionScheme.
                                                    collisionType],
                                                    dtype=np.int32))
+        if simulation.collisionScheme.collisionType == 1:
+            simulation.collisionScheme.preFactor = np.diag(simulation.
+                                                           collisionScheme.
+                                                           preFactor,
+                                                           k=0)
+            self.device.preFactor = cuda.to_device(simulation.collisionScheme.
+                                                   preFactor)
+        elif simulation.collisionScheme.collisionType == 2:
+            self.device.preFactor = cuda.to_device(simulation.collisionScheme.
+                                                   preFactor)
         self.device.equilibriumType = cuda.to_device(np.array([simulation.
                                                      collisionScheme.
                                                      equilibriumType],
@@ -89,6 +97,14 @@ class parallelSetup:
                                            forcingScheme.A],
                                            dtype=simulation.
                                            precision))
+            self.device.forcingPreFactor = \
+                cuda.to_device(simulation.forcingScheme.forcingPreFactor)
+        else:
+            self.device.forcingType = cuda.to_device(self.device.forcingType)
+            self.device.F = cuda.to_device(self.device.F)
+            self.device.A = cuda.to_device(self.device.A)
+            self.device.forcingPreFactor = \
+                cuda.to_device(self.device.forcingPreFactor)
 
         # Copy fields data
         self.device.copyFields(simulation)
@@ -101,6 +117,8 @@ class parallelSetup:
         if (simulation.options.computeForces is True
                 or simulation.options.computeTorque is True):
             simulation.options.setupForcesParallel_cuda()
+        if (simulation.obstacle.obsModifiable is True):
+            simulation.obstacle.setupModifyObstacle_cuda(simulation.precision)
 
     def setupParallel(self, baseAlgorithm, simulation, parallel):
         if parallel is True:
@@ -122,3 +140,5 @@ class parallelSetup:
         if (simulation.options.computeForces is True or
                 simulation.options.computeTorque is True):
             simulation.options.setupForcesParallel_cpu(parallel)
+        if (simulation.obstacle.obsModifiable is True):
+            simulation.obstacle.setupModifyObstacle_cpu(parallel)

@@ -3,7 +3,7 @@ import numpy as np
 
 
 def analytical(Nx, Ny):
-    u_an = np.zeros(Ny, dtype=np.float64)
+    u_an = np.zeros(101, dtype=np.float64)
     y_an = np.linspace(0, 1, 101)
     for i in range(u_an.shape[0]):
         u_an[i] = y_an[i]

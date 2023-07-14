@@ -6,6 +6,13 @@ def proc_boundary(Nx, Ny, data, data_send_topBottom,
                   data_recv_topBottom, data_send_leftRight,
                   data_recv_leftRight, nx, ny, nProc_x, nProc_y, comm):
     current_rank = nx * nProc_y + ny
+    shape = data_recv_leftRight.shape
+    if len(shape) > 1:
+        sendCopy = sendCopy_vector
+        recvCopy = recvCopy_vector
+    else:
+        sendCopy = sendCopy_scalar
+        recvCopy = recvCopy_scalar
     if ny % 2 == 0 and nProc_y > 1:
         # Even top
         nx_send = (nx + nProc_x) % nProc_x
@@ -136,8 +143,8 @@ def proc_boundary(Nx, Ny, data, data_send_topBottom,
     comm.Barrier()
 
 
-@numba.njit
-def sendCopy(data, data_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+# @numba.njit
+def sendCopy_vector(data, data_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
     itr = 0
     for i in range(Nx_i, Nx_f):
         for j in range(Ny_i, Ny_f):
@@ -146,8 +153,18 @@ def sendCopy(data, data_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
             itr += 1
 
 
+# @numba.njit
+def sendCopy_scalar(data, data_send, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+    itr = 0
+    for i in range(Nx_i, Nx_f):
+        for j in range(Ny_i, Ny_f):
+            ind = i * Ny + j
+            data_send[itr] = data[ind]
+            itr += 1
+
+
 @numba.njit
-def recvCopy(data, data_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+def recvCopy_vector(data, data_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
     itr = 0
     for i in range(Nx_i, Nx_f):
         for j in range(Ny_i, Ny_f):
@@ -156,27 +173,32 @@ def recvCopy(data, data_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
             itr += 1
 
 
-def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,
-                     rho_err_sq, rho_sq, comm, rank, size):
+@numba.njit
+def recvCopy_scalar(data, data_recv, Nx_i, Nx_f, Ny_i, Ny_f, Nx, Ny):
+    itr = 0
+    for i in range(Nx_i, Nx_f):
+        for j in range(Ny_i, Ny_f):
+            ind = i * Ny + j
+            data[ind] = data_recv[itr]
+            itr += 1
+
+
+def computeResiduals(residues, tempResidues, comm, rank, size):
+    np.array(residues)
     if size > 1:
         if rank == 0:
-            sum_u, sum_v = u_sq, v_sq
-            sum_rho = rho_sq
-            sum_u_sq, sum_v_sq = u_err_sq, v_err_sq
-            sum_rho_sq = rho_err_sq
+            sum_u, sum_v = residues[0], residues[1]
+            sum_rho = residues[2]
+            sum_u_sq, sum_v_sq = residues[3], residues[4]
+            sum_rho_sq = residues[5]
             for i in range(1, size):
-                temp_sum_u = comm.recv(source=i, tag=1*i)
-                temp_sum_v = comm.recv(source=i, tag=2*i)
-                temp_sum_rho = comm.recv(source=i, tag=3*i)
-                temp_sum_u_sq = comm.recv(source=i, tag=4*i)
-                temp_sum_v_sq = comm.recv(source=i, tag=5*i)
-                temp_sum_rho_sq = comm.recv(source=i, tag=6*i)
-                sum_u += temp_sum_u
-                sum_v += temp_sum_v
-                sum_rho += temp_sum_rho
-                sum_u_sq += temp_sum_u_sq
-                sum_v_sq += temp_sum_v_sq
-                sum_rho_sq += temp_sum_rho_sq
+                comm.Recv(tempResidues, source=i, tag=1*i)
+                sum_u += tempResidues[0]
+                sum_v += tempResidues[1]
+                sum_rho += tempResidues[2]
+                sum_u_sq += tempResidues[3]
+                sum_v_sq += tempResidues[4]
+                sum_rho_sq += tempResidues[5]
             if np.isclose(sum_u, 0, rtol=1e-10):
                 sum_u += 1e-10
             if np.isclose(sum_v, 0, rtol=1e-10):
@@ -188,23 +210,18 @@ def computeResiduals(u_err_sq, u_sq, v_err_sq, v_sq,
             resRho = np.sqrt(sum_rho_sq/(sum_rho))
             return resU, resV, resRho
         else:
-            comm.send(u_sq, dest=0, tag=1*rank)
-            comm.send(v_sq, dest=0, tag=2*rank)
-            comm.send(rho_sq, dest=0, tag=3*rank)
-            comm.send(u_err_sq, dest=0, tag=4*rank)
-            comm.send(v_err_sq, dest=0, tag=5*rank)
-            comm.send(rho_err_sq, dest=0, tag=6*rank)
+            comm.Send(residues, dest=0, tag=1*rank)
             return 0, 0, 0
     else:
-        if np.isclose(u_sq, 0, rtol=1e-10):
-            u_sq += 1e-10
-        if np.isclose(v_sq, 0, rtol=1e-10):
-            v_sq += 1e-10
-        if np.isclose(rho_sq, 0, rtol=1e-10):
-            rho_sq += 1e-10
-        resU = np.sqrt(u_err_sq/(u_sq))
-        resV = np.sqrt(v_err_sq/(v_sq))
-        resRho = np.sqrt(rho_err_sq/(rho_sq))
+        if np.isclose(residues[0], 0, rtol=1e-10):
+            residues[0] += 1e-10
+        if np.isclose(residues[1], 0, rtol=1e-10):
+            residues[1] += 1e-10
+        if np.isclose(residues[2], 0, rtol=1e-10):
+            residues[2] += 1e-10
+        resU = np.sqrt(residues[3]/(residues[0]))
+        resV = np.sqrt(residues[4]/(residues[1]))
+        resRho = np.sqrt(residues[5]/(residues[2]))
         return resU, resV, resRho
 
 
@@ -234,9 +251,14 @@ def gatherForcesTorque_mpi(options, comm, rank, size, precision):
                             sumF[itr, 0] += forces_local[itr_local][0]
                             sumF[itr, 1] += forces_local[itr_local][1]
                             sumT[itr] += torque_local[itr_local]
+        for i in range(1, size):
+            comm.send(sumF, dest=i, tag=1*i)
+            comm.send(sumT, dest=i, tag=2*i)
         return options.surfaceNamesGlobal, sumF, sumT
     else:
         comm.send(options.surfaceNames, dest=0, tag=1*rank)
         comm.send(options.forces, dest=0, tag=2*rank)
         comm.send(options.torque, dest=0, tag=3*rank)
-        return 0, 0, 0
+        sumF = comm.recv(source=0, tag=1*rank)
+        sumT = comm.recv(source=0, tag=2*rank)
+        return options.surfaceNamesGlobal, sumF, sumT

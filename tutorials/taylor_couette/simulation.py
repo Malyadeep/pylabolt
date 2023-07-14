@@ -37,8 +37,11 @@ boundaryDict = {
 }
 
 collisionDict = {
-    'model': 'BGK',
-    'tau': 0.8,
+    'model': 'MRT',
+    'nu': 0.1,
+    'nu_B': 0.1,
+    'S_q': 1.,
+    'S_epsilon': 1.,
     'equilibrium': 'secondOrder',
     'rho_ref': 1
 }
@@ -57,6 +60,7 @@ obstacle = {
         'type': 'circle',
         'center': [0.5, 0.5],
         'radius': 0.2,
+        'rho_s': 0.01,
         'static': False,
         'U_def': {
             'type': 'fixedRotational',
@@ -68,6 +72,7 @@ obstacle = {
         'type': 'circularConfinement',
         'center': [0.5, 0.5],
         'radius': 0.4,
+        'rho_s': 0.01,
         'static': False,
         'U_def': {
             'type': 'fixedRotational',
@@ -78,6 +83,6 @@ obstacle = {
 }
 
 decomposeDict = {
-    'nx': 2,
+    'nx': 5,
     'ny': 2
 }

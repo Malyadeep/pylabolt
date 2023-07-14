@@ -4,15 +4,16 @@ from pylabolt.base.models.equilibriumModels_cuda import (stokesLinear,
                                                          secondOrder,
                                                          incompressible,
                                                          oseen)
-from pylabolt.base.models.collisionModels_cuda import BGK
+from pylabolt.base.models.collisionModels_cuda import (BGK, MRT)
 from pylabolt.base.models.forcingModels_cuda import (Guo_force, Guo_vel)
+import pylabolt.parallel.cudaReduce as cudaReduce
 
 
 @cuda.jit
 def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
-                               tau_1, rho_0, U_0, cs_2, cs_4, c, w,
+                               preFactor, rho_0, U_0, cs_2, cs_4, c, w,
                                source, noOfDirections, F, equilibriumType,
-                               collisionType, forcingType):
+                               collisionType, forcingType, forcingPreFactor):
     ind = cuda.grid(1)
     if ind < Nx * Ny:
         if solid[ind, 0] != 1:
@@ -30,41 +31,48 @@ def equilibriumRelaxation_cuda(Nx, Ny, f_eq, f, f_new, u, rho, solid,
                       rho[ind], rho_0, U_0, cs_2, cs_4, c, w)
 
             if forcingType == 1:
+                force = True
                 Guo_force(u[ind, :], source[ind, :], F, c, w,
-                          noOfDirections, cs_2, cs_4, tau_1)
+                          noOfDirections, cs_2, cs_4)
 
             if collisionType == 1:
                 BGK(f[ind, :], f_new[ind, :],
-                    f_eq[ind, :], tau_1, source[ind, :])
+                    f_eq[ind, :], preFactor, forcingPreFactor,
+                    source[ind, :], force)
+            elif collisionType == 2:
+                MRT(f[ind, :], f_new[ind, :],
+                    f_eq[ind, :], preFactor, forcingPreFactor,
+                    source[ind, :], force)
     else:
         return
 
 
-@cuda.reduce
-def residueReduce(a, b):
-    return a + b
-
-
-def computeResiduals_cuda(u_sq, u_err_sq, rho_sq, rho_err_sq):
-    resU = np.sqrt(residueReduce(u_err_sq[:, 0])/(residueReduce(u_sq[:, 0])
-                   + 1e-9))
-    resV = np.sqrt(residueReduce(u_err_sq[:, 1])/(residueReduce(u_sq[:, 1])
-                   + 1e-9))
-    resRho = np.sqrt(residueReduce(rho_err_sq)/(residueReduce(rho_sq)
-                     + 1e-9))
-    # resU = np.sqrt(np.sum(u_err_sq[:, 0])/(np.sum(u_sq[:, 0])
-    #                + 1e-9))
-    # resV = np.sqrt(np.sum(u_err_sq[:, 1])/(np.sum(u_sq[:, 1])
-    #                + 1e-9))
-    # resRho = np.sqrt(np.sum(rho_err_sq)/(np.sum(rho_sq)
-    #                  + 1e-9))
+def computeResiduals_cuda(residues, noOfResidues, blocks,
+                          n_threads, blockSize):
+    cudaReduce.arrayShape = 6
+    cudaReduce.cudaSum(blocks, n_threads, blockSize, residues)
+    resU_num = residues[0, 0]
+    resU_den = residues[0, 1]
+    resV_num = residues[0, 2]
+    resV_den = residues[0, 3]
+    resRho_num = residues[0, 4]
+    resRho_den = residues[0, 5]
+    if np.isclose(resU_den, 0, rtol=1e-10):
+        resU_den += 1e-10
+    if np.isclose(resV_den, 0, rtol=1e-10):
+        resV_den += 1e-10
+    if np.isclose(resRho_den, 0, rtol=1e-10):
+        resRho_den += 1e-10
+    resU = np.sqrt(resU_num/resU_den)
+    resV = np.sqrt(resV_num/resV_den)
+    resRho = np.sqrt(resRho_num/resRho_den)
     return resU, resV, resRho
 
 
 @cuda.jit
 def computeFields_cuda(Nx, Ny, f_new, u, rho, solid, c,
                        noOfDirections, forcingType, F, A, u_old,
-                       rho_old, u_sq, u_err_sq, rho_sq, rho_err_sq):
+                       rho_old, residues, noOfResidues):
     ind = cuda.grid(1)
     if ind < Nx * Ny:
         if solid[ind, 0] != 1:
@@ -82,18 +90,18 @@ def computeFields_cuda(Nx, Ny, f_new, u, rho, solid, c,
             if forcingType == 1:
                 Guo_vel(u[ind, :], rho[ind], F, A)
 
-            u_err_sq[ind, 0] = (u[ind, 0] - u_old[ind, 0]) * \
-                (u[ind, 0] - u_old[ind, 0])
-            u_sq[ind, 0] = u_old[ind, 0] * u_old[ind, 0]
-            u_err_sq[ind, 1] = (u[ind, 1] - u_old[ind, 1]) * \
-                (u[ind, 1] - u_old[ind, 1])
-            u_sq[ind, 1] = u_old[ind, 1] * u_old[ind, 1]
-            rho_err_sq[ind] = (rho[ind] - rho_old[ind]) * \
-                (rho[ind] - rho_old[ind])
-            rho_sq[ind] = rho_old[ind] * rho_old[ind]
-            u_old[ind, 0] = u[ind, 0]
-            u_old[ind, 1] = u[ind, 1]
-            rho_old[ind] = rho[ind]
+        residues[ind, 0] = (u[ind, 0] - u_old[ind, 0]) * \
+            (u[ind, 0] - u_old[ind, 0])
+        residues[ind, 1] = u_old[ind, 0] * u_old[ind, 0]
+        residues[ind, 2] = (u[ind, 1] - u_old[ind, 1]) * \
+            (u[ind, 1] - u_old[ind, 1])
+        residues[ind, 3] = u_old[ind, 1] * u_old[ind, 1]
+        residues[ind, 4] = (rho[ind] - rho_old[ind]) * \
+            (rho[ind] - rho_old[ind])
+        residues[ind, 5] = rho_old[ind] * rho_old[ind]
+        u_old[ind, 0] = u[ind, 0]
+        u_old[ind, 1] = u[ind, 1]
+        rho_old[ind] = rho[ind]
     else:
         return
 

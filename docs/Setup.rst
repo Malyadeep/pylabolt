@@ -2,14 +2,14 @@
 Setting up simulations
 =======================
 This section walks you through the setup of the simulations, to run using PyLaBolt.
-For this purpose we shall look into the `lid driven cavity tutorial <https://github.com/Malyadeep/pylabolt/tree/main/tutorials/cavity/Re_100>`_,
+For this purpose we shall look into the `lid driven cavity tutorial <https://github.com/Malyadeep/pylabolt/tree/main/tutorials/cavity>`_,
 provided in the `PyLaBolt Github repository <https://github.com/Malyadeep/pylabolt/tree/main>`_.
 
 -----------------------
 ``simulation.py`` file
 -----------------------
 All the input data from the user is provided in the ``simulation.py`` file which
-must be present in the working directory. A sample ``simulation.py`` file is looks
+must be present in the working directory. A sample ``simulation.py`` file looks
 like::
 
     controlDict = {
@@ -35,12 +35,14 @@ like::
     boundaryDict = {
         'walls': {
             'type': 'bounceBack',
-            'points_2': [[1, 0], [1, 1]],
-            'points_0': [[0, 0], [1, 0]],
-            'points_1': [[0, 0], [0, 1]]
+            'entity': 'wall',
+            'points_0': [[1, 0], [1, 1]],
+            'points_1': [[0, 0], [1, 0]],
+            'points_2': [[0, 0], [0, 1]]
         },
         'lid': {
             'type': 'fixedU',
+            'entity': 'wall',
             'value': [0.1, 0],
             'points_1': [[0, 1], [1, 1]]
         }
@@ -48,7 +50,7 @@ like::
 
     collisionDict = {
         'model': 'BGK',
-        'tau': 0.8,
+        'nu': 0.8,
         'equilibrium': 'secondOrder'
     }
 
@@ -123,13 +125,15 @@ boundary region. A sample entry defining a wall boundary is as follows::
   
   'walls': {
             'type': 'bounceBack',
+            'entity': 'wall',
             'points_0': [[1, 0], [1, 1]]
   }
 
 Here, the key ``walls`` is a user-specified name. Inside the ``walls`` dictionary, there is 
 a mandatory entry ``type``, which denotes the boundary condition to be applied. For example, 
-here since the boundary is a wall, we apply ``bounceBack`` boundary condition. The next entries 
-following the ``type`` keyword are the points that define the region of the boundary under 
+here since the boundary is a wall, we apply ``bounceBack`` boundary condition. Another mandatory entry
+is the ``entity`` keyword. This defines whether the boundary is a ``patch`` or a ``wall``. The next entries 
+following the ``entity`` keyword are the points that define the region of the boundary under 
 consideration. Points must be a 2-Dimensional list entry that defines the starting and ending 
 coordinates of the region on the boundary. 
 
@@ -145,12 +149,14 @@ coordinates of the region on the boundary.
 This dictionary defines the collision and equilibrium scheme to be used
 
 - ``model`` - Keyword entry that defines the collision model to be used. Currently, 
-  supports only Bhatnagar-Gross-Krook model (``BGK``). In future releases the MRT and
-  TRT model will be added.
+  supports two collision models namely the Bhatnagar-Gross-Krook model (``BGK``) and the 
+  Multiple Relaxation Time (``MRT``) model.
  
-- ``tau`` - ``float`` entry denoting the relaxation time for the BGK model.
+- ``nu`` - ``float`` entry denoting the kinematic viscosity in lattice units. For the BGK model 
+  and ``D2Q9`` lattice, the relaxation time is given as :math:`\tau = \nu/c_s^2 + 0.5`, where 
+  :math:`c_s` is the speed of sound in lattice units. For more details, refer `here <https://doi.org/10.1007/978-3-319-44649-3>`_.
 - ``equilibrium`` - Keyword entry denoting the type of equilbrium distribution functions
-  to be used. Currently, provides two operations
+  to be used. Currently, provides the following choices
   
   * ``stokesLinear`` - equilibrium distribution function which is first order in velocity.
     Useful in modelling Stokes' flow. For this type of equilibrium another keyword is required 
@@ -187,8 +193,34 @@ Following keywords are required to define the dictionary
     lattice points. The lattices must be square; accordingly the no. of grid points must be set.
 
 
+-----------------------
+Running the simulation
+-----------------------
+Once, the ``simulation.py`` file has been setup, launch a terminal/shell in the working directory 
+and run the following command::
 
+    $ pylabolt --solver fluidLB
 
+The terminal output will show the number of timesteps elapsed, the residuals in velocity components, 
+and the residuals in density. 
+The outputs are saved in the ``output`` folder automatically created during execution. Outputs are saved 
+after every ``saveInterval`` number of time steps. After, the simulation has finished running, all the outputs 
+can be converted to ``VTK`` format via the following command::
+
+    $ pylabolt --toVTK All
+
+After the conversion of outputs to ``VTK``, the directory structure of the case would look like
+
+.. image:: images/dir_structure.png
+   :alt: Directory structure PyLaBolt
+   :align: center
+
+The ``VTK`` files can then be opened in Paraview/Mayavi.
+
+Hurray! You have run your first simulation using PyLaBolt!!
+
+Further sections we elaborate on the available boundary conditions, dealing with obstacles, 
+custom initialization and more.
 
 
 
