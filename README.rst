@@ -64,9 +64,11 @@ PyLaBolt currently supports the following collision schemes
 
 - Bhatnagar-Gross-Krook (BGK) scheme - `Physical Review, vol. 94, Issue 3, pp. 511-525 
   <https://ui.adsabs.harvard.edu/link_gateway/1954PhRv...94..511B/doi:10.1103/PhysRev.94.511>`_
+- Multiple Relaxation Time (MRT) scheme - `Multiple relaxation time lattice Boltzmann models in three dimensions 
+  <https://doi.org/10.1098/rsta.2001.0955>`_
 
-The `MRT <https://doi.org/10.1098/rsta.2001.0955>`_ and `TRT <https://global-sci.org/intro/article_detail/cicp/7862.html>`_ 
-collision schemes will be added in future releases. 
+It also supports the `Guo's forcing scheme <https://doi.org/10.1103/PhysRevE.65.046308>_` for force-driven 
+flows.
 
 The boundary conditions available are
 
