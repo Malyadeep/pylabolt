@@ -5,20 +5,22 @@ import numba
 from copy import deepcopy
 
 
-from pylabolt.base import (mesh, lattice, boundary, schemeLB,
-                           obstacle)
+from pylabolt.base import (mesh, lattice, boundary, obstacle, transport)
 from pylabolt.solvers.fluidLB import (initFields, fields)
 from pylabolt.parallel.MPI_decompose import (decompose, distributeSolid_mpi,
-                                             distributeInitialFields_mpi)
+                                             distributeInitialFields_mpi,
+                                             distributeBoundaries_mpi,
+                                             distributeForceNodes_mpi)
 from pylabolt.utils.options import options
+from pylabolt.solvers.fluidLB import schemeLB
 
 
 @numba.njit
 def initializePopulations(Nx, Ny, f_eq, f, f_new, u, rho,
                           noOfDirections, equilibriumFunc,
-                          equilibriumArgs, procBoundary):
+                          equilibriumArgs, procBoundary, boundaryNode):
     for ind in range(Nx * Ny):
-        if procBoundary[ind] != 1:
+        if procBoundary[ind] != 1 and boundaryNode[ind] != 1:
             equilibriumFunc(f_eq[ind, :], u[ind, :], rho[ind],
                             *equilibriumArgs)
             for k in range(noOfDirections):
@@ -36,7 +38,8 @@ class simulation:
             workingDir = os.getcwd()
             sys.path.append(workingDir)
             from simulation import (controlDict, boundaryDict, collisionDict,
-                                    latticeDict, meshDict, internalFields)
+                                    latticeDict, meshDict, internalFields,
+                                    transportDict)
         except ImportError as e:
             print('FATAL ERROR!')
             print(str(e))
@@ -66,12 +69,11 @@ class simulation:
                 print('ERROR! Keyword ' + str(e) + ' missing in controlDict')
             os._exit(1)
         if rank == 0:
-            self.writeControlLog()
             print('Setting control parameters done!\n', flush=True)
 
         if rank == 0:
             print('Reading mesh info and creating mesh...', flush=True)
-        self.mesh = mesh.createMesh(meshDict, self.precision)
+        self.mesh = mesh.createMesh(meshDict, self.precision, self.rank)
         if rank == 0:
             print('Reading mesh info and creating mesh done!\n', flush=True)
 
@@ -80,18 +82,25 @@ class simulation:
         self.lattice = lattice.createLattice(latticeDict, self.precision)
         if rank == 0:
             print('Setting lattice structure done!\n', flush=True)
+            print('Setting transport parameters...', flush=True)
+        self.transport = transport.transportDef()
+        self.transport.readFluidTransportDict(transportDict, self.precision,
+                                              self.rank)
+        if rank == 0:
+            print('Setting transport parameters done!\n', flush=True)
             print('Setting collision scheme and equilibrium model...',
                   flush=True)
         self.collisionScheme = schemeLB.collisionScheme(self.lattice,
+                                                        self.mesh,
                                                         collisionDict,
                                                         parallelization,
+                                                        self.transport,
                                                         self.rank,
-                                                        self.precision)
+                                                        self.precision,
+                                                        comm)
         if rank == 0:
             print('Setting collision scheme and equilibrium model done!\n',
                   flush=True)
-
-        if rank == 0:
             print('Setting forcing scheme...', flush=True)
         self.forcingScheme = schemeLB.forcingScheme(self.precision,
                                                     self.lattice)
@@ -99,8 +108,8 @@ class simulation:
                                             self.collisionScheme,
                                             self.rank,
                                             self.precision)
+
         if rank == 0:
-            self.schemeLog()
             print('Setting forcing scheme done!\n', flush=True)
 
         if size > 1:
@@ -115,7 +124,7 @@ class simulation:
         self.options = options(self.rank, self.precision, self.mesh)
 
         if rank == 0:
-            print('Reading option done!\n', flush=True)
+            print('Reading options done!\n', flush=True)
 
         if rank == 0:
             print('Initializing fields...', flush=True)
@@ -123,7 +132,6 @@ class simulation:
         initialFields_temp = initFields.initFields(internalFields, self.mesh,
                                                    self.precision, self.rank,
                                                    comm)
-
         self.initialFields = initFields.initialFields(self.mesh.Nx,
                                                       self.mesh.Ny,
                                                       self.precision)
@@ -131,7 +139,24 @@ class simulation:
         solid = self.obstacle.setObstacle(self.mesh, self.precision,
                                           self.options, initialFields_temp,
                                           self.rank, size)
-        comm.Barrier()
+        if (self.options.computeForces is True or self.options.computeTorque
+                is True and rank == 0):
+            self.obstacle.computeFluidSolidNb(solid, self.mesh, self.lattice,
+                                              initialFields_temp, self.size)
+        if rank == 0:
+            print('Initializing fields done!\n', flush=True)
+            print('Reading boundary conditions...', flush=True)
+        self.boundary = boundary.boundary(boundaryDict)
+        if rank == 0:
+            self.boundary.readBoundaryDict(initialFields_temp, self.lattice,
+                                           self.mesh, self.rank,
+                                           self.precision)
+            self.boundary.initializeBoundary(self.lattice, self.mesh,
+                                             initialFields_temp,
+                                             solid, self.precision)
+        if rank == 0:
+            print('Reading boundary conditions done...\n', flush=True)
+
         if size > 1:
             distributeInitialFields_mpi(initialFields_temp, self.initialFields,
                                         self.mpiParams, self.mesh, self.rank,
@@ -141,12 +166,7 @@ class simulation:
         self.fields = fields.fields(self.mesh, self.lattice,
                                     self.initialFields,
                                     self.precision, size, rank)
-        if (self.options.computeForces is True or self.options.computeTorque
-                is True and rank == 0):
-            self.obstacle.computeFluidNb(solid, self.mesh, self.lattice,
-                                         self.size)
-        # if rank == 0:
-        #     self.obstacle.details()
+
         obstacleTemp = deepcopy(self.obstacle)
         if size == 1 and solid is not None:
             self.fields.solid = solid
@@ -154,30 +174,22 @@ class simulation:
             distributeSolid_mpi(solid, self.obstacle,
                                 self.fields, self.mpiParams, self.mesh,
                                 self.precision, self.rank, self.size, comm)
-        if rank == 0:
-            print('Initializing fields done!\n', flush=True)
 
-        if rank == 0:
-            print('Reading boundary conditions...', flush=True)
-        self.boundary = boundary.boundary(boundaryDict)
-        if rank == 0:
-            self.boundary.readBoundaryDict(self.rank)
-            self.boundary.initializeBoundary(self.lattice, self.mesh,
-                                             self.fields, self.precision)
-            # self.boundary.details()
-        if rank == 0:
-            self.writeDomainLog(meshDict)
-            print('Reading boundary conditions done...\n', flush=True)
         if (self.options.computeForces is True or self.options.computeTorque
                 is True):
             if rank == 0:
                 self.options.gatherObstacleNodes(obstacleTemp)
                 self.options.gatherBoundaryNodes(self.boundary)
-                # self.options.details(self.rank, self.mesh, self.fields.solid,
-                #                      self.fields.u, flag='all')
-        # if rank == 3:
-        #     self.obstacle.details()
-        #     obstacleTemp.details()
+
+        if size > 1:
+            distributeBoundaries_mpi(self.boundary, self.mpiParams, self.mesh,
+                                     rank, size, self.precision, comm)
+            if (self.options.computeForces is True or
+                    self.options.computeTorque is True):
+                distributeForceNodes_mpi(self.options, self.mpiParams,
+                                         self.mesh, rank, size,
+                                         self.precision, comm)
+
         del obstacleTemp, solid
         # initialize functions
         self.equilibriumFunc = self.collisionScheme.equilibriumFunc
@@ -189,10 +201,12 @@ class simulation:
         self.collisionArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq,
             self.fields.f, self.fields.f_new, self.fields.u, self.fields.rho,
-            self.fields.solid, self.collisionFunc, self.equilibriumFunc,
-            self.collisionScheme.preFactor, self.collisionScheme.
-            equilibriumArgs, self.fields.procBoundary, self.forcingScheme.
-            forceFunc_force, self.forcingScheme.forceArgs_force,
+            self.fields.solid, self.fields.boundaryNode,
+            self.fields.source, self.forcingScheme.gravity, self.collisionFunc,
+            self.equilibriumFunc, self.collisionScheme.preFactor,
+            self.collisionScheme.equilibriumArgs, self.fields.procBoundary,
+            self.forcingScheme.forceFunc_force,
+            self.forcingScheme.forceArgs_force,
             self.forcingScheme.forcingPreFactor,
             self.lattice.noOfDirections, self.precision
         )
@@ -200,6 +214,7 @@ class simulation:
         self.streamArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f, self.fields.f_new,
             self.fields.solid, self.fields.rho, self.fields.u,
+            self.fields.boundaryNode,
             self.fields.procBoundary, self.lattice.c, self.lattice.w,
             self.lattice.noOfDirections, self.collisionScheme.cs_2,
             self.lattice.invList, self.size
@@ -208,10 +223,11 @@ class simulation:
         self.computeFieldsArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f_new,
             self.fields.u, self.fields.rho, self.fields.solid,
+            self.fields.boundaryNode, self.forcingScheme.gravity,
             self.lattice.c, self.lattice.noOfDirections,
             self.fields.procBoundary, self.size,
             self.forcingScheme.forceFunc_vel,
-            self.forcingScheme.forceArgs_vel,
+            self.forcingScheme.forceCoeffVel,
             self.fields.f_eq, self.precision
         )
 
@@ -235,79 +251,16 @@ class simulation:
             self.proc_copyArgs = (self.mesh.Nx, self.mesh.Ny,
                                   self.lattice.c, self.fields.f_new)
 
+        self.boundary.setBoundaryArgs(self.lattice, self.mesh, self.fields,
+                                      self.collisionScheme)
+
         initializePopulations(
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq, self.fields.f,
             self.fields.f_new, self.fields.u, self.fields.rho,
             self.lattice.noOfDirections, self.equilibriumFunc,
             self.equilibriumArgs,
-            self.fields.procBoundary
+            self.fields.procBoundary, self.fields.boundaryNode
         )
 
-    def writeControlLog(self):
-        controlFile = open('log_control', 'w')
-        controlFile.write('Control parameters...\n')
-        controlFile.write('\tstartTime = ' + str(self.startTime) + '\n')
-        controlFile.write('\tendTime = ' + str(self.endTime) + '\n')
-        controlFile.write('\tstdOutputInterval = ' +
-                          str(self.stdOutputInterval) + '\n')
-        controlFile.write('saveInterval = ' +
-                          str(self.saveInterval) + '\n')
-        controlFile.write('\tsaveStateInterval = ' +
-                          str(self.saveStateInterval) + '\n')
-        controlFile.write('\trelTolU = ' + str(self.relTolU) + '\n')
-        controlFile.write('\trelTolV = ' + str(self.relTolV) + '\n')
-        controlFile.write('\trelTolRho = ' + str(self.relTolRho) + '\n')
-        controlFile.close()
-
-    def writeDomainLog(self, meshDict):
-        meshFile = open('log_domain', 'w')
-        meshFile.write('Domain Information...\n')
-        meshFile.write('\tBounding box : ' + str(meshDict['boundingBox'])
-                       + '\n')
-        meshFile.write('\tGrid points in x-direction : ' +
-                       str(self.mesh.Nx_global) + '\n')
-        meshFile.write('\tGrid points in y-direction : ' +
-                       str(self.mesh.Ny_global) + '\n')
-        meshFile.write('\tdelX : ' +
-                       str(self.mesh.delX) + '\n')
-        meshFile.write('\nBoundary information...\n')
-        for itr, name in enumerate(self.boundary.nameList):
-            meshFile.write('\n\tboundary name : ' + str(name) + '\n')
-            meshFile.write('\tboundary type : ' +
-                           str(self.boundary.boundaryType[itr]) + '\n')
-            pointArray = np.array(self.boundary.points[name])
-            for k in range(pointArray.shape[0]):
-                meshFile.write('\tpoint ' + str(k) + ': ' +
-                               str(pointArray[k, 0]) + ', ' +
-                               str(pointArray[k, 1]) + '\n')
-                temp = self.boundary.boundaryIndices[k + itr, 1] -\
-                    self.boundary.boundaryIndices[k + itr, 0]
-                meshFile.write('\tno.of fields : ' +
-                               str(temp[0] * temp[1]) + '\n')
-        meshFile.close()
-
-    def schemeLog(self):
-        schemeFile = open('log_scheme', 'w')
-        schemeFile.write('Scheme Information...\n')
-        schemeFile.write('\tcollision scheme : ' +
-                         str(self.collisionScheme.collisionModel) + '\n')
-        schemeFile.write('\trelaxation time : ' +
-                         str(self.collisionScheme.nu) + '\n')
-        schemeFile.write('\tcollision scheme : ' +
-                         str(self.collisionScheme.equilibriumModel) + '\n')
-        schemeFile.write('\nLattice Information...\n')
-        schemeFile.write('\tLattice : ' +
-                         str(self.lattice.latticeType) + '\n')
-        schemeFile.write('\tdeltaX in lattice units : ' +
-                         str(self.lattice.deltaX) + '\n')
-        schemeFile.write('\tdeltaT in lattice units : ' +
-                         str(self.lattice.deltaT) + '\n')
-        schemeFile.write('\nForcing Information...\n')
-        try:
-            schemeFile.write('\tModel : ' + self.forcingScheme.
-                             forcingModel + '\n')
-            schemeFile.write('\tValue : ' + str(self.forcingScheme.
-                             forcingValue) + '\n')
-        except AttributeError:
-            schemeFile.write('\tNo Forcing scheme selected\n')
-        schemeFile.close()
+    def setupParallel_cpu(self, parallel):
+        self.boundary.setupBoundary_cpu(parallel)

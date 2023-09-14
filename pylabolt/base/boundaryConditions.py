@@ -3,41 +3,50 @@ import numpy as np
 
 
 def fixedU(f, f_new, rho, u, solid, faceList, outDirections, invDirections,
-           boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
+           c, w, cs, Nx, Ny):
     cs_2 = 1/(cs * cs)
-    for ind in prange(faceList.shape[0]):
-        if solid[faceList[ind], 0] != 1:
-            rhoWall = rho[faceList[ind]]
-            for dir in range(invDirections.shape[0]):
-                preFactor = 2 * w[outDirections[dir]] * rhoWall *\
-                    ((c[outDirections[dir], 0] * boundaryVector[0] +
-                     c[outDirections[dir], 1] * boundaryVector[1])) * cs_2
-                f_new[faceList[ind], invDirections[dir]] = \
-                    f[faceList[ind], outDirections[dir]] - preFactor
+    for itr in prange(faceList.shape[0]):
+        ind = faceList[itr]
+        if solid[ind, 0] != 1:
+            rhoWall = rho[ind]
+            for direction in range(invDirections.shape[0]):
+                i, j = int(ind / Ny), int(ind % Ny)
+                i_nb = int(i + c[outDirections[direction], 0])
+                j_nb = int(j + c[outDirections[direction], 1])
+                ind_nb = int(i_nb * Ny + j_nb)
+                preFactor = 2 * w[outDirections[direction]] * rhoWall *\
+                    ((c[outDirections[direction], 0] * u[ind_nb, 0] +
+                     c[outDirections[direction], 1] * u[ind_nb, 1])) * cs_2
+                f_new[ind, invDirections[direction]] = \
+                    f[ind, outDirections[direction]] - preFactor
 
 
 def variableU(f, f_new, rho, u, solid, faceList, outDirections, invDirections,
-              boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
+              c, w, cs, Nx, Ny):
     cs_2 = 1/(cs * cs)
-    for ind in prange(faceList.shape[0]):
-        if solid[faceList[ind], 0] != 1:
-            rhoWall = rho[faceList[ind]]
-            for dir in range(invDirections.shape[0]):
-                preFactor = 2 * w[outDirections[dir]] * rhoWall *\
-                    ((c[outDirections[dir], 0] * boundaryVector[ind, 0] +
-                     c[outDirections[dir], 1] * boundaryVector[ind, 1])) * cs_2
-                f_new[faceList[ind], invDirections[dir]] = \
-                    f[faceList[ind], outDirections[dir]] - preFactor
+    for itr in prange(faceList.shape[0]):
+        ind = faceList[itr]
+        if solid[ind, 0] != 1:
+            rhoWall = rho[ind]
+            for direction in range(invDirections.shape[0]):
+                i_nb = int(int(ind / Ny) + c[outDirections[direction], 0])
+                j_nb = int(int(ind % Ny) + c[outDirections[direction], 1])
+                ind_nb = int(i_nb * Ny + j_nb)
+                preFactor = 2 * w[outDirections[direction]] * rhoWall *\
+                    ((c[outDirections[direction], 0] * u[ind_nb, 0] +
+                     c[outDirections[direction], 1] * u[ind_nb, 1])) * cs_2
+                f_new[ind, invDirections[direction]] = \
+                    f[ind, outDirections[direction]] - preFactor
 
 
 def fixedPressure(f, f_new, rho, u, solid, faceList, outDirections,
-                  invDirections, boundaryVector, boundaryScalar, c, w, cs,
-                  Nx, Ny):
+                  invDirections, nbList, c, w, cs, Nx, Ny):
     cs_2 = 1/(cs * cs)
     cs_4 = cs_2 * cs_2
-    for ind in prange(faceList.shape[0]):
-        if solid[faceList[ind], 0] != 1:
-            i, j = int(faceList[ind] / Ny), int(faceList[ind] % Ny)
+    for itr in prange(faceList.shape[0]):
+        ind = faceList[itr]
+        if solid[ind, 0] != 1:
+            i, j = int(ind / Ny), int(ind % Ny)
             for direction in invDirections:
                 c_mag = int(np.ceil((c[direction, 0] * c[direction, 0]
                             + c[direction, 1] * c[direction, 1])))
@@ -46,34 +55,32 @@ def fixedPressure(f, f_new, rho, u, solid, faceList, outDirections,
                     j_nb = int(j + c[direction, 1])
                     ind_nb = int(i_nb * Ny + j_nb)
                     break
-            u_nb = u[faceList[ind], :] + 0.5 * (u[faceList[ind], :] -
-                                                u[ind_nb, :])
+            u_nb = u[ind, :] + 0.5 * (u[ind, :] - u[ind_nb, :])
             u_nb_2 = u_nb[0] * u_nb[0] + u_nb[1] * u_nb[1]
-            for dir in range(invDirections.shape[0]):
-                c_dot_u = (c[outDirections[dir], 0] * u_nb[0] +
-                           c[outDirections[dir], 1] * u_nb[1])
-                preFactor = 2 * w[outDirections[dir]] * boundaryScalar * cs_2 \
-                    * (1. + c_dot_u * c_dot_u * 0.5 * cs_4 - u_nb_2 * 0.5
-                       * cs_2)
-                f_new[faceList[ind], invDirections[dir]] = \
-                    - f[faceList[ind], outDirections[dir]] + preFactor
+            for direction in range(invDirections.shape[0]):
+                c_dot_u = (c[outDirections[direction], 0] * u_nb[0] +
+                           c[outDirections[direction], 1] * u_nb[1])
+                preFactor = 2 * w[outDirections[direction]] *\
+                    rho[nbList[itr]] * (1. + c_dot_u * c_dot_u * 0.5 * cs_4
+                                        - u_nb_2 * 0.5 * cs_2)
+                f_new[ind, invDirections[direction]] = \
+                    - f[ind, outDirections[direction]] + preFactor
 
 
-def bounceBack(f, f_new, rho, u, solid, faceList, outDirections, invDirections,
-               boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
+def bounceBack(f, f_new, solid, faceList, outDirections, invDirections):
     for ind in prange(faceList.shape[0]):
         if solid[faceList[ind], 0] != 1:
-            for dir in range(invDirections.shape[0]):
-                f_new[faceList[ind], invDirections[dir]] = \
-                    f[faceList[ind], outDirections[dir]]
+            for direction in range(invDirections.shape[0]):
+                f_new[faceList[ind], invDirections[direction]] = \
+                    f[faceList[ind], outDirections[direction]]
 
 
-def zeroGradient(f, f_new, rho, u, solid, faceList, outDirections,
-                 invDirections, boundaryVector, boundaryScalar, c, w, cs,
-                 Nx, Ny):
-    for ind in prange(faceList.shape[0]):
-        if solid[faceList[ind], 0] != 1:
-            i, j = int(faceList[ind] / Ny), int(faceList[ind] % Ny)
+def zeroGradient(f, f_new, solid, faceList, outDirections, invDirections,
+                 c, Nx, Ny):
+    for itr in prange(faceList.shape[0]):
+        ind = faceList[itr]
+        if solid[ind, 0] != 1:
+            i, j = int(ind / Ny), int(ind % Ny)
             for direction in invDirections:
                 c_mag = int(np.ceil((c[direction, 0] * c[direction, 0]
                             + c[direction, 1] * c[direction, 1])))
@@ -83,9 +90,8 @@ def zeroGradient(f, f_new, rho, u, solid, faceList, outDirections,
                     ind_nb = int(i_nb * Ny + j_nb)
                     break
             for k in range(f.shape[1]):
-                f[faceList[ind], k] = f[ind_nb, k]
+                f_new[ind, k] = f_new[ind_nb, k]
 
 
-def periodic(f, f_new, rho, u, solid, faceList, outDirections, invDirections,
-             boundaryVector, boundaryScalar, c, w, cs, Nx, Ny):
+def periodic():
     pass

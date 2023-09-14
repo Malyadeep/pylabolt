@@ -10,22 +10,34 @@ from pylabolt.parallel.MPI_comm import proc_boundary
 
 
 @numba.njit
-def findNb(solid, Nx, Ny, c, noOfDirections, size, obsNo):
-    nbNodes = []
+def findNb(solid, boundaryNode, Nx, Ny, c, noOfDirections, size, obsNo):
+    fluidNbNodes = []
+    solidNbNodes = []
     for i in range(Nx):
         for j in range(Ny):
             ind = i * Ny + j
-            if solid[ind, 0] != 1:
+            if solid[ind, 0] != 1 and boundaryNode[ind] != 1:
                 for k in range(noOfDirections):
                     i_nb = int(i + c[k, 0] + Nx) % Nx
                     j_nb = int(j + c[k, 1] + Ny) % Ny
                     ind_nb = i_nb * Ny + j_nb
-                    if solid[ind_nb, 0] == 1 and solid[ind_nb, 1] == obsNo:
-                        nbNodes.append(ind)
+                    if (solid[ind_nb, 0] == 1 and solid[ind_nb, 1] == obsNo
+                            and boundaryNode[ind_nb] != 1):
+                        fluidNbNodes.append(ind)
+                        break
+            elif solid[ind, 0] != 0 and boundaryNode[ind] != 1:
+                for k in range(noOfDirections):
+                    i_nb = int(i + c[k, 0] + Nx) % Nx
+                    j_nb = int(j + c[k, 1] + Ny) % Ny
+                    ind_nb = i_nb * Ny + j_nb
+                    if (solid[ind_nb, 0] == 0 and solid[ind, 1] == obsNo
+                            and boundaryNode[ind_nb] != 1):
+                        solidNbNodes.append(ind)
                         break
             else:
                 continue
-    return np.array(nbNodes, dtype=np.int64)
+    return np.array(fluidNbNodes, dtype=np.int64),\
+        np.array(solidNbNodes, dtype=np.int64)
 
 
 @cuda.jit
@@ -78,11 +90,12 @@ def setOmegaFromTorque(obsNodes, momentOfInertia, omega, omega_old,
 
 
 class obstacleSetup:
-    def __init__(self, size, mesh, precision):
+    def __init__(self, size, mesh, precision, phase=False):
         self.obstacles = []
         self.obstaclesGlobal = []
         self.noOfObstacles = 0
         self.fluidNbObstacle = []
+        self.solidNbObstacle = []
         self.obsNodes = []
         self.modifyObsFunc = []
         self.obsModifiable = False
@@ -93,6 +106,7 @@ class obstacleSetup:
         self.obsU = []
         self.obsOrigin = []
         self.allStatic = True
+        self.phase = phase
         self.N_local = np.zeros((2, 2, 0), dtype=np.int64)
         if size > 1:
             self.obs_send_topBottom = np.zeros((mesh.Nx + 2, 2),
@@ -127,7 +141,8 @@ class obstacleSetup:
         except ImportError:
             if rank == 0:
                 print('No obstacle defined!', flush=True)
-            return None
+            return np.zeros((mesh.Nx_global * mesh.Ny_global, 2),
+                            dtype=np.int32)
         try:
             if rank == 0:
                 solid = np.full((mesh.Nx_global * mesh.Ny_global, 2),
@@ -149,9 +164,10 @@ class obstacleSetup:
                 if obstacleType == 'circle':
                     center = obstacle[obsName]['center']
                     radius = obstacle[obsName]['radius']
-                    if isinstance(center, list) and isinstance(radius, float):
-                        center = np.array(center, dtype=np.float64)
-                        radius = np.float64(radius)
+                    if (isinstance(center, list) and isinstance(radius, float)
+                            or isinstance(radius, int)):
+                        center = np.array(center, dtype=precision)
+                        radius = precision(radius)
                     else:
                         if rank == 0:
                             print("ERROR!", flush=True)
@@ -221,8 +237,9 @@ class obstacleSetup:
                             velOmega = precision(velOmega)
                             self.obsU.append(np.zeros(2, dtype=precision))
                             self.obsOmega.append(velOmega)
-                            self.obsOrigin.append(np.divide(velOrigin,
-                                                  mesh.delX))
+                            self.obsOrigin.append(np.int64(np.divide(velOrigin,
+                                                  mesh.delX)) + np.ones(2,
+                                                  dtype=np.int64))
                             if velType == 'calculatedRotational':
                                 self.modifyObsFunc.append(setOmegaFromTorque)
                                 self.obsModifiable = True
@@ -243,7 +260,7 @@ class obstacleSetup:
                 elif obstacleType == 'rectangle':
                     boundingBox = obstacle[obsName]['boundingBox']
                     if isinstance(boundingBox, list):
-                        boundingBox = np.array(boundingBox, dtype=np.float64)
+                        boundingBox = np.array(boundingBox, dtype=np.int64)
                     else:
                         print("ERROR!", flush=True)
                         print("For 'rectangle' type obstacle bounding box"
@@ -312,7 +329,8 @@ class obstacleSetup:
                             self.obsU.append(np.zeros(2, dtype=precision))
                             self.obsOmega.append(velOmega)
                             self.obsOrigin.append(np.divide(velOrigin,
-                                                  mesh.delX))
+                                                  mesh.delX) + np.ones(2,
+                                                  dtype=np.int64))
                             if velType == 'calculatedRotational':
                                 self.modifyObsFunc.append(setOmegaFromTorque)
                                 self.obsModifiable = True
@@ -333,7 +351,8 @@ class obstacleSetup:
                 elif obstacleType == 'circularConfinement':
                     center = obstacle[obsName]['center']
                     radius = obstacle[obsName]['radius']
-                    if isinstance(center, list) and isinstance(radius, float):
+                    if (isinstance(center, list) and isinstance(radius, float)
+                            or isinstance(radius, int)):
                         center = np.array(center, dtype=np.float64)
                         radius = np.float64(radius)
                     else:
@@ -406,8 +425,9 @@ class obstacleSetup:
                             velOmega = precision(velOmega)
                             self.obsU.append(np.zeros(2, dtype=precision))
                             self.obsOmega.append(velOmega)
-                            self.obsOrigin.append(np.divide(velOrigin,
-                                                  mesh.delX))
+                            self.obsOrigin.append(np.int64(np.divide(velOrigin,
+                                                  mesh.delX)) + np.ones(2,
+                                                  dtype=np.int64))
                             if velType == 'calculatedRotational':
                                 self.modifyObsFunc.append(setOmegaFromTorque)
                                 self.obsModifiable = True
@@ -430,8 +450,8 @@ class obstacleSetup:
                     print("ERROR!")
                     print("Unsupported obstacle type!", flush=True)
                     os._exit(1)
-                if rank == 0:
-                    print('Reading Obstacle data done!', flush=True)
+            if rank == 0:
+                print('Reading Obstacle data done!', flush=True)
             if self.allStatic is False:
                 self.obsU = np.array(self.obsU, dtype=precision)
                 self.obsOmega = np.array(self.obsOmega, dtype=precision)
@@ -458,11 +478,14 @@ class obstacleSetup:
             del self.obs_send_leftRight, self.obs_send_topBottom,\
                 self.obs_recv_leftRight, self.obs_recv_topBottom
 
-    def computeFluidNb(self, solid, mesh, lattice, size):
+    def computeFluidSolidNb(self, solid, mesh, lattice, fields, size):
         for obsNo in range(self.noOfObstacles):
-            nbNodes = findNb(solid, mesh.Nx_global, mesh.Ny_global,
-                             lattice.c, lattice.noOfDirections, size, obsNo)
-            self.fluidNbObstacle.append(nbNodes)
+            fluidNbNodes, solidNbNodes = \
+                findNb(solid, fields.boundaryNode, mesh.Nx_global,
+                       mesh.Ny_global, lattice.c, lattice.noOfDirections,
+                       size, obsNo)
+            self.fluidNbObstacle.append(fluidNbNodes)
+            self.solidNbObstacle.append(solidNbNodes)
 
     def details(self):
         print(self.obstacles)
@@ -474,6 +497,7 @@ class obstacleSetup:
         print(self.modifyObsFunc)
         print(self.obsU)
         print(self.obsOmega)
+        print(self.obsOrigin)
 
     def writeModifiedObstacleData(self, timeStep, torque, omega, origin):
         if not os.path.isdir('postProcessing'):
@@ -488,10 +512,14 @@ class obstacleSetup:
                         'torque'.ljust(12) + '\t' +
                         'omega'.ljust(12) + '\n')
         for itr in range(len(self.obstaclesGlobal)):
+            if self.phase is True:
+                torque_obs = np.sum(torque[itr])
+            else:
+                torque_obs = torque[itr]
             writeFile.write(str(itr).ljust(12) + '\t' +
                             (self.obstaclesGlobal[itr]).ljust(12) + '\t' +
                             str(origin[itr]).ljust(12) + '\t' +
-                            str(round(torque[itr], 10)).ljust(12) + '\t'
+                            str(round(torque_obs, 10)).ljust(12) + '\t'
                             + str(round(omega[itr], 10)).ljust(12)
                             + '\n')
         writeFile.close()
@@ -516,9 +544,14 @@ class obstacleSetup:
             N_local = mpiParams.N_local
         for itr in range(self.noOfObstacles):
             if self.modifyObsFunc[itr] is not None:
+                # print(self.obsOrigin[itr])
+                if self.phase is True:
+                    torque_obs = np.sum(torque[itr])
+                else:
+                    torque_obs = torque[itr]
                 args = (self.obsNodes[itr], self.momentOfInertia[itr],
                         self.obsOmega, self.obsOmega_old,
-                        torque[itr], fields.u, self.obsOrigin[itr],
+                        torque_obs, fields.u, self.obsOrigin[itr],
                         mesh.Nx, mesh.Ny, nx, ny, nProc_x, nProc_y,
                         N_local, size, itr)
                 self.modifyObsFunc[itr](*args)
@@ -547,7 +580,12 @@ class obstacleSetup:
 
     def gatherProperties(self, torque, size, rank, comm, precision):
         if rank == 0:
-            torque_obs = np.zeros(len(self.obstaclesGlobal), dtype=precision)
+            if self.phase is True:
+                torque_obs = np.zeros((len(self.obstaclesGlobal), 2),
+                                      dtype=precision)
+            else:
+                torque_obs = np.zeros(len(self.obstaclesGlobal),
+                                      dtype=precision)
             omega = np.zeros(len(self.obstaclesGlobal), dtype=precision)
             origin = np.zeros((len(self.obstaclesGlobal), 2), dtype=precision)
             for i in range(size):
@@ -556,7 +594,11 @@ class obstacleSetup:
                         for itr_local, local_name in enumerate(self.obstacles):
                             if name == local_name:
                                 omega[itr] = self.obsOmega[itr_local]
-                                torque_obs[itr] = torque[itr_local]
+                                if self.phase is True:
+                                    torque_obs[itr, 0] = torque[itr_local, 0]
+                                    torque_obs[itr, 1] = torque[itr_local, 1]
+                                else:
+                                    torque_obs[itr] = torque[itr_local]
                                 origin[itr, 0] = self.obsOrigin[itr_local][0]
                                 origin[itr, 1] = self.obsOrigin[itr_local][1]
                 else:
@@ -568,7 +610,11 @@ class obstacleSetup:
                                 enumerate(obstacles_local):
                             if name == local_name:
                                 omega[itr] = omega_local[itr_local]
-                                torque_obs[itr] = torque[itr_local]
+                                if self.phase is True:
+                                    torque_obs[itr, 0] = torque[itr_local, 0]
+                                    torque_obs[itr, 1] = torque[itr_local, 1]
+                                else:
+                                    torque_obs[itr] = torque[itr_local]
                                 origin[itr, 0] = origin_local[itr_local][0]
                                 origin[itr, 1] = origin_local[itr_local][1]
             return torque_obs, omega, origin

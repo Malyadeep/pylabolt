@@ -5,6 +5,8 @@ class lattice:
     def __init__(self, lat, precision):
         self.latticeType = lat
         self.cs = precision(1/np.sqrt(3))
+        self.cs_2 = 1.0 / (self.cs * self.cs)
+        self.cs_4 = self.cs_2 * self.cs_2
         self.deltaX = 1
         self.deltaT = 1
         if lat == 'D2Q9':

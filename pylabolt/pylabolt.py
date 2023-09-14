@@ -6,8 +6,8 @@ import mpi4py
 def main():
     mpi4py.rc(initialize=False, finalize=False)
     parser = ArgumentParser(description='A Lattice Boltzmann Python solver')
-    parser.add_argument('-s', '--solver', choices=['fluidLB'], type=str,
-                        help='choice of solver to run')
+    parser.add_argument('-s', '--solver', choices=['fluidLB', 'phaseFieldLB'],
+                        type=str, help='choice of solver to run')
     parser.add_argument('-p', '--parallel', action='store_true', default=False,
                         help='set to run simulation in parallel using OpenMP')
     parser.add_argument('-c', '--cuda', action='store_true', default=False,
@@ -42,6 +42,9 @@ def main():
     if args.solver == 'fluidLB':
         from pylabolt.solvers.fluidLB import fluidLB
         fluidLB.main(parallelization, n_threads=args.n_threads)
+    elif args.solver == 'phaseFieldLB':
+        from pylabolt.solvers.phaseFieldLB import phaseFieldLB
+        phaseFieldLB.main(parallelization, n_threads=args.n_threads)
 
     if args.reconstruct is not None:
         from pylabolt.parallel.MPI_reconstruct import reconstruct

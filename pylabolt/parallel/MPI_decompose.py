@@ -2,7 +2,7 @@ import numpy as np
 import os
 import sys
 
-from pylabolt.parallel.MPI_comm import proc_boundary
+from pylabolt.parallel.MPI_comm import proc_boundary, proc_boundaryScalars
 
 
 def computeLocalSize(mpiParams, mesh):
@@ -42,23 +42,6 @@ def decompose(mesh, rank, size, comm):
         print('Aborting....')
         os._exit(1)
     mpiParams = decomposeParams(nProc_x, nProc_y)
-    if mpiParams.nProc_x * mpiParams.nProc_y != size:
-        if rank == 0:
-            print("FATAL ERROR in domain decompsition!")
-            print("nx * ny is not equal to the total no.of MPI processes")
-        comm.Barrier()
-        comm.Abort(0)
-
-    if rank == 0:
-        if not os.path.isdir('procs'):
-            os.makedirs('procs')
-    comm.Barrier()
-    if not os.path.isdir('procs/proc_' + str(rank)):
-        os.makedirs('procs/proc_' + str(rank))
-    decomposeFile = open('procs/proc_' + str(rank) + '/' +
-                         '/log_decompose', 'w')
-    decomposeFile.write('Domain decomposition information...\n')
-    decomposeFile.write('\trank : ' + str(rank) + '\n')
     for i in range(nProc_x):
         for j in range(nProc_y):
             if rank == nProc_y * i + j:
@@ -77,6 +60,23 @@ def decompose(mesh, rank, size, comm):
     mpiParams.nx = int(rank / nProc_y)
     mpiParams.ny = int(rank % nProc_y)
     mpiParams.N_local = computeLocalSize(mpiParams, mesh)
+    if mpiParams.nProc_x * mpiParams.nProc_y != size:
+        if rank == 0:
+            print("FATAL ERROR in domain decompsition!")
+            print("nx * ny is not equal to the total no.of MPI processes")
+        comm.Barrier()
+        comm.Abort(0)
+
+    if rank == 0:
+        if not os.path.isdir('procs'):
+            os.makedirs('procs')
+    comm.Barrier()
+    if not os.path.isdir('procs/proc_' + str(rank)):
+        os.makedirs('procs/proc_' + str(rank))
+    decomposeFile = open('procs/proc_' + str(rank) + '/' +
+                         '/log_decompose', 'w')
+    decomposeFile.write('Domain decomposition information...\n')
+    decomposeFile.write('\trank : ' + str(rank) + '\n')
     decomposeFile.write('\tn_Procs x : ' + str(nProc_x) + '\n')
     decomposeFile.write('\tn_Procs y : ' + str(nProc_y) + '\n')
     decomposeFile.write('\tNo. of grid points in x-direction : ' +
@@ -109,9 +109,15 @@ def fieldCopy(fields_temp, fields, mpiParams, Nx_local, Ny_local, mesh):
                        int(mpiParams.ny * Ny_local + Ny_final)):
             ind = int(i * mesh.Ny_global + j)
             ind_write = int((i_write + 1) * mesh.Ny + (j_write + 1))
-            fields.u[ind_write, 0] = fields_temp.u[ind, 0]
-            fields.u[ind_write, 1] = fields_temp.u[ind, 1]
-            fields.rho[ind_write] = fields_temp.rho[ind]
+            for itr, field in enumerate(fields.fieldList):
+                if field == 'u':
+                    fields.u[ind_write, 0] = fields_temp.u[ind, 0]
+                    fields.u[ind_write, 1] = fields_temp.u[ind, 1]
+                if field == 'rho':
+                    fields.rho[ind_write] = fields_temp.rho[ind]
+                if field == 'phi':
+                    fields.phi[ind_write] = fields_temp.phi[ind]
+                fields.boundaryNode[ind_write] = fields_temp.boundaryNode[ind]
             j_write += 1
         j_write = 0
         i_write += 1
@@ -144,38 +150,53 @@ def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
         fields_temp = comm.recv(source=0, tag=rank)
         fieldCopy(fields_temp, fields, mpiParams, Nx_local, Ny_local, mesh)
     comm.Barrier()
-    initial_send_topBottom = np.zeros((mesh.Nx + 2, 2),
-                                      dtype=precision)
-    initial_recv_topBottom = np.zeros((mesh.Nx + 2, 2),
-                                      dtype=precision)
-    initial_send_leftRight = np.zeros((mesh.Ny + 2, 2),
-                                      dtype=precision)
-    initial_recv_leftRight = np.zeros((mesh.Ny + 2, 2),
-                                      dtype=precision)
-    args = (mesh.Nx, mesh.Ny,
-            fields.u, initial_send_topBottom,
-            initial_recv_topBottom, initial_send_leftRight,
-            initial_recv_leftRight, mpiParams.nx,
-            mpiParams.ny, mpiParams.nProc_x,
-            mpiParams.nProc_y, comm)
-    proc_boundary(*args)
-    comm.Barrier()
-    initial_send_topBottom = np.zeros((mesh.Nx + 2),
-                                      dtype=precision)
-    initial_recv_topBottom = np.zeros((mesh.Nx + 2),
-                                      dtype=precision)
-    initial_send_leftRight = np.zeros((mesh.Ny + 2),
-                                      dtype=precision)
-    initial_recv_leftRight = np.zeros((mesh.Ny + 2),
-                                      dtype=precision)
-    args = (mesh.Nx, mesh.Ny,
-            fields.rho, initial_send_topBottom,
-            initial_recv_topBottom, initial_send_leftRight,
-            initial_recv_leftRight, mpiParams.nx,
-            mpiParams.ny, mpiParams.nProc_x,
-            mpiParams.nProc_y, comm)
-    proc_boundary(*args)
-    comm.Barrier()
+    for fieldName in fields.fieldList:
+        if fieldName == 'u':
+            initial_send_topBottom = np.zeros((mesh.Nx + 2, 2),
+                                              dtype=precision)
+            initial_recv_topBottom = np.zeros((mesh.Nx + 2, 2),
+                                              dtype=precision)
+            initial_send_leftRight = np.zeros((mesh.Ny + 2, 2),
+                                              dtype=precision)
+            initial_recv_leftRight = np.zeros((mesh.Ny + 2, 2),
+                                              dtype=precision)
+            args = (mesh.Nx, mesh.Ny,
+                    fields.u, initial_send_topBottom,
+                    initial_recv_topBottom, initial_send_leftRight,
+                    initial_recv_leftRight, mpiParams.nx,
+                    mpiParams.ny, mpiParams.nProc_x,
+                    mpiParams.nProc_y, comm)
+            proc_boundary(*args)
+            comm.Barrier()
+        if (fieldName == 'rho' or fieldName == 'phi' or fieldName == 'T' or
+                fieldName == 'boundaryNode'):
+            initial_send_topBottom = np.zeros((mesh.Nx + 2),
+                                              dtype=precision)
+            initial_recv_topBottom = np.zeros((mesh.Nx + 2),
+                                              dtype=precision)
+            initial_send_leftRight = np.zeros((mesh.Ny + 2),
+                                              dtype=precision)
+            initial_recv_leftRight = np.zeros((mesh.Ny + 2),
+                                              dtype=precision)
+            if fieldName == 'rho':
+                field = fields.rho
+            elif fieldName == 'phi':
+                field = fields.phi
+            elif fieldName == 'T':
+                field = fields.T
+            elif fieldName == 'boundaryNode':
+                field = fields.boundaryNode
+            args = (mesh.Nx, mesh.Ny,
+                    field, initial_send_topBottom,
+                    initial_recv_topBottom, initial_send_leftRight,
+                    initial_recv_leftRight, mpiParams.nx,
+                    mpiParams.ny, mpiParams.nProc_x,
+                    mpiParams.nProc_y, comm)
+            if fieldName == 'phi':
+                proc_boundaryScalars(*args, inner=True)
+            else:
+                proc_boundary(*args)
+            comm.Barrier()
     if rank == 0:
         print('Done distributing fields!', flush=True)
 
@@ -356,16 +377,145 @@ def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size,
                 Ny_local = N_local[nx, ny, 1]
                 noOfBoundaries = 0
                 faceList = []
-                boundaryVector = []
-                boundaryScalar = []
+                nbList = []
                 outDirections = []
                 invDirections = []
-                boundaryFunc = []
+                boundaryFuncFluid = []
+                boundaryFuncPhase = []
+                boundaryFuncT = []
+                boundaryTypeFluid = []
+                boundaryTypePhase = []
+                boundaryTypeT = []
+                fluid, phase = False, False
+                T = False
                 for itr in range(boundary.noOfBoundaries):
                     flag = 0
                     tempFaces = []
+                    tempNb = []
                     tempVector = []
-                    for numFace, ind in enumerate(boundary.faceList[itr]):
+                    for numFace in range(boundary.faceList[itr].shape[0]):
+                        ind = boundary.faceList[itr][numFace]
+                        ind_nb = boundary.nbList[itr][numFace]
+                        i = int(ind / mesh.Ny_global)
+                        j = int(ind % mesh.Ny_global)
+                        i_nb = int(ind_nb / mesh.Ny_global)
+                        j_nb = int(ind_nb % mesh.Ny_global)
+                        if nx == mpiParams.nProc_x - 1:
+                            Nx_local = N_local[nx - 1, ny, 0]
+                        if ny == mpiParams.nProc_y - 1:
+                            Ny_local = N_local[nx, ny - 1, 1]
+                        if (i >= nx * Nx_local and i < (nx + 1) * Nx_local
+                                and j >= ny * Ny_local and j < (ny + 1) *
+                                Ny_local):
+                            flag = 1
+                            i_local = int(i % Nx_local)
+                            j_local = int(j % Ny_local)
+                            i_nb_local = int(i_nb % Nx_local)
+                            j_nb_local = int(j_nb % Ny_local)
+                            if nx == mpiParams.nProc_x - 1:
+                                Nx_local = N_local[nx, ny, 0]
+                            if ny == mpiParams.nProc_y - 1:
+                                Ny_local = N_local[nx, ny, 1]
+                            tempFaces.append((i_local + 1) * (Ny_local + 2)
+                                             + (j_local + 1))
+                            tempNb.append((i_nb_local + 1) * (Ny_local + 2)
+                                          + (j_nb_local + 1))
+                            if boundary.boundaryTypeFluid[itr] == 'variableU':
+                                tempVector.append(boundary.boundaryVector
+                                                  [itr][numFace])
+                    if flag != 0:
+                        noOfBoundaries += 1
+                        faceList.append(np.array(tempFaces, dtype=np.int64))
+                        nbList.append(np.array(tempNb, dtype=np.int64))
+                        if boundary.fluid is True:
+                            fluid = True
+                            boundaryFuncFluid.\
+                                append(boundary.boundaryFuncFluid[itr])
+                            boundaryTypeFluid.\
+                                append(boundary.boundaryTypeFluid[itr])
+                        if boundary.phase is True:
+                            phase = True
+                            boundaryFuncPhase.\
+                                append(boundary.boundaryFuncPhase[itr])
+                            boundaryTypePhase.\
+                                append(boundary.boundaryTypePhase[itr])
+                        if boundary.T is True:
+                            T = True
+                            boundaryFuncT.append(boundary.boundaryFuncT[itr])
+                            boundaryTypeT.\
+                                append(boundary.boundaryTypeT[itr])
+                        outDirections.append(boundary.outDirections[itr])
+                        invDirections.append(boundary.invDirections[itr])
+                dataToProc = (noOfBoundaries, faceList, nbList,
+                              outDirections, invDirections,
+                              boundaryFuncFluid,
+                              boundaryFuncPhase, boundaryFuncT,
+                              boundaryTypeFluid,
+                              boundaryTypePhase, boundaryTypeT,
+                              fluid, phase, T)
+                rank_send = nx * mpiParams.nProc_y + ny
+                if rank_send == 0:
+                    boundary.noOfBoundaries = dataToProc[0]
+                    boundary.faceList = dataToProc[1]
+                    boundary.nbList = dataToProc[2]
+                    boundary.outDirections = dataToProc[3]
+                    boundary.invDirections = dataToProc[4]
+                    boundary.boundaryFuncFluid = dataToProc[5]
+                    boundary.boundaryFuncPhase = dataToProc[6]
+                    boundary.boundaryFuncT = dataToProc[7]
+                    boundary.boundaryTypeFluid = dataToProc[8]
+                    boundary.boundaryTypePhase = dataToProc[9]
+                    boundary.boundaryTypeT = dataToProc[10]
+                    boundary.fluid = dataToProc[11]
+                    boundary.phase = dataToProc[12]
+                    boundary.T = dataToProc[13]
+                else:
+                    comm.send(dataToProc, dest=rank_send, tag=rank_send)
+    else:
+        dataFromRoot = comm.recv(source=0, tag=rank)
+        boundary.noOfBoundaries = dataFromRoot[0]
+        boundary.faceList = dataFromRoot[1]
+        boundary.nbList = dataFromRoot[2]
+        boundary.outDirections = dataFromRoot[3]
+        boundary.invDirections = dataFromRoot[4]
+        boundary.boundaryFuncFluid = dataFromRoot[5]
+        boundary.boundaryFuncPhase = dataFromRoot[6]
+        boundary.boundaryFuncT = dataFromRoot[7]
+        boundary.boundaryTypeFluid = dataFromRoot[8]
+        boundary.boundaryTypePhase = dataFromRoot[9]
+        boundary.boundaryTypeT = dataFromRoot[10]
+        boundary.fluid = dataFromRoot[11]
+        boundary.phase = dataFromRoot[12]
+        boundary.T = dataFromRoot[13]
+    comm.Barrier()
+    if rank == 0:
+        print('Distributing boundaries done!', flush=True)
+
+
+def distributeForceNodes_mpi(options, mpiParams, mesh, rank, size, precision,
+                             comm):
+    if rank == 0:
+        print('\nMPI option with force computation selected', flush=True)
+        print('Distributing nodes to sub-domains...', flush=True)
+    N_local = mpiParams.N_local
+    if rank == 0:
+        for nx in range(mpiParams.nProc_x - 1, -1, -1):
+            for ny in range(mpiParams.nProc_y - 1, -1, -1):
+                Nx_local = N_local[nx, ny, 0]
+                Ny_local = N_local[nx, ny, 1]
+                noOfSurfaces = 0
+                surfaceNames = []
+                surfaceNodes = []
+                solidNbNodes = []
+                surfaceInvList = []
+                surfaceOutList = []
+                obstacleFlag = []
+                for itr in range(options.noOfSurfaces):
+                    flag = 0
+                    tempFaces = []
+                    tempSolidFaces = []
+                    for num in range(options.surfaceNodes[itr].shape[0]):
+                        ind = options.surfaceNodes[itr][num]
                         i = int(ind / mesh.Ny_global)
                         j = int(ind % mesh.Ny_global)
                         if nx == mpiParams.nProc_x - 1:
@@ -384,74 +534,13 @@ def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size,
                                 Ny_local = N_local[nx, ny, 1]
                             tempFaces.append((i_local + 1) * (Ny_local + 2)
                                              + (j_local + 1))
-                            if boundary.boundaryType[itr] == 'variableU':
-                                tempVector.append(boundary.boundaryVector
-                                                  [itr][numFace])
-                    if flag != 0:
-                        noOfBoundaries += 1
-                        faceList.append(np.array(tempFaces, dtype=np.int64))
-                        if boundary.boundaryType[itr] == 'variableU':
-                            boundaryVector.append(np.array(tempVector,
-                                                           dtype=precision))
-                        else:
-                            boundaryVector.append(boundary.boundaryVector[itr])
-                        boundaryScalar.append(boundary.boundaryScalar[itr])
-                        outDirections.append(boundary.outDirections[itr])
-                        invDirections.append(boundary.invDirections[itr])
-                        boundaryFunc.append(boundary.boundaryFunc[itr])
-                dataToProc = (noOfBoundaries, faceList, boundaryVector,
-                              boundaryScalar, outDirections, invDirections,
-                              boundaryFunc)
-                rank_send = nx * mpiParams.nProc_y + ny
-                if rank_send == 0:
-                    boundary.noOfBoundaries = dataToProc[0]
-                    boundary.faceList = dataToProc[1]
-                    boundary.boundaryVector = dataToProc[2]
-                    boundary.boundaryScalar = dataToProc[3]
-                    boundary.outDirections = dataToProc[4]
-                    boundary.invDirections = dataToProc[5]
-                    boundary.boundaryFunc = dataToProc[6]
-                else:
-                    comm.send(dataToProc, dest=rank_send, tag=rank_send)
-    else:
-        dataFromRoot = comm.recv(source=0, tag=rank)
-        boundary.noOfBoundaries = dataFromRoot[0]
-        boundary.faceList = dataFromRoot[1]
-        boundary.boundaryVector = dataFromRoot[2]
-        boundary.boundaryScalar = dataFromRoot[3]
-        boundary.outDirections = dataFromRoot[4]
-        boundary.invDirections = dataFromRoot[5]
-        boundary.boundaryFunc = dataFromRoot[6]
-    comm.Barrier()
-    if rank == 0:
-        print('Distributing boundaries done!', flush=True)
-
-
-def distributeForceNodes_mpi(simulation, rank, size, comm):
-    if rank == 0:
-        print('\nMPI option with force computation selected', flush=True)
-        print('Distributing nodes to sub-domains...', flush=True)
-    N_local = simulation.mpiParams.N_local
-    if rank == 0:
-        for nx in range(simulation.mpiParams.nProc_x - 1, -1, -1):
-            for ny in range(simulation.mpiParams.nProc_y - 1, -1, -1):
-                Nx_local = N_local[nx, ny, 0]
-                Ny_local = N_local[nx, ny, 1]
-                noOfSurfaces = 0
-                surfaceNames = []
-                surfaceNodes = []
-                surfaceInvList = []
-                surfaceOutList = []
-                obstacleFlag = []
-                for itr in range(simulation.options.noOfSurfaces):
-                    flag = 0
-                    tempFaces = []
-                    for ind in simulation.options.surfaceNodes[itr]:
-                        i = int(ind / simulation.mesh.Ny_global)
-                        j = int(ind % simulation.mesh.Ny_global)
-                        if nx == simulation.mpiParams.nProc_x - 1:
+                    for num in range(options.solidNbNodes[itr].shape[0]):
+                        ind = options.solidNbNodes[itr][num]
+                        i = int(ind / mesh.Ny_global)
+                        j = int(ind % mesh.Ny_global)
+                        if nx == mpiParams.nProc_x - 1:
                             Nx_local = N_local[nx - 1, ny, 0]
-                        if ny == simulation.mpiParams.nProc_y - 1:
+                        if ny == mpiParams.nProc_y - 1:
                             Ny_local = N_local[nx, ny - 1, 1]
                         if (i >= nx * Nx_local and i < (nx + 1) * Nx_local
                                 and j >= ny * Ny_local and j < (ny + 1) *
@@ -459,44 +548,50 @@ def distributeForceNodes_mpi(simulation, rank, size, comm):
                             flag = 1
                             i_local = int(i % Nx_local)
                             j_local = int(j % Ny_local)
-                            if nx == simulation.mpiParams.nProc_x - 1:
+                            if nx == mpiParams.nProc_x - 1:
                                 Nx_local = N_local[nx, ny, 0]
-                            if ny == simulation.mpiParams.nProc_y - 1:
+                            if ny == mpiParams.nProc_y - 1:
                                 Ny_local = N_local[nx, ny, 1]
-                            tempFaces.append((i_local + 1) * (Ny_local + 2)
-                                             + (j_local + 1))
+                            tempSolidFaces.append((i_local + 1) *
+                                                  (Ny_local + 2)
+                                                  + (j_local + 1))
                     if flag != 0:
                         noOfSurfaces += 1
                         surfaceNodes.append(np.array(tempFaces,
                                             dtype=np.int64))
-                        surfaceNames.append(simulation.options.
+                        solidNbNodes.append(np.array(tempSolidFaces,
+                                            dtype=np.int64))
+                        surfaceNames.append(options.
                                             surfaceNames[itr])
-                        surfaceInvList.append(simulation.options.
+                        surfaceInvList.append(options.
                                               surfaceInvList[itr])
-                        surfaceOutList.append(simulation.options.
+                        surfaceOutList.append(options.
                                               surfaceOutList[itr])
-                        obstacleFlag.append(simulation.options.
+                        obstacleFlag.append(options.
                                             obstacleFlag[itr])
                 dataToProc = (noOfSurfaces, surfaceNames, surfaceNodes,
-                              surfaceInvList, surfaceOutList, obstacleFlag)
-                rank_send = nx * simulation.mpiParams.nProc_y + ny
+                              solidNbNodes, surfaceInvList,
+                              surfaceOutList, obstacleFlag)
+                rank_send = nx * mpiParams.nProc_y + ny
                 if rank_send == 0:
-                    simulation.options.noOfSurfaces = dataToProc[0]
-                    simulation.options.surfaceNames = dataToProc[1]
-                    simulation.options.surfaceNodes = dataToProc[2]
-                    simulation.options.surfaceInvList = dataToProc[3]
-                    simulation.options.surfaceOutList = dataToProc[4]
-                    simulation.options.obstacleFlag = dataToProc[5]
+                    options.noOfSurfaces = dataToProc[0]
+                    options.surfaceNames = dataToProc[1]
+                    options.surfaceNodes = dataToProc[2]
+                    options.solidNbNodes = dataToProc[3]
+                    options.surfaceInvList = dataToProc[4]
+                    options.surfaceOutList = dataToProc[5]
+                    options.obstacleFlag = dataToProc[6]
                 else:
                     comm.send(dataToProc, dest=rank_send, tag=rank_send)
     else:
         dataFromRoot = comm.recv(source=0, tag=rank)
-        simulation.options.noOfSurfaces = dataFromRoot[0]
-        simulation.options.surfaceNames = dataFromRoot[1]
-        simulation.options.surfaceNodes = dataFromRoot[2]
-        simulation.options.surfaceInvList = dataFromRoot[3]
-        simulation.options.surfaceOutList = dataFromRoot[4]
-        simulation.options.obstacleFlag = dataFromRoot[5]
+        options.noOfSurfaces = dataFromRoot[0]
+        options.surfaceNames = dataFromRoot[1]
+        options.surfaceNodes = dataFromRoot[2]
+        options.solidNbNodes = dataFromRoot[3]
+        options.surfaceInvList = dataFromRoot[4]
+        options.surfaceOutList = dataFromRoot[5]
+        options.obstacleFlag = dataFromRoot[6]
     comm.Barrier()
     if rank == 0:
         print('Distributing nodes to sub-domains done!', flush=True)

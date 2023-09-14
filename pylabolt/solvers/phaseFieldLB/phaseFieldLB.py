@@ -3,9 +3,9 @@ import time
 from mpi4py import MPI
 
 from pylabolt.utils.inputOutput import loadState, saveState
-import pylabolt.solvers.fluidLB.createSim as createSim
-from pylabolt.solvers.fluidLB.baseAlgorithm import baseAlgorithm
-from pylabolt.solvers.fluidLB.deviceFields import deviceData
+import pylabolt.solvers.phaseFieldLB.createSim as createSim
+from pylabolt.solvers.phaseFieldLB.baseAlgorithm import baseAlgorithm
+from pylabolt.solvers.phaseFieldLB.deviceFields import deviceData
 from pylabolt.parallel.parallelSetup import parallelSetup
 
 
@@ -14,6 +14,7 @@ def main(parallelization, n_threads):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
+
     simulation = createSim.simulation(parallelization, rank, size, comm)
     if simulation.startTime != 0:
         temp = loadState(simulation.startTime)
@@ -34,6 +35,7 @@ def main(parallelization, n_threads):
         device = deviceData(simulation.mesh, simulation.lattice,
                             simulation.precision)
         parallel.setupCuda(simulation, device)
+
     if parallel.mode != 'cuda':
         base.jitWarmUp(simulation, size, rank, comm)
     if parallel.mode == 'cuda':

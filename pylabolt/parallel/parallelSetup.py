@@ -123,20 +123,8 @@ class parallelSetup:
     def setupParallel(self, baseAlgorithm, simulation, parallel):
         if parallel is True:
             numba.set_num_threads(self.n_threads)
-        baseAlgorithm.equilibriumRelaxation = numba.njit(baseAlgorithm.
-                                                         equilibriumRelaxation,
-                                                         parallel=parallel,
-                                                         cache=False,
-                                                         nogil=True)
-        baseAlgorithm.stream = numba.njit(baseAlgorithm.stream,
-                                          parallel=parallel,
-                                          cache=False,
-                                          nogil=True)
-        baseAlgorithm.computeFields = numba.njit(baseAlgorithm.computeFields,
-                                                 parallel=parallel,
-                                                 cache=False,
-                                                 nogil=True)
-        simulation.boundary.setupBoundary_cpu(parallel)
+        baseAlgorithm.setupBase_cpu(parallel)
+        simulation.setupParallel_cpu(parallel)
         if (simulation.options.computeForces is True or
                 simulation.options.computeTorque is True):
             simulation.options.setupForcesParallel_cpu(parallel)

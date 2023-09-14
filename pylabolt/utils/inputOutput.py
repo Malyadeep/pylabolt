@@ -3,22 +3,71 @@ import pickle
 import numpy as np
 
 
-def writeFields(timeStep, fields, mesh):
+def writeFields(timeStep, fields, lattice, mesh):
+    u = False
+    rho = False
+    phi = False
+    T = False
+    p = False
     if not os.path.isdir('output'):
         os.makedirs('output')
     if not os.path.isdir('output/' + str(timeStep)):
         os.makedirs('output/' + str(timeStep))
-    writeFile = open('output/' + str(timeStep) + '/fields.dat', 'w')
-    for ind in range(fields.u.shape[0]):
-        writeFile.write(str(np.round(ind, 10)).ljust(12) + '\t' +
-                        str(np.round(mesh.x[ind], 10)).ljust(12) + '\t' +
-                        str(np.round(mesh.y[ind], 10)).ljust(12) + '\t' +
-                        str(np.round(fields.rho[ind], 10)).ljust(12) + '\t' +
-                        str(np.round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
-                        str(np.round(fields.u[ind, 1], 10)).ljust(12) + '\t' +
-                        str(np.round(fields.solid[ind, 0], 10)).ljust(12) +
-                        '\n')
-    writeFile.close()
+    pointsFile = open('output/' + str(timeStep) + '/points.dat', 'w')
+    solidFile = open('output/' + str(timeStep) + '/solid.dat', 'w')
+    for field in fields.fieldList:
+        if field == 'u':
+            u = True
+            uFile = open('output/' + str(timeStep) + '/u.dat', 'w')
+        if field == 'rho':
+            rho = True
+            rhoFile = open('output/' + str(timeStep) + '/rho.dat', 'w')
+        if field == 'p':
+            p = True
+            pFile = open('output/' + str(timeStep) + '/p.dat', 'w')
+        if field == 'phi':
+            phi = True
+            phiFile = open('output/' + str(timeStep) + '/phi.dat', 'w')
+        if field == 'T':
+            T = True
+            TFile = open('output/' + str(timeStep) + '/T.dat', 'w')
+    for ind in range(mesh.Nx * mesh.Ny):
+        if fields.boundaryNode[ind] != 1:
+            pointsFile.write(str(np.round(ind, 10)).ljust(12) + '\t' +
+                             str(np.round(mesh.x[ind], 10)).ljust(12) + '\t' +
+                             str(np.round(mesh.y[ind], 10)).ljust(12) + '\n')
+            if u is True:
+                uFile.\
+                    write(str(np.round(fields.u[ind, 0], 10)).ljust(12) + '\t'
+                          + str(np.round(fields.u[ind, 1], 10)).ljust(12) +
+                          '\n')
+            if rho is True:
+                rhoFile.write(str(np.round(fields.rho[ind], 10)).ljust(12) +
+                              '\n')
+            if p is True:
+                pFile.write(str(np.round(fields.p[ind] * fields.rho[ind]
+                            * lattice.cs * lattice.cs, 10)).ljust(12) +
+                            '\n')
+            if phi is True:
+                phiFile.write(str(np.round(fields.phi[ind], 10)).ljust(12) +
+                              '\n')
+            if T is True:
+                TFile.write(str(np.round(fields.T[ind], 10)).ljust(12) +
+                            '\n')
+            solidFile.write(str(np.round(fields.solid[ind, 0], 10)).ljust(12)
+                            + '\n')
+    pointsFile.close()
+    solidFile.close()
+    if u is True:
+        uFile.close()
+    if rho is True:
+        rhoFile.close()
+    if p is True:
+        pFile.close()
+    if phi is True:
+        phiFile.close()
+    if T is True:
+        TFile.close()
 
 
 def saveState(timeStep, simulation):
@@ -56,23 +105,74 @@ def copyFields_cuda(device, fields, flag):
     pass
 
 
-def writeFields_mpi(timeStep, fields, mesh, rank, comm):
+def writeFields_mpi(timeStep, fields, lattice, mesh, rank, comm):
+    u = False
+    rho = False
+    phi = False
+    T = False
+    p = False
     if not os.path.isdir('procs'):
         os.makedirs('procs')
     if not os.path.isdir('procs/proc_' + str(rank)):
         os.makedirs('procs/proc_' + str(rank))
     if not os.path.isdir('procs/proc_' + str(rank) + '/' + str(timeStep)):
         os.makedirs('procs/proc_' + str(rank) + '/' + str(timeStep))
-    writeFile = open('procs/proc_' + str(rank) + '/' +
-                     str(timeStep) + '/fields.dat', 'w')
-    for i in range(mesh.Nx):
-        for j in range(mesh.Ny):
-            ind = i * mesh.Ny + j
-            writeFile.write(str(np.round(ind, 10)).ljust(12) + '\t' +
-                            str(np.round(fields.rho[ind], 10)).ljust(12) + '\t'
-                            + str(np.round(fields.u[ind, 0], 10)).ljust(12) +
-                            '\t' + str(np.round(fields.u[ind, 1], 10)).
-                            ljust(12) + '\t' +
-                            str(np.round(fields.solid[ind, 0], 10)).ljust(12)
-                            + '\n')
-    writeFile.close()
+    pointsFile = open('procs/proc_' + str(rank) + '/' +
+                      str(timeStep) + '/points.dat', 'w')
+    solidFile = open('procs/proc_' + str(rank) + '/' +
+                     str(timeStep) + '/solid.dat', 'w')
+    boundaryNodeFile = open('procs/proc_' + str(rank) + '/' +
+                            str(timeStep) + '/boundaryNode.dat', 'w')
+    for field in fields.fieldList:
+        if field == 'u':
+            u = True
+            uFile = open('procs/proc_' + str(rank) + '/' +
+                         str(timeStep) + '/u.dat', 'w')
+        if field == 'rho':
+            rho = True
+            rhoFile = open('procs/proc_' + str(rank) + '/' +
+                           str(timeStep) + '/rho.dat', 'w')
+        if field == 'p':
+            p = True
+            pFile = open('procs/proc_' + str(rank) + '/' +
+                         str(timeStep) + '/p.dat', 'w')
+        if field == 'phi':
+            phi = True
+            phiFile = open('procs/proc_' + str(rank) + '/' +
+                           str(timeStep) + '/phi.dat', 'w')
+        if field == 'T':
+            T = True
+            TFile = open('procs/proc_' + str(rank) + '/' +
+                         str(timeStep) + '/T.dat', 'w')
+    for ind in range(mesh.Nx * mesh.Ny):
+        pointsFile.write(str(np.round(ind, 10)).ljust(12) + '\n')
+        if u is True:
+            uFile.write(str(np.round(fields.u[ind, 0], 10)).ljust(12) + '\t' +
+                        str(np.round(fields.u[ind, 1], 10)).ljust(12) + '\n')
+        if rho is True:
+            rhoFile.write(str(np.round(fields.rho[ind], 10)).ljust(12) + '\n')
+        if p is True:
+            pFile.write(str(np.round(fields.p[ind] * fields.rho[ind]
+                        * lattice.cs * lattice.cs, 10)).ljust(12) + '\n')
+        if phi is True:
+            phiFile.write(str(np.round(fields.phi[ind], 10)).ljust(12) + '\n')
+        if T is True:
+            TFile.write(str(np.round(fields.T[ind], 10)).ljust(12) + '\n')
+        solidFile.write(str(np.round(fields.solid[ind, 0], 10)).ljust(12)
+                        + '\n')
+        boundaryNodeFile.write(str(np.round(fields.boundaryNode[ind], 10)).
+                               ljust(12)
+                               + '\n')
+    pointsFile.close()
+    solidFile.close()
+    boundaryNodeFile.close()
+    if u is True:
+        uFile.close()
+    if rho is True:
+        rhoFile.close()
+    if p is True:
+        pFile.close()
+    if phi is True:
+        phiFile.close()
+    if T is True:
+        TFile.close()

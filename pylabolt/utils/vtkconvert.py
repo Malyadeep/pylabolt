@@ -83,61 +83,134 @@ def toVTK(options, time):
 
 
 def vtkConverter(inputPath, outputPath, time):
-    data = np.loadtxt(inputPath + "fields.dat")
-    nx = len(np.unique(data[:, 1]))
-    ny = len(np.unique(data[:, 2]))
-    point_id = np.array(data[:, 0], dtype=np.int64)
+    u, rho = False, False
+    p = False
+    phi, T = False, False
+    print('----------------------------------------------')
+    print('timeStep = ' + str(time) + '\n')
+    try:
+        pointsData = np.loadtxt(inputPath + "points.dat")
+        print("Reading points field")
+    except FileNotFoundError:
+        print("ERROR! points information not present!")
+        os._exit(1)
+    try:
+        uData = np.loadtxt(inputPath + "u.dat")
+        print("Reading velocity field")
+        u = True
+        velArray = vtkDoubleArray()
+        velArray.SetName('U')
+        velArray.SetNumberOfComponents(3)
+    except FileNotFoundError:
+        pass
+    try:
+        rhoData = np.loadtxt(inputPath + "rho.dat")
+        print("Reading density field")
+        rho = True
+        rhoArray = vtkDoubleArray()
+        rhoArray.SetName('rho')
+    except FileNotFoundError:
+        pass
+    try:
+        pData = np.loadtxt(inputPath + "p.dat")
+        print("Reading pressure field")
+        p = True
+        pArray = vtkDoubleArray()
+        pArray.SetName('p')
+    except FileNotFoundError:
+        pass
+    try:
+        phiData = np.loadtxt(inputPath + "phi.dat")
+        print("Reading phase field")
+        phi = True
+        phiArray = vtkDoubleArray()
+        phiArray.SetName('phi')
+    except FileNotFoundError:
+        pass
+    try:
+        TData = np.loadtxt(inputPath + "T.dat")
+        print("Reading temperature field")
+        T = True
+        TArray = vtkDoubleArray()
+        TArray.SetName('T')
+    except FileNotFoundError:
+        pass
+    try:
+        solidData = np.loadtxt(inputPath + "solid.dat")
+        print("Reading obstacle field")
+        solArray = vtkIntArray()
+        solArray.SetName('obstacle')
+    except FileNotFoundError:
+        pass
+    from simulation import meshDict
+    Nx = int(meshDict['grid'][0])
+    Ny = int(meshDict['grid'][1])
+    if (Nx * Ny) != pointsData.shape[0]:
+        print("ERROR! Grid size in 'meshDict' doesn't match with output!")
+        os._exit(1)
 
     # Create a grid
     grid = vtkRectilinearGrid()
-    grid.SetDimensions(nx, ny, 1)
+    grid.SetDimensions(Nx, Ny, 1)
 
+    # Write out points
+    pointArray = vtkIntArray()
+    pointArray.SetName('Point_ID')
     xArray = vtkDoubleArray()
-    for i in range(nx):
-        xArray.InsertNextValue(data[i*ny, 1])
-
     yArray = vtkDoubleArray()
-    for i in range(ny):
-        yArray.InsertNextValue(data[i, 2])
+    zArray = vtkDoubleArray()
+
+    for i in range(Nx):
+        xArray.InsertNextValue(pointsData[i * Ny, 1])
+
+    for i in range(Ny):
+        yArray.InsertNextValue(pointsData[i, 2])
 
     zArray = vtkDoubleArray()
     zArray.InsertNextValue(0.0)
 
-    # Create vector/scalar arrays
-    pointArray = vtkIntArray()
-    pointArray.SetName('Points_ID')
-    for ind in range(nx * ny):
-        pointArray.InsertNextValue(point_id[ind])
-
-    velArray = vtkDoubleArray()
-    velArray.SetName('Velocity')
-    velArray.SetNumberOfComponents(3)
-    for j in range(ny):
-        for i in range(nx):
-            velArray.InsertNextTuple3(data[j+i*ny, 4], data[j+i*ny, 5], 0)
-
-    rhoArray = vtkDoubleArray()
-    rhoArray.SetName('Density')
-    for j in range(ny):
-        for i in range(nx):
-            rhoArray.InsertNextValue(data[j+i*ny, 3])
-
-    solArray = vtkDoubleArray()
-    solArray.SetName('obstacle')
-    for j in range(ny):
-        for i in range(nx):
-            solArray.InsertNextValue(data[j+i*ny, 6])
-
+    for j in range(Ny):
+        for i in range(Nx):
+            ind = i * Ny + j
+            xArray.InsertNextValue(pointsData[ind, 1])
+            yArray.InsertNextValue(pointsData[ind, 2])
+            zArray.InsertNextValue(0.0)
+            pointArray.InsertNextValue(int(pointsData[ind, 0]))
     grid.SetXCoordinates(xArray)
     grid.SetYCoordinates(yArray)
     grid.SetZCoordinates(zArray)
     grid.GetPointData().AddArray(pointArray)
-    grid.GetPointData().AddArray(velArray)
-    grid.GetPointData().AddArray(rhoArray)
+
+    # Write Fields
+    for j in range(Ny):
+        for i in range(Nx):
+            ind = i * Ny + j
+            if u is True:
+                velArray.InsertNextTuple3(uData[ind, 0], uData[ind, 1], 0)
+            if rho is True:
+                rhoArray.InsertNextValue(rhoData[ind])
+            if p is True:
+                pArray.InsertNextValue(pData[ind])
+            if phi is True:
+                phiArray.InsertNextValue(phiData[ind])
+            if T is True:
+                TArray.InsertNextValue(TData[ind])
+            solArray.InsertNextValue(np.int32(solidData[ind]))
+    if u is True:
+        grid.GetPointData().AddArray(velArray)
+    if rho is True:
+        grid.GetPointData().AddArray(rhoArray)
+    if p is True:
+        grid.GetPointData().AddArray(pArray)
+    if phi is True:
+        grid.GetPointData().AddArray(phiArray)
+    if T is True:
+        grid.GetPointData().AddArray(TArray)
     grid.GetPointData().AddArray(solArray)
-    print('timeStep = ' + str(time))
-    print('There are', grid.GetNumberOfPoints(), 'points.')
-    print('There are', grid.GetNumberOfCells(), 'cells. \n')
+
+    print('\nThere are', grid.GetNumberOfPoints(), 'points.')
+    print('There are', grid.GetNumberOfCells(), 'cells.')
+    print('----------------------------------------------\n\n')
 
     writer = vtk.vtkRectilinearGridWriter()
     writer.SetFileVersion(42)

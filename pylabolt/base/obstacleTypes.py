@@ -5,9 +5,11 @@ def circle(center, radius, solid, u, rho, rho_s, mesh, obsNo,
            velType='fixedTranslational', velValue=[0.0, 0.0],
            velOrigin=0, velOmega=0):
     obsNodes = []
-    center_idx = np.int64(np.divide(center, mesh.delX))
+    center_idx = np.int64(np.divide(center, mesh.delX)) + \
+        np.ones(2, dtype=np.int64)
     radius_idx = np.int64(radius/mesh.delX)
-    origin_idx = np.int64(np.divide(velOrigin, mesh.delX))
+    origin_idx = np.int64(np.divide(velOrigin, mesh.delX)) + \
+        np.ones(2, dtype=np.int64)
     for i in range(mesh.Nx_global):
         for j in range(mesh.Ny_global):
             if ((i - center_idx[0])*(i - center_idx[0]) +
@@ -40,8 +42,10 @@ def rectangle(boundingBox, solid, u, rho, rho_s, mesh, obsNo,
               velType='fixedTranslational', velValue=[0.0, 0.0],
               velOrigin=0, velOmega=0):
     obsNodes = []
-    boundingBox_idx = np.int32(np.divide(boundingBox, mesh.delX))
-    origin_idx = np.int64(np.divide(velOrigin, mesh.delX))
+    boundingBox_idx = np.int64(np.divide(boundingBox, mesh.delX)) +\
+        np.ones((2, 2), dtype=np.int64)
+    origin_idx = np.int64(np.divide(velOrigin, mesh.delX)) + \
+        np.ones(2, dtype=np.int64)
     for i in range(mesh.Nx_global):
         for j in range(mesh.Ny_global):
             if (i >= boundingBox_idx[0, 0] and i <= boundingBox_idx[1, 0]
@@ -76,9 +80,11 @@ def circularConfinement(center, radius, solid, u, rho, rho_s, mesh, obsNo,
                         velType='fixedTranslational', velValue=[0.0, 0.0],
                         velOrigin=0, velOmega=0):
     obsNodes = []
-    center_idx = np.int64(np.divide(center, mesh.delX))
+    center_idx = np.int64(np.divide(center, mesh.delX)) + \
+        np.ones(2, dtype=np.int64)
     radius_idx = np.int64(radius/mesh.delX)
-    origin_idx = np.int64(np.divide(velOrigin, mesh.delX))
+    origin_idx = np.int64(np.divide(velOrigin, mesh.delX)) + \
+        np.ones(2, dtype=np.int64)
     for i in range(mesh.Nx_global):
         for j in range(mesh.Ny_global):
             if ((i - center_idx[0])*(i - center_idx[0]) +
