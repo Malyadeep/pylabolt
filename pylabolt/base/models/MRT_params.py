@@ -1,4 +1,5 @@
 import numpy as np
+import numba
 
 
 class MRT_def:
@@ -24,3 +25,8 @@ class MRT_def:
         self.forcingPreFactorMat = np.matmul(np.matmul(self.M_1, self.S_guo),
                                              self.M)
         return self.forcingPreFactorMat
+
+
+@numba.njit
+def computeMRT():
+    pass

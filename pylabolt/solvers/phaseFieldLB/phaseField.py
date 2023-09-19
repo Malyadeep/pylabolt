@@ -15,6 +15,7 @@ class phaseFieldDef:
             else:
                 self.computeViscFunc = computeViscHarmonic
             self.contactAngle = phaseDict['contactAngle']
+            self.surfaceTensionModel = phaseDict['surfaceTensionModel']
             if self.contactAngle is not None:
                 if (not isinstance(self.contactAngle, int) and
                         not isinstance(self.contactAngle, float)):
@@ -35,6 +36,21 @@ class phaseFieldDef:
                                      interfaceWidth) / self.M)
             self.kappa = 1.5 * transport.sigma * self.interfaceWidth
             self.beta = 12 * transport.sigma / self.interfaceWidth
+            if self.surfaceTensionModel == 'chemicalPotential':
+                self.surfaceTensionFunc = chemicalPotentialModel
+                self.surfaceTensionArgs = (self.beta, self.kappa,
+                                           transport.phi_l, transport.phi_g)
+            elif self.surfaceTensionModel == 'continuum':
+                self.surfaceTensionFunc = continuumModel
+                self.surfaceTensionArgs = (transport.sigma, lattice.c,
+                                           lattice.w, lattice.cs_2,
+                                           lattice.noOfDirections,
+                                           self.interfaceWidth)
+            else:
+                if rank == 0:
+                    print("ERROR! Unsupported surface tension force model!",
+                          flush=True)
+                os._exit(1)
         except KeyError as e:
             if rank == 0:
                 print("ERROR! Keyword: " + str(e) +
@@ -48,6 +64,7 @@ class phaseFieldDef:
         self.forceFluid =  \
             numba.njit(forceFluid, parallel=parallel,
                        cache=False, nogil=True)
+        # self.forceFluid = forceFluid
         self.correctNormal =  \
             numba.njit(correctNormal, parallel=parallel,
                        cache=False, nogil=True)
@@ -157,7 +174,7 @@ def computeGradLapPhi(Nx, Ny, phi, gradPhi, normalPhi, lapPhi, solid,
                         (1 - solid[ind_nb, 0])
                     gradPhiSum_y += c[k, 1] * w[k] * phi[ind_nb] * \
                         (1 - solid[ind_nb, 0])
-                    lapPhiSum += w[k] * (phi[i_nb * Ny + j_nb] - phi[ind]) * \
+                    lapPhiSum += w[k] * (phi[ind_nb] - phi[ind]) * \
                         (1 - solid[ind_nb, 0])
                     denominator += w[k] * (1 - solid[ind_nb, 0])
             if initial is False:
@@ -333,6 +350,10 @@ def simpleWetting(surfaceNodes, surfaceNormals, normalPhi, gradPhi,
             gradPhiDotTangent * tangent[0]
         gradPhi[ind, 1] = gradPhiDotSolidNormal * surfaceNormals[itr, 1] +\
             gradPhiDotTangent * tangent[1]
+        magGradPhi = np.sqrt(gradPhi[ind, 0] * gradPhi[ind, 0] +
+                             gradPhi[ind, 1] * gradPhi[ind, 1])
+        normalPhi[ind, 0] = gradPhi[ind, 0] / (magGradPhi + 1e-17)
+        normalPhi[ind, 1] = gradPhi[ind, 1] / (magGradPhi + 1e-17)
 
 
 def computeMass(mass, phi, solid, boundaryNode, procBoundary, Nx, Ny):
@@ -345,12 +366,31 @@ def computeMass(mass, phi, solid, boundaryNode, procBoundary, Nx, Ny):
     return mass
 
 
+@numba.njit
+def chemicalPotentialModel(phi, gradPhi, curvature, lapPhi, beta,
+                           kappa, phi_g, phi_l):
+    chemPotential = 4 * beta * (phi - phi_g) * (phi - phi_l)\
+                * (phi - 0.5) - kappa * lapPhi
+    surfaceTensionForce_x = chemPotential * gradPhi[0]
+    surfaceTensionForce_y = chemPotential * gradPhi[1]
+    return surfaceTensionForce_x, surfaceTensionForce_y
+
+
+@numba.njit
+def continuumModel(phi, gradPhi, curvature, lapPhi, sigma, c, w,
+                   cs_2, noOfDirections, interfaceWidth):
+    surfaceTensionForce_x = - sigma * curvature * gradPhi[0]
+    surfaceTensionForce_y = - sigma * curvature * gradPhi[1]
+    return surfaceTensionForce_x, surfaceTensionForce_y
+
+
 def forceFluid(f_new, f_eq, forceField, rho, p, phi, solid, lapPhi, gradPhi,
-               stressTensor, procBoundary, boundaryNode, gravity,
+               normalPhi, stressTensor, procBoundary, boundaryNode, gravity,
                preFactorFluid, forcingPreFactor, constructOperatorFunc,
                collisionOperatorArgs, constructStressTensorFunc,
-               computeViscFunc, beta, kappa, mu_l, mu_g, rho_l, rho_g, phi_l,
-               phi_g, cs, noOfDirections, c, cs_2, Nx, Ny):
+               computeViscFunc, surfaceTensionFunc, surfaceTensionArgs, mu_l,
+               mu_g, rho_l, rho_g, phi_l, phi_g, cs, noOfDirections, w, c,
+               cs_2, Nx, Ny, sigma, size):
     for ind in prange(Nx * Ny):
         if (solid[ind, 0] != 1 and procBoundary[ind] != 1
                 and boundaryNode[ind] != 1):
@@ -361,10 +401,37 @@ def forceFluid(f_new, f_eq, forceField, rho, p, phi, solid, lapPhi, gradPhi,
             constructStressTensorFunc(f_new[ind], f_eq[ind], stressTensor[ind],
                                       preFactorFluid[ind], noOfDirections, c,
                                       cs_2, nu)
-            chemPotential = 4 * beta * (phi[ind] - phi_g) * (phi[ind] - phi_l)\
-                * (phi[ind] - 0.5) - kappa * lapPhi[ind]
-            surfaceTensionForce_x = chemPotential * gradPhi[ind, 0]
-            surfaceTensionForce_y = chemPotential * gradPhi[ind, 1]
+            curvature = 0
+            denominator = 0
+            i, j = int(ind / Ny), int(ind % Ny)
+            for k in range(noOfDirections):
+                i_nb = i + int(c[k, 0])
+                j_nb = j + int(c[k, 1])
+                if size == 1 and boundaryNode[ind] == 2:
+                    if i + int(2 * c[k, 0]) < 0 or i + int(2 * c[k, 0]) >= Nx:
+                        i_nb = (i_nb + int(2 * c[k, 0]) + Nx) % Nx
+                    else:
+                        i_nb = (i_nb + Nx) % Nx
+                    if j + int(2 * c[k, 1]) < 0 or j + int(2 * c[k, 1]) >= Ny:
+                        j_nb = (j_nb + int(2 * c[k, 1]) + Ny) % Ny
+                    else:
+                        j_nb = (j_nb + Ny) % Ny
+                elif size > 1 and boundaryNode[ind] == 2:
+                    if (i + int(2 * c[k, 0]) == 0 or
+                            i + int(2 * c[k, 0]) == Nx - 1):
+                        i_nb = i_nb + int(c[k, 0])
+                    if (j + int(2 * c[k, 1]) == 0 or
+                            j + int(2 * c[k, 1]) == Ny - 1):
+                        j_nb = j_nb + int(c[k, 1])
+                ind_nb = int(i_nb * Ny + j_nb)
+                curvature += w[k] * (c[k, 0] * normalPhi[ind_nb, 0] +
+                                     c[k, 1] * normalPhi[ind_nb, 1]) * \
+                    (1 - solid[ind_nb, 0])
+                denominator += w[k] * (1 - solid[ind_nb, 0])
+            curvature = cs_2 * curvature / (denominator + 1e-17)
+            surfaceTensionForce_x, surfaceTensionForce_y =\
+                surfaceTensionFunc(phi[ind], gradPhi[ind], curvature,
+                                   lapPhi[ind], *surfaceTensionArgs)
             pressureCorrection_x = - p[ind] * cs * cs * (rho_l - rho_g) *\
                 gradPhi[ind, 0]
             pressureCorrection_y = - p[ind] * cs * cs * (rho_l - rho_g) *\

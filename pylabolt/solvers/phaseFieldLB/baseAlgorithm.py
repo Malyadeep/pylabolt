@@ -369,21 +369,24 @@ class baseAlgorithm:
                                     rank, comm)
                 if (simulation.options.computeForces is True
                         or simulation.options.computeTorque is True):
-                    args = (simulation.fields, simulation.lattice,
-                            simulation.mesh, simulation.precision,
-                            size)
+                    args = (simulation.fields, simulation.transport,
+                            simulation.lattice, simulation.mesh,
+                            simulation.precision, size)
                     if size > 1:
                         simulation.options. \
-                            forceTorqueCalc(*args, mpiParams=simulation.
-                                            mpiParams, ref_index=None)
+                            forceTorqueCalc(*args, timeStep,
+                                            mpiParams=simulation.mpiParams,
+                                            ref_index=None,
+                                            phaseField=simulation.phaseField)
                         names, forces, torque = \
                             gatherForcesTorque_mpi(simulation.options,
                                                    comm, rank, size,
                                                    simulation.precision)
                     else:
                         simulation.options. \
-                            forceTorqueCalc(*args, mpiParams=None,
-                                            ref_index=None)
+                            forceTorqueCalc(*args, timeStep, mpiParams=None,
+                                            ref_index=None,
+                                            phaseField=simulation.phaseField)
                         names = simulation.options.surfaceNamesGlobal
                         forces = np.array(simulation.options.forces,
                                           dtype=simulation.precision)
@@ -415,12 +418,15 @@ class baseAlgorithm:
                                     simulation.lattice, simulation.mesh)
                         if (simulation.options.computeForces is True or
                                 simulation.options.computeTorque is True):
-                            args = (simulation.fields, simulation.lattice,
-                                    simulation.mesh, simulation.precision,
-                                    size)
+                            args = (simulation.fields, simulation.transport,
+                                    simulation.lattice, simulation.mesh,
+                                    simulation.precision, size)
                             simulation.options. \
-                                forceTorqueCalc(*args, mpiParams=None,
-                                                ref_index=None)
+                                forceTorqueCalc(*args, timeStep,
+                                                mpiParams=None,
+                                                ref_index=None,
+                                                phaseField=simulation.
+                                                phaseField)
                             names = simulation.options.surfaceNamesGlobal
                             forces = np.array(simulation.options.forces,
                                               dtype=simulation.precision)
@@ -440,7 +446,9 @@ class baseAlgorithm:
                                 simulation.options.computeTorque is True):
                             simulation.options. \
                                 forceTorqueCalc(*args, mpiParams=simulation.
-                                                mpiParams, ref_index=None)
+                                                mpiParams, ref_index=None,
+                                                phaseField=simulation.
+                                                phaseField)
                             names, forces, torque = \
                                 gatherForcesTorque_mpi(simulation.options,
                                                        comm, rank, size,
@@ -461,12 +469,13 @@ class baseAlgorithm:
                                     simulation.mesh, rank, comm)
                     if (simulation.options.computeForces is True or
                             simulation.options.computeTorque is True):
-                        args = (simulation.fields, simulation.lattice,
-                                simulation.mesh, simulation.precision,
-                                size)
+                        args = (simulation.fields, simulation.transport,
+                                simulation.lattice, simulation.mesh,
+                                simulation.precision, size)
                         simulation.options. \
                             forceTorqueCalc(*args, mpiParams=simulation.
-                                            mpiParams, ref_index=None)
+                                            mpiParams, ref_index=None,
+                                            phaseField=simulation.phaseField)
                         names, forces, torque = \
                             gatherForcesTorque_mpi(simulation.options,
                                                    comm, rank, size,
@@ -477,14 +486,15 @@ class baseAlgorithm:
 
             # Obstacle modification #
             if simulation.obstacle.obsModifiable is True:
-                args = (simulation.fields, simulation.lattice,
-                        simulation.mesh, simulation.precision,
-                        size)
+                args = (simulation.fields, simulation.transport,
+                        simulation.lattice, simulation.mesh,
+                        simulation.precision, size)
                 if size == 1:
                     simulation.options. \
                         forceTorqueCalc(*args, mpiParams=None,
                                         ref_index=simulation.obstacle.
-                                        obsOrigin)
+                                        obsOrigin, phaseField=simulation.
+                                        phaseField)
                     torque = np.array(simulation.options.torque,
                                       dtype=simulation.precision)
                     forces = np.array(simulation.options.forces,
@@ -498,7 +508,8 @@ class baseAlgorithm:
                     simulation.options. \
                         forceTorqueCalc(*args, mpiParams=simulation.
                                         mpiParams, ref_index=simulation.
-                                        obstacle.obsOrigin)
+                                        obstacle.obsOrigin,
+                                        phaseField=simulation.phaseField)
                     names, forces, torque = \
                         gatherForcesTorque_mpi(simulation.options,
                                                comm, rank, size,

@@ -166,8 +166,9 @@ class options:
                         lattice.noOfDirections, mesh.Nx, mesh.Ny, size)
             self.surfaceNormals.append(tempNormal)
 
-    def forceTorqueCalc(self, fields, lattice, mesh, precision,
-                        size, mpiParams=None, ref_index=None):
+    def forceTorqueCalc(self, fields, transport, lattice, mesh, precision,
+                        size, timeStep, mpiParams=None, ref_index=None,
+                        phaseField=None):
         self.forces = []
         self.torque = []
         if self.phase is True:
@@ -216,17 +217,16 @@ class options:
                 self.torque.append(np.sum(tempTorque, axis=0))
             else:
                 args = (fields.f, fields.f_new, fields.solid, fields.phi,
-                        fields.procBoundary, self.surfaceNodes[itr],
-                        self.surfaceInvList[itr], self.surfaceOutList[itr],
-                        lattice.c, lattice.invList, self.obstacleFlag[itr],
+                        fields.normalPhi, fields.procBoundary, transport.sigma,
+                        phaseField.interfaceWidth, self.surfaceNodes[itr],
+                        self.surfaceNormals[itr], self.surfaceInvList[itr],
+                        self.surfaceOutList[itr], lattice.c,
+                        lattice.invList, self.obstacleFlag[itr],
                         mesh.Nx, mesh.Ny, tempForces_l, tempForces_g,
                         tempTorque_l, tempTorque_g, lattice.noOfDirections,
                         self.computeForces, self.computeTorque, idx, N_local,
                         nx, ny, nProc_x, nProc_y, size)
                 self.forceTorqueFuncPhase(*args)
-                if itr == 0:
-                    profile = tempForces_l + tempForces_g
-                    np.savez('profile.npz', force=profile)
                 self.forces.append([np.sum(tempForces_l, axis=0),
                                    np.sum(tempForces_g, axis=0)])
                 self.torque.append([np.sum(tempTorque_l, axis=0),
@@ -245,6 +245,7 @@ class options:
 
     def setupForcesParallel_cpu(self, parallel):
         if self.phase is True:
+            # pass
             self.forceTorqueFuncPhase = numba.njit(self.forceTorqueFuncPhase,
                                                    parallel=parallel,
                                                    cache=False,
@@ -440,11 +441,12 @@ def forceTorque(f, f_new, solid, procBoundary, surfaceNodes, surfaceInvList,
                             torque[itr] += (r_0 * value_1 - r_1 * value_0)
 
 
-def forceTorquePhase(f, f_new, solid, phi, procBoundary, surfaceNodes,
+def forceTorquePhase(f, f_new, solid, phi, normalPhi, procBoundary, sigma,
+                     interfaceWidth, surfaceNodes, surfaceNormals,
                      surfaceInvList, surfaceOutList, c, invList, obstacleFlag,
                      Nx, Ny, forces_l, forces_g, torque_l, torque_g,
-                     noOfDirections, computeForces, computeTorque,
-                     x_ref, N_local, nx, ny, nProc_x, nProc_y, size):
+                     noOfDirections, computeForces, computeTorque, x_ref,
+                     N_local, nx, ny, nProc_x, nProc_y, size):
     for itr in prange(surfaceNodes.shape[0]):
         ind = surfaceNodes[itr]
         if procBoundary[ind] != 1:
@@ -463,9 +465,6 @@ def forceTorquePhase(f, f_new, solid, phi, procBoundary, surfaceNodes,
                         forces_l[itr, 1] += value_1 * phi[ind]
                         forces_g[itr, 0] += value_0 * (1. - phi[ind])
                         forces_g[itr, 1] += value_1 * (1. - phi[ind])
-                        # deltaX = np.round(phi[ind] * (1 - phi[ind]), 8)
-                        # forces_g[itr, 0] += value_0 * deltaX / (deltaX + 1e-17)
-                        # forces_g[itr, 1] += value_1 * deltaX / (deltaX + 1e-17)
                     if computeTorque is True:
                         i_local, j_local = int(ind / Ny), int(ind % Ny)
                         if size == 1:
@@ -484,6 +483,28 @@ def forceTorquePhase(f, f_new, solid, phi, procBoundary, surfaceNodes,
                             phi[ind]
                         torque_g[itr] += (r_0 * value_1 - r_1 * value_0) *\
                             (1. - phi[ind])
+                tangent = normalPhi[ind, 0] * surfaceNormals[itr, 1] -\
+                    surfaceNormals[itr, 0] * normalPhi[ind, 1]
+                normalCap_x = -normalPhi[ind, 1] * tangent
+                normalCap_y = normalPhi[ind, 0] * tangent
+                magNormal = np.sqrt(normalCap_x * normalCap_x +
+                                    normalCap_y * normalCap_y)
+                capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
+                    (phi[ind] - 1) * (phi[ind] - 1) *\
+                    (normalCap_x / (magNormal + 1e-17)) /\
+                    interfaceWidth
+                capForce_y = 24 * sigma * phi[ind] * phi[ind] *\
+                    (phi[ind] - 1) * (phi[ind] - 1) *\
+                    (normalCap_y / (magNormal + 1e-17)) /\
+                    interfaceWidth
+                # capForce_x = 4 * sigma * phi[ind] / interfaceWidth *\
+                #     (1 - phi[ind]) * (normalCap_x / (magNormal + 1e-17))
+                # capForce_y = 4 * sigma * phi[ind] / interfaceWidth *\
+                #     (1 - phi[ind]) * (normalCap_y / (magNormal + 1e-17))
+                forces_l[itr, 0] += capForce_x
+                forces_l[itr, 1] += capForce_y
+                if computeTorque is True:
+                    torque_l[itr] += (r_0 * capForce_y - r_1 * capForce_x)
             elif obstacleFlag == 1:
                 i, j = int(ind / Ny), int(ind % Ny)
                 for k in range(noOfDirections):
@@ -502,9 +523,6 @@ def forceTorquePhase(f, f_new, solid, phi, procBoundary, surfaceNodes,
                             forces_l[itr, 1] += value_1 * phi[ind]
                             forces_g[itr, 0] += value_0 * (1. - phi[ind])
                             forces_g[itr, 1] += value_1 * (1. - phi[ind])
-                            # deltaX = np.round(phi[ind] * (1 - phi[ind]), 8)
-                            # forces_g[itr, 0] += value_0 * deltaX / (deltaX + 1e-17)
-                            # forces_g[itr, 1] += value_1 * deltaX / (deltaX + 1e-17)
                         if computeTorque is True:
                             if size > 1:
                                 i_local, j_local = i, j
@@ -523,6 +541,28 @@ def forceTorquePhase(f, f_new, solid, phi, procBoundary, surfaceNodes,
                                 phi[ind]
                             torque_g[itr] += (r_0 * value_1 - r_1 * value_0) *\
                                 (1. - phi[ind])
+                tangent = normalPhi[ind, 0] * surfaceNormals[itr, 1] -\
+                    surfaceNormals[itr, 0] * normalPhi[ind, 1]
+                normalCap_x = -normalPhi[ind, 1] * tangent
+                normalCap_y = normalPhi[ind, 0] * tangent
+                magNormal = np.sqrt(normalCap_x * normalCap_x +
+                                    normalCap_y * normalCap_y)
+                capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
+                    (phi[ind] - 1) * (phi[ind] - 1) *\
+                    (normalCap_x / (magNormal + 1e-17)) /\
+                    interfaceWidth
+                capForce_y = 24 * sigma * phi[ind] * phi[ind] *\
+                    (phi[ind] - 1) * (phi[ind] - 1) *\
+                    (normalCap_y / (magNormal + 1e-17)) /\
+                    interfaceWidth
+                # capForce_x = 4 * sigma * phi[ind] / interfaceWidth *\
+                #     (1 - phi[ind]) * (normalCap_x / (magNormal + 1e-17))
+                # capForce_y = 4 * sigma * phi[ind] / interfaceWidth *\
+                #     (1 - phi[ind]) * (normalCap_y / (magNormal + 1e-17))
+                forces_l[itr, 0] += capForce_x
+                forces_l[itr, 1] += capForce_y
+                if computeTorque is True:
+                    torque_l[itr] += (r_0 * capForce_y - r_1 * capForce_x)
 
 
 @cuda.jit

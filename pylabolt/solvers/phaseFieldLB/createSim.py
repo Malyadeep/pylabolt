@@ -286,12 +286,12 @@ class simulation:
             self.lattice.cs_2, self.lattice.c, self.lattice.w,
             self.lattice.noOfDirections, self.size
         ]
-
         self.forceFluidArgs = [self.fields.f_new, self.fields.f_eq,
                                self.fields.forceField, self.fields.rho,
                                self.fields.p,  self.fields.phi,
                                self.fields.solid, self.fields.lapPhi,
-                               self.fields.gradPhi, self.fields.stressTensor,
+                               self.fields.gradPhi, self.fields.normalPhi,
+                               self.fields.stressTensor,
                                self.fields.procBoundary, self.fields.
                                boundaryNode, self.forcingScheme.gravity,
                                self.collisionScheme.preFactorFluid,
@@ -300,14 +300,15 @@ class simulation:
                                self.collisionScheme.collisionOperatorArgs,
                                self.collisionScheme.constructStressTensorFunc,
                                self.phaseField.computeViscFunc,
-                               self.phaseField.beta, self.phaseField.kappa,
+                               self.phaseField.surfaceTensionFunc,
+                               self.phaseField.surfaceTensionArgs,
                                self.transport.mu_l, self.transport.mu_g,
                                self.transport.rho_l, self.transport.rho_g,
                                self.transport.phi_l, self.transport.phi_g,
                                self.lattice.cs, self.lattice.noOfDirections,
-                               self.lattice.c, self.lattice.cs_2,
-                               self.mesh.Nx, self.mesh.Ny
-                               ]
+                               self.lattice.w, self.lattice.c,
+                               self.lattice.cs_2, self.mesh.Nx, self.mesh.Ny,
+                               self.transport.sigma, self.size]
 
         if size > 1:
             self.gatherArgs = [self.fields.u, self.fields.rho,
