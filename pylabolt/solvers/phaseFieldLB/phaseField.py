@@ -77,38 +77,62 @@ class phaseFieldDef:
         self.liangWetting =  \
             numba.njit(liangWetting, parallel=parallel,
                        cache=False, nogil=True)
+        self.fakhariWetting =  \
+            numba.njit(fakhariWetting, parallel=parallel,
+                       cache=False, nogil=True)
+        # self.fakhariWetting = fakhariWetting
         self.leclaireWetting =  \
             numba.njit(leclaireWetting, parallel=parallel,
                        cache=False, nogil=True)
         self.simpleWetting =  \
             numba.njit(simpleWetting, parallel=parallel,
                        cache=False, nogil=True)
+        self.newCorrectNormal =  \
+            numba.njit(newCorrectNormal, parallel=parallel,
+                       cache=False, nogil=True)
 
     def setSolidPhaseField(self, options, fields, lattice, mesh, size):
         for itr in range(options.noOfSurfaces):
-            pass
             # self.setSolidPhi(options.solidNbNodes[itr], fields.phi,
             #                  fields.solid, fields.boundaryNode,
             #                  fields.procBoundary, lattice.w, lattice.c,
             #                  lattice.noOfDirections, mesh.Nx, mesh.Ny,
             #                  size)
-            # if itr == 0:
-            #     self.liangWetting(options.solidNbNodes[itr], fields.phi,
-            #                       self.contactAngle, mesh.Nx, mesh.Ny)
+            # self.liangWetting(options.solidNbNodes[itr], fields.phi,
+            #                   self.contactAngle, mesh.Nx, mesh.Ny)
+            self.fakhariWetting(options.solidNbNodes[itr], options.
+                                surfaceNormals[itr], options.
+                                phiInterpolated[itr], fields.phi,
+                                self.contactAngle, self.interfaceWidth,
+                                mesh.Nx, mesh.Ny)
 
-    def correctNormalPhi(self, options, fields, precision):
+    def correctNormalPhi(self, options, fields, precision, mesh, lattice,
+                         size, timeStep, saveInterval):
         for itr in range(options.noOfSurfaces):
+            pass
             # self.correctNormal(fields.normalPhi, fields.gradPhi,
             #                    options.surfaceNodes[itr],
             #                    options.surfaceNormals[itr], self.contactAngle)
+            # checkDot =\
+            #     self.newCorrectNormal(options.surfaceNodes[itr],
+            #                           options.surfaceNormals[itr],
+            #                           fields.gradPhi, fields.normalPhi,
+            #                           fields.procBoundary, self.contactAngle,
+            #                           precision)
             # self.leclaireWetting(options.surfaceNodes[itr],
             #                      options.surfaceNormals[itr],
             #                      fields.normalPhi, fields.gradPhi,
             #                      self.contactAngle, precision)
-            self.simpleWetting(options.surfaceNodes[itr],
-                               options.surfaceNormals[itr],
-                               fields.normalPhi, fields.gradPhi,
-                               self.contactAngle, precision)
+            # self.simpleWetting(options.surfaceNodes[itr],
+            #                    options.surfaceNormals[itr],
+            #                    fields.normalPhi, fields.gradPhi,
+            #                    fields.phi, self.contactAngle, precision,
+            #                    fields.solid, fields.boundaryNode,
+            #                    mesh.Nx, mesh.Ny, size, lattice.c, lattice.w,
+            #                    lattice.cs_2)
+            # if itr == 0 and timeStep % saveInterval == 0:
+            #     np.savez('output/' + str(timeStep) + '/checkDot.npz',
+            #              checkDot=checkDot)
 
 
 @numba.njit
@@ -139,7 +163,7 @@ def computeGradLapPhi(Nx, Ny, phi, gradPhi, normalPhi, lapPhi, solid,
                       procBoundary, boundaryNode, cs_2, c, w, noOfDirections,
                       size, initial=False):
     for ind in prange(Nx * Ny):
-        if (procBoundary[ind] != 1 or solid[ind, 0] != 1 or
+        if (procBoundary[ind] != 1 and solid[ind, 0] != 1 and
                 boundaryNode[ind] != 1):
             i, j = int(ind / Ny), int(ind % Ny)
             gradPhiSum_x, gradPhiSum_y = 0., 0.
@@ -202,22 +226,22 @@ def setSolidPhi(solidNodes, phi, solid, boundaryNode, procBoundary, w,
             for k in range(noOfDirections):
                 i_nb = i + int(c[k, 0])
                 j_nb = j + int(c[k, 1])
-                # if size == 1 and boundaryNode[ind] == 2:
-                #     if i + int(2 * c[k, 0]) < 0 or i + int(2 * c[k, 0]) >= Nx:
-                #         i_nb = (i_nb + int(2 * c[k, 0]) + Nx) % Nx
-                #     else:
-                #         i_nb = (i_nb + Nx) % Nx
-                #     if j + int(2 * c[k, 1]) < 0 or j + int(2 * c[k, 1]) >= Ny:
-                #         j_nb = (j_nb + int(2 * c[k, 1]) + Ny) % Ny
-                #     else:
-                #         j_nb = (j_nb + Ny) % Ny
-                # elif size > 1 and boundaryNode[ind] == 2:
-                #     if (i + int(2 * c[k, 0]) == 0 or
-                #             i + int(2 * c[k, 0]) == Nx - 1):
-                #         i_nb = i_nb + int(c[k, 0])
-                #     if (j + int(2 * c[k, 1]) == 0 or
-                #             j + int(2 * c[k, 1]) == Ny - 1):
-                #         j_nb = j_nb + int(c[k, 1])
+                if size == 1 and boundaryNode[ind] == 2:
+                    if i + int(2 * c[k, 0]) < 0 or i + int(2 * c[k, 0]) >= Nx:
+                        i_nb = (i_nb + int(2 * c[k, 0]) + Nx) % Nx
+                    else:
+                        i_nb = (i_nb + Nx) % Nx
+                    if j + int(2 * c[k, 1]) < 0 or j + int(2 * c[k, 1]) >= Ny:
+                        j_nb = (j_nb + int(2 * c[k, 1]) + Ny) % Ny
+                    else:
+                        j_nb = (j_nb + Ny) % Ny
+                elif size > 1 and boundaryNode[ind] == 2:
+                    if (i + int(2 * c[k, 0]) == 0 or
+                            i + int(2 * c[k, 0]) == Nx - 1):
+                        i_nb = i_nb + int(c[k, 0])
+                    if (j + int(2 * c[k, 1]) == 0 or
+                            j + int(2 * c[k, 1]) == Ny - 1):
+                        j_nb = j_nb + int(c[k, 1])
                 ind_nb = int(i_nb * Ny + j_nb)
                 if solid[ind_nb, 0] == 0:
                     phiSum += w[k] * phi[ind_nb]
@@ -266,7 +290,7 @@ def liangWetting(solidNodes, phi, contactAngle, Nx, Ny):
     for itr in range(solidNodes.shape[0]):
         ind = solidNodes[itr]
         i, j = int(ind / Ny), int(ind % Ny)
-        if j == 3:
+        if j == 7:
             ind_xTop_1 = int(i * Ny + j + 1)
             ind_xNext_1 = int((i + 1) * Ny + j + 1)
             ind_xPrev_1 = int((i - 1) * Ny + j + 1)
@@ -277,6 +301,97 @@ def liangWetting(solidNodes, phi, contactAngle, Nx, Ny):
                        - 0.5 * (phi[ind_xNext_2] - phi[ind_xPrev_2]))
             phi[ind] = phi[ind_xTop_1] + np.tan((np.pi/2 - contactAngle)) *\
                 np.abs(tangentDotGradPhi)
+        if j == 29:
+            ind_xTop_1 = int(i * Ny + j - 1)
+            ind_xNext_1 = int((i + 1) * Ny + j - 1)
+            ind_xPrev_1 = int((i - 1) * Ny + j - 1)
+            ind_xNext_2 = int((i + 1) * Ny + j - 2)
+            ind_xPrev_2 = int((i - 1) * Ny + j - 2)
+            tangentDotGradPhi = \
+                0.5 * (1.5 * (phi[ind_xNext_1] - phi[ind_xPrev_1])
+                       - 0.5 * (phi[ind_xNext_2] - phi[ind_xPrev_2]))
+            phi[ind] = phi[ind_xTop_1] + np.tan((np.pi/2 - contactAngle)) *\
+                np.abs(tangentDotGradPhi)
+
+
+def fakhariWetting(solidNodes, surfaceNormals, phiInterpolated, phi,
+                   contactAngle, interfaceWidth, Nx, Ny):
+    epsilon = - 2 * np.cos(contactAngle) / interfaceWidth
+    epsilon_1 = 1./(epsilon + 1e-17)
+    # print(solidNodes.shape, surfaceNormals.shape)
+    # np.savez('solidData.npz', solid=solidNodes)
+    # np.savez('normalSolid.npz', normal=surfaceNormals)
+    # print(epsilon, epsilon_1)
+    for itr in prange(solidNodes.shape[0]):
+        ind = solidNodes[itr]
+        i, j = int(ind / Ny), int(ind % Ny)
+        i_nb = i + surfaceNormals[itr, 0]
+        j_nb = j + surfaceNormals[itr, 1]
+        i_next, j_next = int(np.ceil(i_nb)), int(np.ceil(j_nb))
+        i_prev, j_prev = int(np.floor(i_nb)), int(np.floor(j_nb))
+        deltaX, deltaY = i_next - i_prev, j_next - j_prev
+        if deltaX == 0 or deltaY == 0:
+            # print(ind, surfaceNormals[itr], deltaX, deltaY, i_nb, j_nb)
+            # print(itr, 'hit', surfaceNormals[itr])
+            phi_fluid = phi[int(i_nb * Ny + j_nb)]
+            # phi_fluid = phi[int(i * Ny + j + 1)]
+        elif deltaX != 0 and deltaY != 0:
+            phi_fluid = ((i_next - i_nb) * (j_next - j_nb) *
+                         phi[i_prev * Ny + j_prev] +
+                         (i_next - i_nb) * (j_nb - j_prev) *
+                         phi[i_prev * Ny + j_next] +
+                         (i_nb - i_prev) * (j_next - j_nb) *
+                         phi[i_next * Ny + j_prev] +
+                         (i_nb - i_prev) * (j_nb - j_prev) *
+                         phi[i_next * Ny + j_next])/(deltaX * deltaY)
+            # print(phi_fluid)
+        phiInterpolated[itr] = phi_fluid
+        phi[ind] =\
+            np.abs(epsilon_1 * (1 + epsilon - np.sqrt((1 + epsilon)
+                   * (1 + epsilon) - 4 * epsilon * phi_fluid)) - phi_fluid)
+
+
+def newCorrectNormal(surfaceNodes, surfaceNormals, gradPhi, normalPhi,
+                     procBoundary, contactAngle, precision):
+    checkDot = np.zeros(surfaceNormals.shape[0], dtype=precision)
+    for itr in prange(surfaceNodes.shape[0]):
+        ind = surfaceNodes[itr]
+        if procBoundary[ind] != 1:
+            tangent = np.zeros(2, dtype=precision)
+            sinTheta = np.sin(contactAngle)
+            cosTheta = np.cos(contactAngle)
+            distance_1 = ((normalPhi[ind, 0] + surfaceNormals[itr, 1]) *
+                          (normalPhi[ind, 0] + surfaceNormals[itr, 1])) +\
+                         ((normalPhi[ind, 1] - surfaceNormals[itr, 0]) *
+                          (normalPhi[ind, 1] - surfaceNormals[itr, 0]))
+            distance_2 = ((normalPhi[ind, 0] - surfaceNormals[itr, 1]) *
+                          (normalPhi[ind, 0] - surfaceNormals[itr, 1])) +\
+                         ((normalPhi[ind, 1] + surfaceNormals[itr, 0]) *
+                          (normalPhi[ind, 1] + surfaceNormals[itr, 0]))
+            if distance_1 < distance_2:
+                tangent[0] = -surfaceNormals[itr, 1]
+                tangent[1] = surfaceNormals[itr, 0]
+            elif distance_1 >= distance_2:
+                tangent[0] = surfaceNormals[itr, 1]
+                tangent[1] = -surfaceNormals[itr, 0]
+            # print(tangent)
+            denominator = tangent[0] * normalPhi[ind, 1] -\
+                normalPhi[ind, 0] * tangent[1]
+            normal_x = (surfaceNormals[itr, 1] * sinTheta +
+                        tangent[1] * cosTheta) / (denominator + 1e-17)
+            normal_y = -(surfaceNormals[itr, 0] * sinTheta +
+                         tangent[0] * cosTheta) / (denominator + 1e-17)
+            magNormal = np.sqrt(normal_x * normal_x + normal_y * normal_y)
+            normalPhi[ind, 0] = normal_x / (magNormal + 1e-17)
+            normalPhi[ind, 1] = normal_y / (magNormal + 1e-17)
+            magGradPhi = np.sqrt(gradPhi[ind, 0] * gradPhi[ind, 0] +
+                                 gradPhi[ind, 1] * gradPhi[ind, 1])
+            gradPhi[ind, 0] = magGradPhi * normalPhi[ind, 0]
+            gradPhi[ind, 1] = magGradPhi * normalPhi[ind, 1]
+            checkDotVal = normalPhi[ind, 0] * surfaceNormals[itr, 0] +\
+                normalPhi[ind, 1] * surfaceNormals[itr, 1]
+            checkDot[itr] = np.arccos(-checkDotVal) * 180 / np.pi
+    return checkDot
 
 
 def correctNormal(normalPhi, gradPhi, surfaceNodes, surfaceNormals,
@@ -335,8 +450,9 @@ def correctNormal(normalPhi, gradPhi, surfaceNodes, surfaceNormals,
         gradPhi[ind, 1] = magGradPhi * normalPhi[ind, 1]
 
 
-def simpleWetting(surfaceNodes, surfaceNormals, normalPhi, gradPhi,
-                  contactAngle, precision):
+def simpleWetting(surfaceNodes, surfaceNormals, normalPhi, gradPhi, phi,
+                  contactAngle, precision, solid, boundaryNode, Nx, Ny,
+                  size, c, w, cs_2):
     for itr in prange(surfaceNodes.shape[0]):
         ind = surfaceNodes[itr]
         tangent = np.zeros(2, dtype=precision)
@@ -390,7 +506,7 @@ def forceFluid(f_new, f_eq, forceField, rho, p, phi, solid, lapPhi, gradPhi,
                collisionOperatorArgs, constructStressTensorFunc,
                computeViscFunc, surfaceTensionFunc, surfaceTensionArgs, mu_l,
                mu_g, rho_l, rho_g, phi_l, phi_g, cs, noOfDirections, w, c,
-               cs_2, Nx, Ny, sigma, size):
+               cs_2, Nx, Ny, sigma, size, curvature):
     for ind in prange(Nx * Ny):
         if (solid[ind, 0] != 1 and procBoundary[ind] != 1
                 and boundaryNode[ind] != 1):
@@ -401,7 +517,7 @@ def forceFluid(f_new, f_eq, forceField, rho, p, phi, solid, lapPhi, gradPhi,
             constructStressTensorFunc(f_new[ind], f_eq[ind], stressTensor[ind],
                                       preFactorFluid[ind], noOfDirections, c,
                                       cs_2, nu)
-            curvature = 0
+            curvatureTemp = 0
             denominator = 0
             i, j = int(ind / Ny), int(ind % Ny)
             for k in range(noOfDirections):
@@ -424,13 +540,13 @@ def forceFluid(f_new, f_eq, forceField, rho, p, phi, solid, lapPhi, gradPhi,
                             j + int(2 * c[k, 1]) == Ny - 1):
                         j_nb = j_nb + int(c[k, 1])
                 ind_nb = int(i_nb * Ny + j_nb)
-                curvature += w[k] * (c[k, 0] * normalPhi[ind_nb, 0] +
-                                     c[k, 1] * normalPhi[ind_nb, 1]) * \
+                curvatureTemp += w[k] * (c[k, 0] * normalPhi[ind_nb, 0] +
+                                         c[k, 1] * normalPhi[ind_nb, 1]) * \
                     (1 - solid[ind_nb, 0])
                 denominator += w[k] * (1 - solid[ind_nb, 0])
-            curvature = cs_2 * curvature / (denominator + 1e-17)
+            curvature[ind] = cs_2 * curvatureTemp / (denominator + 1e-17)
             surfaceTensionForce_x, surfaceTensionForce_y =\
-                surfaceTensionFunc(phi[ind], gradPhi[ind], curvature,
+                surfaceTensionFunc(phi[ind], gradPhi[ind], curvature[ind],
                                    lapPhi[ind], *surfaceTensionArgs)
             pressureCorrection_x = - p[ind] * cs * cs * (rho_l - rho_g) *\
                 gradPhi[ind, 0]

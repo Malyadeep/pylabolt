@@ -131,7 +131,8 @@ class obstacleSetup:
         self.modifyObsNo_device = []
         self.obsOrigin_device = []
 
-    def setObstacle(self, mesh, precision, options, initialFields, rank, size):
+    def setObstacle(self, mesh, precision, options, initialFields, rank, size,
+                    comm):
         workingDir = os.getcwd()
         sys.path.append(workingDir)
         try:
@@ -346,6 +347,106 @@ class obstacleSetup:
                                           mesh, obsNo, velType=velType,
                                           velOrigin=velOrigin,
                                           velOmega=velOmega)
+                            self.obsNodes.append(nodes)
+                            self.momentOfInertia.append(momentOfInertia)
+                elif obstacleType == 'inclinedRectangle':
+                    centerLine = obstacle[obsName]['centerLine']
+                    width = obstacle[obsName]['width']
+                    if (isinstance(centerLine, list) and
+                            isinstance(width, float) or
+                            isinstance(width, int)):
+                        centerLine = np.array(centerLine, dtype=np.int64)
+                        width = precision(width)
+                    else:
+                        print("ERROR!", flush=True)
+                        print("For 'inclinedRectangle' type obstacle center"
+                              + "line must be a list and width must be float"
+                              + " or int.", flush=True)
+                        os._exit(1)
+                    static = obstacle[obsName]['static']
+                    if static is True:
+                        self.modifyObsFunc.append(None)
+                        nodes, momentOfInertia = \
+                            obstacleTypes.\
+                            inclinedRectangle(centerLine, width, solid,
+                                              u, rho, rho_s, mesh,
+                                              obsNo, comm)
+                        self.obsNodes.append(nodes)
+                        self.momentOfInertia.append(momentOfInertia)
+                    else:
+                        self.allStatic = False
+                        velDict = obstacle[obsName]['U_def']
+                        if velDict['type'] == 'fixedTranslational':
+                            velType = 'fixedTranslational'
+                            velValue = velDict['value']
+                            if not isinstance(velValue, list):
+                                if rank == 0:
+                                    print("ERROR!", flush=True)
+                                    print("For 'fixedTranslational' type "
+                                          + "velocity, value must be a list",
+                                          flush=True)
+                                os._exit(1)
+                            velValue = np.array(velValue, dtype=precision)
+                            self.obsU.append(velValue)
+                            self.obsOmega.append(precision(0))
+                            self.obsOrigin.append(np.array([0, 0],
+                                                  dtype=precision))
+                            self.modifyObsFunc.append(None)
+                            nodes, momentOfInertia = \
+                                obstacleTypes.\
+                                inclinedRectangle(centerLine, width, solid,
+                                                  u, rho, rho_s, mesh,
+                                                  obsNo, comm, velType=velType,
+                                                  velValue=velValue)
+                            self.obsNodes.append(nodes)
+                            self.momentOfInertia.append(momentOfInertia)
+                        elif (velDict['type'] == 'fixedRotational' or
+                              velDict['type'] == 'calculatedRotational'):
+                            velType = velDict['type']
+                            velOrigin = velDict['origin']
+                            velOmega = velDict['angularVelocity']
+                            if (not isinstance(velOrigin, list) and not
+                                    isinstance(velOmega, float)):
+                                if rank == 0:
+                                    print("ERROR!", flush=True)
+                                    print("For 'fixedRotational' type " +
+                                          "velocity, origin must be " +
+                                          "a list and angular velocity " +
+                                          "must be a float",
+                                          flush=True)
+                                os._exit(1)
+                            if (options.computeTorque is False and
+                                    velType == 'calculatedRotational'):
+                                if rank == 0:
+                                    print("ERROR!", flush=True)
+                                    print("For 'calculatedRotational' type " +
+                                          "velocity in obstacle, " +
+                                          "'computeTorque' must be 'True'!",
+                                          flush=True)
+                                    os._exit(1)
+                            velOrigin = np.array(velOrigin, dtype=precision)
+                            velOmega = precision(velOmega)
+                            self.obsU.append(np.zeros(2, dtype=precision))
+                            self.obsOmega.append(velOmega)
+                            self.obsOrigin.append(np.divide(velOrigin,
+                                                  mesh.delX) + np.ones(2,
+                                                  dtype=np.int64))
+                            if velType == 'calculatedRotational':
+                                self.modifyObsFunc.append(setOmegaFromTorque)
+                                self.obsModifiable = True
+                                self.writeProperties = velDict['write']
+                                if self.writeProperties is True:
+                                    self.writeInterval = \
+                                        velDict['writeInterval']
+                            else:
+                                self.modifyObsFunc.append(None)
+                            nodes, momentOfInertia = \
+                                obstacleTypes.\
+                                inclinedRectangle(centerLine, width, solid,
+                                                  u, rho, rho_s, mesh,
+                                                  obsNo, comm, velType=velType,
+                                                  velOrigin=velOrigin,
+                                                  velOmega=velOmega)
                             self.obsNodes.append(nodes)
                             self.momentOfInertia.append(momentOfInertia)
                 elif obstacleType == 'circularConfinement':

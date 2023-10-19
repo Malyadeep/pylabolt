@@ -154,7 +154,7 @@ class simulation:
                                                phase=True)
         solid = self.obstacle.setObstacle(self.mesh, self.precision,
                                           self.options, initialFields_temp,
-                                          self.rank, size)
+                                          self.rank, size, comm)
         if rank == 0:
             print('Initializing fields done!\n', flush=True)
             print('Reading boundary conditions...', flush=True)
@@ -308,7 +308,8 @@ class simulation:
                                self.lattice.cs, self.lattice.noOfDirections,
                                self.lattice.w, self.lattice.c,
                                self.lattice.cs_2, self.mesh.Nx, self.mesh.Ny,
-                               self.transport.sigma, self.size]
+                               self.transport.sigma, self.size,
+                               self.fields.curvature]
 
         if size > 1:
             self.gatherArgs = [self.fields.u, self.fields.rho,
@@ -345,6 +346,15 @@ class simulation:
                                 self.mpiParams.nx, self.mpiParams.ny,
                                 self.mpiParams.nProc_x,
                                 self.mpiParams.nProc_y]
+            self.commNormalPhiArgs = [self.mesh.Nx, self.mesh.Ny,
+                                      self.fields.normalPhi,
+                                      self.fields.normalPhi_send_topBottom,
+                                      self.fields.normalPhi_recv_topBottom,
+                                      self.fields.normalPhi_send_leftRight,
+                                      self.fields.normalPhi_recv_leftRight,
+                                      self.mpiParams.nx, self.mpiParams.ny,
+                                      self.mpiParams.nProc_x,
+                                      self.mpiParams.nProc_y]
 
         self.boundary.setBoundaryArgs(self.lattice, self.mesh, self.fields,
                                       self.collisionScheme)

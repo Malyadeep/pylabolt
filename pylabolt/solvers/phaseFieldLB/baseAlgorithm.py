@@ -11,7 +11,7 @@ from pylabolt.solvers.phaseFieldLB.kernels import (equilibriumRelaxation_cuda,
                                                    computeResiduals_cuda)
 from pylabolt.parallel.MPI_comm import (reduceComm, proc_boundary,
                                         gatherForcesTorque_mpi,
-                                        proc_boundaryScalars)
+                                        proc_boundaryGradTerms)
 from pylabolt.solvers.phaseFieldLB.phaseField import forcePhaseField
 
 
@@ -228,6 +228,7 @@ class baseAlgorithm:
         tempSim.stdOutputInterval = 100
         tempSim.saveInterval = 100
         tempSim.saveStateInterval = None
+        tempSim.phaseField.diffusionTime = 2
         self.solver(tempSim, size, rank, comm, warmup=True)
         if rank == 0:
             print('JIT warmup done!!\n\n', flush=True)
@@ -256,7 +257,8 @@ class baseAlgorithm:
                                     phi_old, residues)
             if size > 1:
                 comm.Barrier()
-                proc_boundaryScalars(*simulation.commPhiArgs, comm, inner=True)
+                proc_boundaryGradTerms(*simulation.commPhiArgs, comm,
+                                       inner=True)
                 comm.Barrier()
             simulation.phaseField.computeGradLapPhi(*simulation.
                                                     computeGradLapPhiArgs,
@@ -298,29 +300,41 @@ class baseAlgorithm:
             # Compute macroscopic fields and forces #
             self.computeFieldsPhase(*simulation.computeFieldsArgsPhase,
                                     phi_old, residues)
+            # np.savez('phi.npz', phi=simulation.fields.phi)
             if size > 1:
                 comm.Barrier()
-                proc_boundaryScalars(*simulation.commPhiArgs, comm, inner=True)
+                proc_boundaryGradTerms(*simulation.commPhiArgs, comm,
+                                       inner=True)
                 comm.Barrier()
-            # if simulation.phaseField.contactAngle is not None:
-            #     simulation.phaseField.setSolidPhaseField(simulation.options,
-            #                                              simulation.fields,
-            #                                              simulation.lattice,
-            #                                              simulation.mesh,
-            #                                              size)
-            #     if size > 1:
-            #         comm.Barrier()
-            #         proc_boundaryScalars(*simulation.commPhiArgs, comm,
-            #                              inner=True)
-            #         comm.Barrier()
+            if simulation.phaseField.contactAngle is not None:
+                simulation.phaseField.setSolidPhaseField(simulation.options,
+                                                         simulation.fields,
+                                                         simulation.lattice,
+                                                         simulation.mesh,
+                                                         size)
+                if size > 1:
+                    comm.Barrier()
+                    proc_boundaryGradTerms(*simulation.commPhiArgs, comm,
+                                           inner=True)
+                    comm.Barrier()
 
             simulation.phaseField.computeGradLapPhi(*simulation.
                                                     computeGradLapPhiArgs,
-                                                    initial=True)
-            if simulation.phaseField.contactAngle is not None:
-                simulation.phaseField.correctNormalPhi(simulation.options,
-                                                       simulation.fields,
-                                                       simulation.precision)
+                                                    initial=False)
+            if size > 1:
+                comm.Barrier()
+                proc_boundaryGradTerms(*simulation.commNormalPhiArgs, comm,
+                                       inner=True)
+                comm.Barrier()
+            # if simulation.phaseField.contactAngle is not None:
+            #     simulation.phaseField.correctNormalPhi(simulation.options,
+            #                                            simulation.fields,
+            #                                            simulation.precision,
+            #                                            simulation.mesh,
+            #                                            simulation.lattice,
+            #                                            simulation.size,
+            #                                            timeStep,
+            #                                            simulation.saveInterval)
             simulation.phaseField.forceFluid(*simulation.forceFluidArgs)
             self.computeFieldsFluid(*simulation.computeFieldsArgsFluid,
                                     u_old, rho_old, residues)

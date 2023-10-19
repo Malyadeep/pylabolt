@@ -150,6 +150,31 @@ def circle(fields, mesh, precision, region):
         center_idx = np.int64(np.array(center)/mesh.delX) +\
             np.ones(2, dtype=np.int64)
         radius_idx = np.int64(radius/mesh.delX)
+        circleType = region['circleType']
+        if circleType == 'half':
+            point_0 = region['diameterPoint_0']
+            point_1 = region['diameterPoint_1']
+            activeDomain = region['activeDomain']
+            if activeDomain != '+' and activeDomain != '-':
+                print("ERROR! activeDomain must be '+' or '-'!")
+                return 0
+            if not isinstance(point_0, list):
+                print('ERROR! coordinates in diameterPoint_0 must be list')
+                print('Cannot set fields in region for region type circle\n')
+                return 0
+            if not isinstance(point_1, list):
+                print('ERROR! coordinates in diameterPoint_1 must be list')
+                print('Cannot set fields in region for region type circle\n')
+                return 0
+            Nx_i = int(point_0[0]/mesh.delX) + 1
+            Nx_f = int(point_1[0]/mesh.delX) + 1
+            Ny_i = int(point_0[1]/mesh.delX) + 1
+            Ny_f = int(point_1[1]/mesh.delX) + 1
+            if Ny_f - Ny_i == 0 and Nx_f - Nx_i == 0:
+                print('ERROR! diameter cannot be a point')
+            if Ny_f - Ny_i != 0 and Nx_f - Nx_i != 0:
+                slope = (Ny_f - Ny_i)/(Nx_f - Nx_i)
+                intercept = Ny_i - slope * Nx_i
         fieldsInitial = []
         for field in fields.fieldList:
             if field == 'u':
@@ -192,14 +217,49 @@ def circle(fields, mesh, precision, region):
         print('ERROR! Keyword ' + str(e) +
               ' missing in internalFields')
         return 0
-    for i in range(mesh.Nx_global):
-        for j in range(mesh.Ny_global):
-            if ((i - center_idx[0])*(i - center_idx[0]) +
-                    (j - center_idx[1])*(j - center_idx[1]) <=
-                    radius_idx*radius_idx):
-                ind = i * mesh.Ny_global + j
-                setFields(fields, ind, fieldsInitial, mesh, velType,
-                          x_ref=x_ref_idx)
+    if circleType == 'full':
+        for i in range(mesh.Nx_global):
+            for j in range(mesh.Ny_global):
+                if ((i - center_idx[0])*(i - center_idx[0]) +
+                        (j - center_idx[1])*(j - center_idx[1]) <=
+                        radius_idx*radius_idx):
+                    ind = i * mesh.Ny_global + j
+                    setFields(fields, ind, fieldsInitial, mesh, velType,
+                              x_ref=x_ref_idx)
+    elif circleType == 'half':
+        for i in range(mesh.Nx_global):
+            for j in range(mesh.Ny_global):
+                if ((i - center_idx[0])*(i - center_idx[0]) +
+                        (j - center_idx[1])*(j - center_idx[1]) <
+                        radius_idx*radius_idx):
+                    if Nx_f - Nx_i == 0 and Ny_f - Ny_i != 0:
+                        if activeDomain == '+' and i >= Nx_f:
+                            ind = i * mesh.Ny_global + j
+                            setFields(fields, ind, fieldsInitial, mesh,
+                                      velType, x_ref=x_ref_idx)
+                        elif activeDomain == '-' and i <= Nx_f:
+                            ind = i * mesh.Ny_global + j
+                            setFields(fields, ind, fieldsInitial, mesh,
+                                      velType, x_ref=x_ref_idx)
+                    elif Ny_f - Ny_i == 0 and Nx_f - Nx_i != 0:
+                        if activeDomain == '+' and j >= Ny_f:
+                            ind = i * mesh.Ny_global + j
+                            setFields(fields, ind, fieldsInitial, mesh,
+                                      velType, x_ref=x_ref_idx)
+                        elif activeDomain == '-' and j <= Ny_f:
+                            ind = i * mesh.Ny_global + j
+                            setFields(fields, ind, fieldsInitial, mesh,
+                                      velType, x_ref=x_ref_idx)
+                    else:
+                        j_ref = int(slope * i + intercept)
+                        if activeDomain == '+' and j >= j_ref:
+                            ind = i * mesh.Ny_global + j
+                            setFields(fields, ind, fieldsInitial, mesh,
+                                      velType, x_ref=x_ref_idx)
+                        elif activeDomain == '-' and j <= j_ref:
+                            ind = i * mesh.Ny_global + j
+                            setFields(fields, ind, fieldsInitial, mesh,
+                                      velType, x_ref=x_ref_idx)
     return 1
 
 

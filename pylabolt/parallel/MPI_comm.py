@@ -184,10 +184,10 @@ def proc_boundary(Nx, Ny, data, data_send_topBottom,
     comm.Barrier()
 
 
-def proc_boundaryScalars(Nx, Ny, data, data_send_topBottom,
-                         data_recv_topBottom, data_send_leftRight,
-                         data_recv_leftRight, nx, ny, nProc_x, nProc_y, comm,
-                         inner=False):
+def proc_boundaryGradTerms(Nx, Ny, data, data_send_topBottom,
+                           data_recv_topBottom, data_send_leftRight,
+                           data_recv_leftRight, nx, ny, nProc_x, nProc_y, comm,
+                           inner=False):
     current_rank = nx * nProc_y + ny
     shape = data_recv_leftRight.shape
     if len(shape) > 1:
@@ -431,27 +431,15 @@ def gatherForcesTorque_mpi(options, comm, rank, size, precision):
                         dtype=precision)
         sumT = np.zeros((len(options.surfaceNamesGlobal)),
                         dtype=precision)
-        if options.phase is True:
-            sumF = np.zeros((len(options.surfaceNamesGlobal), 2, 2),
-                            dtype=precision)
-            sumT = np.zeros((len(options.surfaceNamesGlobal), 2),
-                            dtype=precision)
         for i in range(size):
             if i == 0:
                 for itr, name in enumerate(options.surfaceNamesGlobal):
                     for itr_local, local_name in \
                             enumerate(options.surfaceNames):
-                        if name == local_name and options.phase is False:
+                        if name == local_name:
                             sumF[itr, 0] += options.forces[itr_local][0]
                             sumF[itr, 1] += options.forces[itr_local][1]
                             sumT[itr] += options.torque[itr_local]
-                        elif name == local_name and options.phase is True:
-                            sumF[itr, 0, 0] += options.forces[itr_local][0][0]
-                            sumF[itr, 0, 1] += options.forces[itr_local][0][1]
-                            sumT[itr, 0] += options.torque[itr_local][0]
-                            sumF[itr, 1, 0] += options.forces[itr_local][1][0]
-                            sumF[itr, 1, 1] += options.forces[itr_local][1][1]
-                            sumT[itr, 1] += options.torque[itr_local][1]
             else:
                 surfaceNames_local = comm.recv(source=i, tag=1*i)
                 forces_local = comm.recv(source=i, tag=2*i)
@@ -459,17 +447,10 @@ def gatherForcesTorque_mpi(options, comm, rank, size, precision):
                 for itr, name in enumerate(options.surfaceNamesGlobal):
                     for itr_local, local_name in \
                             enumerate(surfaceNames_local):
-                        if name == local_name and options.phase is False:
+                        if name == local_name:
                             sumF[itr, 0] += forces_local[itr_local][0]
                             sumF[itr, 1] += forces_local[itr_local][1]
                             sumT[itr] += torque_local[itr_local]
-                        elif name == local_name and options.phase is True:
-                            sumF[itr, 0, 0] += forces_local[itr_local][0][0]
-                            sumF[itr, 0, 1] += forces_local[itr_local][0][1]
-                            sumT[itr, 0] += torque_local[itr_local][0]
-                            sumF[itr, 1, 0] += forces_local[itr_local][1][0]
-                            sumF[itr, 1, 1] += forces_local[itr_local][1][1]
-                            sumT[itr, 1] += torque_local[itr_local][1]
         for i in range(1, size):
             comm.send(sumF, dest=i, tag=1*i)
             comm.send(sumT, dest=i, tag=2*i)

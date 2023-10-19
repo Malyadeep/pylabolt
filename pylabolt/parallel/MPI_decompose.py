@@ -2,7 +2,8 @@ import numpy as np
 import os
 import sys
 
-from pylabolt.parallel.MPI_comm import proc_boundary, proc_boundaryScalars
+from pylabolt.parallel.MPI_comm import (proc_boundary,
+                                        proc_boundaryGradTerms)
 
 
 def computeLocalSize(mpiParams, mesh):
@@ -193,7 +194,7 @@ def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
                     mpiParams.ny, mpiParams.nProc_x,
                     mpiParams.nProc_y, comm)
             if fieldName == 'phi':
-                proc_boundaryScalars(*args, inner=True)
+                proc_boundaryGradTerms(*args, inner=True)
             else:
                 proc_boundary(*args)
             comm.Barrier()

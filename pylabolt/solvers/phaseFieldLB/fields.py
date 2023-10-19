@@ -29,6 +29,7 @@ class fields:
         self.boundaryNode = np.full((mesh.Nx * mesh.Ny), fill_value=0,
                                     dtype=np.int32)
         self.forceField = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
+        self.curvature = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         self.source = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
                                dtype=precision)
         self.stressTensor = np.zeros((mesh.Nx * mesh.Ny, 2, 2),
@@ -73,6 +74,14 @@ class fields:
             self.phi_recv_topBottom = np.zeros(mesh.Nx, dtype=precision)
             self.phi_send_leftRight = np.zeros(mesh.Ny, dtype=precision)
             self.phi_recv_leftRight = np.zeros(mesh.Ny, dtype=precision)
+            self.normalPhi_send_topBottom = \
+                np.zeros((mesh.Nx, 2), dtype=precision)
+            self.normalPhi_recv_topBottom = \
+                np.zeros((mesh.Nx, 2), dtype=precision)
+            self.normalPhi_send_leftRight = \
+                np.zeros((mesh.Ny, 2), dtype=precision)
+            self.normalPhi_recv_leftRight = \
+                np.zeros((mesh.Ny, 2), dtype=precision)
 
 
 @numba.njit

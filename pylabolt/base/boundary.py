@@ -79,6 +79,8 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                         faceList.append(fluidBoundaryNode)
                         if periodicFlag is True:
                             boundaryNode[fluidBoundaryNode] = 2
+                            if solid[fluidBoundaryNode, 0] == 1:
+                                solid[ind, 0] = 1
                         else:
                             boundaryNode[fluidBoundaryNode] = 0
                         nbList.append(ind)
@@ -87,6 +89,8 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                         faceList.append(fluidBoundaryNode)
                         if periodicFlag is True:
                             boundaryNode[fluidBoundaryNode] = 2
+                            if solid[fluidBoundaryNode, 0] == 1:
+                                solid[ind, 0] = 1
                         else:
                             boundaryNode[fluidBoundaryNode] = 0
                         nbList.append(ind)
@@ -95,6 +99,8 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                         faceList.append(fluidBoundaryNode)
                         if periodicFlag is True:
                             boundaryNode[fluidBoundaryNode] = 2
+                            if solid[fluidBoundaryNode, 0] == 1:
+                                solid[ind, 0] = 1
                         else:
                             boundaryNode[fluidBoundaryNode] = 0
                         nbList.append(ind)
@@ -103,6 +109,8 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                         faceList.append(fluidBoundaryNode)
                         if periodicFlag is True:
                             boundaryNode[fluidBoundaryNode] = 2
+                            if solid[fluidBoundaryNode, 0] == 1:
+                                solid[ind, 0] = 1
                         else:
                             boundaryNode[fluidBoundaryNode] = 0
                         nbList.append(ind)
