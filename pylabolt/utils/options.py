@@ -8,12 +8,9 @@ import pylabolt.parallel.cudaReduce as cudaReduce
 
 
 @numba.njit
-def solidNormal(surfaceNodes, solidNodes, normal, normalFluid, solid,
-                procBoundary, boundaryNode, cs_2, c, w, noOfDirections,
-                Nx, Ny, size):
-    angle = 15.524110996754256 * np.pi / 180
-    cosAngle = np.cos(angle)
-    sinAngle = np.sin(angle)
+def solidNormal(surfaceNodes, solidNodes, solidNbNodesWhole, normal,
+                normalFluid, solid, procBoundary, boundaryNode, cs_2,
+                c, w, noOfDirections, Nx, Ny, size):
     for itr in prange(solidNodes.shape[0]):
         ind = solidNodes[itr]
         if (solid[ind, 0] != 0 and procBoundary[ind] != 1 and
@@ -53,6 +50,7 @@ def solidNormal(surfaceNodes, solidNodes, normal, normalFluid, solid,
             #     normal[itr, 1] = cosAngle
     for itr in prange(surfaceNodes.shape[0]):
         ind = surfaceNodes[itr]
+        solidNbNodesWhole[ind] = 1
         if (solid[ind, 0] != 1 and procBoundary[ind] != 1 and
                 boundaryNode[ind] != 1):
             i, j = int(ind / Ny), int(ind % Ny)
@@ -209,8 +207,8 @@ class options:
             tempNormalFluid = np.zeros((self.surfaceNodes[itr].shape[0],
                                        2), dtype=precision)
             solidNormal(self.surfaceNodes[itr], self.solidNbNodes[itr],
-                        tempNormal, tempNormalFluid, fields.solid,
-                        fields.procBoundary, fields.boundaryNode,
+                        fields.solidNbNodesWhole, tempNormal, tempNormalFluid,
+                        fields.solid, fields.procBoundary, fields.boundaryNode,
                         lattice.cs_2, lattice.c, lattice.w,
                         lattice.noOfDirections, mesh.Nx, mesh.Ny, size)
             self.surfaceNormals.append(tempNormal)
@@ -256,37 +254,49 @@ class options:
                         nx, ny, nProc_x, nProc_y, size)
                 self.forceTorqueFunc(*args)
             else:
+                # args = (fields.f, fields.f_new, fields.solid, fields.phi,
+                #         fields.rho, fields.normalPhi, fields.procBoundary,
+                #         self.phiInterpolated[itr], transport.sigma,
+                #         phaseField.interfaceWidth, self.surfaceNodes[itr],
+                #         self.solidNbNodes[itr], self.surfaceNormals[itr],
+                #         self.surfaceInvList[itr], self.surfaceOutList[itr],
+                #         lattice.c, lattice.invList, self.obstacleFlag[itr],
+                #         mesh.Nx, mesh.Ny, tempForces, tempTorque,
+                #         tempCapForces, tempCapTorque,
+                #         lattice.noOfDirections, self.computeForces,
+                #         self.computeTorque, idx, N_local,
+                #         nx, ny, nProc_x, nProc_y, size, fields.stressTensor,
+                #         fields.p, lattice.cs, fields.curvature, fields.gradPhi,
+                #         fields.forceField, lattice.w)
                 args = (fields.f, fields.f_new, fields.solid, fields.phi,
                         fields.rho, fields.normalPhi, fields.procBoundary,
-                        self.phiInterpolated[itr], transport.sigma,
-                        phaseField.interfaceWidth, self.surfaceNodes[itr],
-                        self.solidNbNodes[itr], self.surfaceNormals[itr],
+                        transport.sigma, phaseField.interfaceWidth,
+                        self.surfaceNodes[itr], self.surfaceNormalsFluid[itr],
                         self.surfaceInvList[itr], self.surfaceOutList[itr],
                         lattice.c, lattice.invList, self.obstacleFlag[itr],
                         mesh.Nx, mesh.Ny, tempForces, tempTorque,
-                        tempCapForces, tempCapTorque,
                         lattice.noOfDirections, self.computeForces,
                         self.computeTorque, idx, N_local,
                         nx, ny, nProc_x, nProc_y, size, fields.stressTensor,
                         fields.p, lattice.cs, fields.curvature, fields.gradPhi,
-                        fields.forceField, lattice.w)
+                        fields.forceField, fields.solidNbNodesWhole, lattice.w)
                 normal, phiNormal, normalSolid, delta, pressForce,\
                     viscForce, surfForce, phiNodes =\
                     self.forceTorqueFuncPhase(*args)
                 if itr == 0:
                     profile = tempForces
-                    temp = np.array(np.sum(tempCapForces, axis=0))
-                    np.savetxt('output/' + str(timeStep) + '/forces.dat', temp)
-                    np.savez('output/' + str(timeStep) + '/nodes.npz',
-                             solidNodes=self.solidNbNodes[itr])
+                    # temp = np.array(np.sum(tempCapForces, axis=0))
+                    # np.savetxt('output/' + str(timeStep) + '/forces.dat', temp)
+                    # np.savez('output/' + str(timeStep) + '/nodes.npz',
+                    #          solidNodes=self.solidNbNodes[itr])
                     # np.savez('output/' + str(timeStep) + '/profile.npz',
                     #          force=profile)
-                    np.savez('output/' + str(timeStep) + '/normal.npz',
-                             normal=normal)
-                    np.savez('output/' + str(timeStep) + '/normalSolid.npz',
-                             normalSolid=normalSolid)
-                    np.savez('output/' + str(timeStep) + '/phiNormal.npz',
-                             normalPhi=phiNormal)
+                    # np.savez('output/' + str(timeStep) + '/normal.npz',
+                    #          normal=normal)
+                    # np.savez('output/' + str(timeStep) + '/normalSolid.npz',
+                    #          normalSolid=normalSolid)
+                    # np.savez('output/' + str(timeStep) + '/phiNormal.npz',
+                    #          normalPhi=phiNormal)
                     # np.savez('output/' + str(timeStep) + '/delta.npz',
                     #          delta=delta)
                     # np.savez('output/' + str(timeStep) + '/pressForce.npz',
@@ -463,228 +473,25 @@ def forceTorque(f, f_new, solid, procBoundary, surfaceNodes, surfaceInvList,
                             torque[itr] += (r_0 * value_1 - r_1 * value_0)
 
 
-def forceTorquePhase(f, f_new, solid, phi, rho, normalPhi, procBoundary,
-                     phiInterpolated, sigma, interfaceWidth, surfaceNodes,
-                     solidNodes, surfaceNormals, surfaceInvList,
-                     surfaceOutList, c, invList, obstacleFlag,
-                     Nx, Ny, forces, torque, capForces, capTorque,
-                     noOfDirections, computeForces, computeTorque, x_ref,
-                     N_local, nx, ny, nProc_x, nProc_y, size, stressTensor,
-                     p, cs, curvature, gradPhi, forceField, w):
-    normal = np.zeros((solidNodes.shape[0], 2), dtype=np.float64)
-    phiNormal = np.zeros((solidNodes.shape[0], 2), dtype=np.float64)
-    normalSolid = np.zeros((solidNodes.shape[0], 2), dtype=np.float64)
-    delta = np.zeros(surfaceNodes.shape[0], dtype=np.float64)
-    pressForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
-    viscForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
-    surfForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
-    phiNodes = np.zeros(solidNodes.shape[0], dtype=np.float64)
-    for itr in prange(surfaceNodes.shape[0]):
-        ind = surfaceNodes[itr]
-        if procBoundary[ind] != 1:
-            if obstacleFlag == 0:
-                for k in range(surfaceOutList.shape[0]):
-                    value_0 = ((f[ind, surfaceOutList[k]] *
-                               c[surfaceOutList[k], 0]) -
-                               (f_new[ind, surfaceInvList[k]]
-                               * c[surfaceInvList[k], 0]))
-                    value_1 = ((f[ind, surfaceOutList[k]] *
-                               c[surfaceOutList[k], 1]) -
-                               (f_new[ind, surfaceInvList[k]]
-                               * c[surfaceInvList[k], 1]))
-                    if computeForces is True:
-                        forces[itr, 0] += value_0 * rho[ind]
-                        forces[itr, 1] += value_1 * rho[ind]
-                    if computeTorque is True:
-                        i_local, j_local = int(ind / Ny), int(ind % Ny)
-                        if size == 1:
-                            i, j = i_local, j_local
-                        else:
-                            Nx_local, Ny_local = Nx - 2, Ny - 2
-                            if nx == nProc_x - 1:
-                                Nx_local = N_local[nx - 1, ny, 0]
-                            if ny == nProc_y - 1:
-                                Ny_local = N_local[nx, ny - 1, 1]
-                            i = nx * Nx_local + i_local - 1
-                            j = ny * Ny_local + j_local - 1
-                        r_0 = i - x_ref[0]
-                        r_1 = j - x_ref[1]
-                        torque[itr] += (r_0 * value_1 - r_1 * value_0)
-            elif obstacleFlag == 1:
-                i, j = int(ind / Ny), int(ind % Ny)
-                for k in range(noOfDirections):
-                    i_nb = int(i + c[k, 0] + Nx) % Nx
-                    j_nb = int(j + c[k, 1] + Ny) % Ny
-                    ind_nb = i_nb * Ny + j_nb
-                    if solid[ind_nb, 0] == 1:
-                        value_0 = ((f[ind, k] * c[k, 0]) -
-                                   (f_new[ind, invList[k]]
-                                   * c[invList[k], 0]))
-                        value_1 = ((f[ind, k] * c[k, 1]) -
-                                   (f_new[ind, invList[k]]
-                                   * c[invList[k], 1]))
-                        if computeForces is True:
-                            forces[itr, 0] += value_0 * rho[ind]
-                            forces[itr, 1] += value_1 * rho[ind]
-                        if computeTorque is True:
-                            if size > 1:
-                                i_local, j_local = i, j
-                                Nx_local, Ny_local = Nx - 2, Ny - 2
-                                if nx == nProc_x - 1:
-                                    Nx_local = N_local[nx - 1, ny, 0]
-                                if ny == nProc_y - 1:
-                                    Ny_local = N_local[nx, ny - 1, 1]
-                                i_global = nx * Nx_local + i_local - 1
-                                j_global = ny * Ny_local + j_local - 1
-                            else:
-                                i_global, j_global = i, j
-                            r_0 = i_global - x_ref[0]
-                            r_1 = j_global - x_ref[1]
-                            torque[itr] += (r_0 * value_1 - r_1 * value_0)
-    for itr in prange(solidNodes.shape[0]):
-        ind = solidNodes[itr]
-        if procBoundary[ind] != 1:
-            i, j = int(ind / Ny), int(ind % Ny)
-            normalSum_x, normalSum_y = 0., 0.
-            denominator = 0.
-            for k in range(noOfDirections):
-                i_nb = i + int(c[k, 0])
-                j_nb = j + int(c[k, 1])
-                if size == 1:
-                    i_nb = (i_nb + Nx) % Nx
-                    j_nb = (j_nb + Ny) % Ny
-                ind_nb = i_nb * Ny + j_nb
-                normalSum_x += w[k] * normalPhi[ind_nb, 0] *\
-                    (1 - solid[ind_nb, 0])
-                normalSum_y += w[k] * normalPhi[ind_nb, 1] *\
-                    (1 - solid[ind_nb, 0])
-                denominator += w[k] * (1 - solid[ind_nb, 0])
-            normalInterpolated_x = normalSum_x / (denominator + 1e-17)
-            normalInterpolated_y = normalSum_y / (denominator + 1e-17)
-            normalDotTangent = \
-                np.abs(-normalInterpolated_x * surfaceNormals[itr, 1] +
-                       normalInterpolated_y * surfaceNormals[itr, 0])
-            if obstacleFlag == 0:
-                tangent = normalInterpolated_x * surfaceNormals[itr, 1] -\
-                    surfaceNormals[itr, 0] * normalInterpolated_y
-                normalCap_x = -normalInterpolated_y * tangent
-                normalCap_y = normalInterpolated_x * tangent
-                magNormal = np.sqrt(normalCap_x * normalCap_x +
-                                    normalCap_y * normalCap_y)
-                # capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
-                #     (phi[ind] - 1) * (phi[ind] - 1) *\
-                #     (normalCap_x / (magNormal + 1e-17)) /\
-                #     interfaceWidth
-                # capForce_y = 24 * sigma * phi[ind] * phi[ind] *\
-                #     (phi[ind] - 1) * (phi[ind] - 1) *\
-                #     (normalCap_y / (magNormal + 1e-17)) /\
-                #     interfaceWidth
-                normal[itr, 0] = normalCap_x / (magNormal + 1e-17)
-                normal[itr, 1] = normalCap_y / (magNormal + 1e-17)
-                phiNormal[itr, 0] = normalInterpolated_x
-                phiNormal[itr, 1] = normalInterpolated_y
-                normalSolid[itr, 0] = surfaceNormals[itr, 0]
-                normalSolid[itr, 1] = surfaceNormals[itr, 1]
-                capForces[itr, 0] = 4 * sigma * phi[ind] / interfaceWidth *\
-                    (1 - phi[ind]) * (normalCap_x / (magNormal + 1e-17))\
-                    * normalDotTangent
-                capForces[itr, 1] = 4 * sigma * phi[ind] / interfaceWidth *\
-                    (1 - phi[ind]) * (normalCap_y / (magNormal + 1e-17))\
-                    * normalDotTangent
-                if computeTorque is True:
-                    capTorque[itr] += (r_0 * capForces[itr, 1] -
-                                       r_1 * capForces[itr, 0])
-            elif obstacleFlag == 1:
-                tangent = normalInterpolated_x * surfaceNormals[itr, 1] -\
-                    surfaceNormals[itr, 0] * normalInterpolated_y
-                normalCap_x = -normalInterpolated_y * tangent
-                normalCap_y = normalInterpolated_x * tangent
-                magNormal = np.sqrt(normalCap_x * normalCap_x +
-                                    normalCap_y * normalCap_y)
-                # capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
-                #     (phi[ind] - 1) * (phi[ind] - 1) *\
-                #     (normalCap_x / (magNormal + 1e-17)) /\
-                #     interfaceWidth
-                # capForce_y = 24 * sigma * phi[ind] * phi[ind] *\
-                #     (phi[ind] - 1) * (phi[ind] - 1) *\
-                #     (normalCap_y / (magNormal + 1e-17)) /\
-                #     interfaceWidth
-                normal[itr, 0] = normalCap_x / (magNormal + 1e-17)
-                normal[itr, 1] = normalCap_y / (magNormal + 1e-17)
-                phiNormal[itr, 0] = normalInterpolated_x
-                phiNormal[itr, 1] = normalInterpolated_y
-                normalSolid[itr, 0] = surfaceNormals[itr, 0]
-                normalSolid[itr, 1] = surfaceNormals[itr, 1]
-                capForces[itr, 0] = 4 * sigma * phi[ind] / interfaceWidth *\
-                    (1 - phi[ind]) * (normalCap_x / (magNormal + 1e-17))\
-                    * normalDotTangent
-                capForces[itr, 1] = 4 * sigma * phi[ind] / interfaceWidth *\
-                    (1 - phi[ind]) * (normalCap_y / (magNormal + 1e-17))\
-                    * normalDotTangent
-                if computeTorque is True:
-                    capTorque[itr] += (r_0 * capForces[itr, 1] -
-                                       r_1 * capForces[itr, 0])
-    return normal, phiNormal, normalSolid, delta, pressForce,\
-        viscForce, surfForce, phiNodes
-
-
-# def forceTorquePhase(f, f_new, solid, phi, rho, normalPhi, procBoundary, sigma,
-#                      interfaceWidth, surfaceNodes, surfaceNormalsFluid,
-#                      surfaceInvList, surfaceOutList, c, invList, obstacleFlag,
-#                      Nx, Ny, forces, torque, noOfDirections, computeForces,
-#                      computeTorque, x_ref, N_local, nx, ny, nProc_x,
-#                      nProc_y, size, stressTensor, p, cs, curvature, gradPhi,
-#                      forceField, w):
-#     normal = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
-#     phiNormal = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
-#     normalSolid = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
+# def forceTorquePhase(f, f_new, solid, phi, rho, normalPhi, procBoundary,
+#                      phiInterpolated, sigma, interfaceWidth, surfaceNodes,
+#                      solidNodes, surfaceNormals, surfaceInvList,
+#                      surfaceOutList, c, invList, obstacleFlag,
+#                      Nx, Ny, forces, torque, capForces, capTorque,
+#                      noOfDirections, computeForces, computeTorque, x_ref,
+#                      N_local, nx, ny, nProc_x, nProc_y, size, stressTensor,
+#                      p, cs, curvature, gradPhi, forceField, w):
+#     normal = np.zeros((solidNodes.shape[0], 2), dtype=np.float64)
+#     phiNormal = np.zeros((solidNodes.shape[0], 2), dtype=np.float64)
+#     normalSolid = np.zeros((solidNodes.shape[0], 2), dtype=np.float64)
 #     delta = np.zeros(surfaceNodes.shape[0], dtype=np.float64)
 #     pressForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
 #     viscForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
 #     surfForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
-#     phiNodes = np.zeros(surfaceNodes.shape[0], dtype=np.float64)
+#     phiNodes = np.zeros(solidNodes.shape[0], dtype=np.float64)
 #     for itr in prange(surfaceNodes.shape[0]):
 #         ind = surfaceNodes[itr]
 #         if procBoundary[ind] != 1:
-#             if phi[ind] >= 0.05 and phi[ind] <= 0.95:
-#                 phiNodes[itr] = ind
-#             # force from stress tensor
-#             pressForce[itr, 0] = - p[ind] * surfaceNormalsFluid[itr, 0] *\
-#                 rho[ind] * cs * cs
-#             pressForce[itr, 1] = - p[ind] * surfaceNormalsFluid[itr, 1] *\
-#                 rho[ind] * cs * cs
-#             viscForce[itr, 0] = \
-#                 (stressTensor[ind, 0, 0] * surfaceNormalsFluid[itr, 0] +
-#                  stressTensor[ind, 0, 1] * surfaceNormalsFluid[itr, 1]) *\
-#                 rho[ind]
-#             viscForce[itr, 1] = \
-#                 (stressTensor[ind, 1, 0] * surfaceNormalsFluid[itr, 0] +
-#                  stressTensor[ind, 1, 1] * surfaceNormalsFluid[itr, 1]) *\
-#                 rho[ind]
-#             surfForce[itr, 0] = forceField[ind, 0]
-#             surfForce[itr, 1] = forceField[ind, 1]
-#             #############################################################
-#             normalDotTangent = \
-#                 np.abs(-normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] +
-#                        normalPhi[ind, 1] * surfaceNormalsFluid[itr, 0])
-#             # distance_1 = ((normalPhi[ind, 0] + surfaceNormalsFluid[itr, 1]) *
-#             #               (normalPhi[ind, 0] + surfaceNormalsFluid[itr, 1])) +\
-#             #              ((normalPhi[ind, 1] - surfaceNormalsFluid[itr, 0]) *
-#             #               (normalPhi[ind, 1] - surfaceNormalsFluid[itr, 0]))
-#             # distance_2 = ((normalPhi[ind, 0] - surfaceNormalsFluid[itr, 1]) *
-#             #               (normalPhi[ind, 0] - surfaceNormalsFluid[itr, 1])) +\
-#             #              ((normalPhi[ind, 1] + surfaceNormalsFluid[itr, 0]) *
-#             #               (normalPhi[ind, 1] + surfaceNormalsFluid[itr, 0]))
-#             # if distance_1 < distance_2:
-#             #     normalDotTangent = \
-#             #         (-normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] +
-#             #          normalPhi[ind, 1] * surfaceNormalsFluid[itr, 0])
-#             # elif distance_1 >= distance_2:
-#             #     normalDotTangent = \
-#             #         (normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] -
-#             #          normalPhi[ind, 1] * surfaceNormalsFluid[itr, 0])
-#             deltaFunc = 4 * phi[ind] * (1 - phi[ind]) / interfaceWidth
-#             delta[itr] = deltaFunc * normalDotTangent
 #             if obstacleFlag == 0:
 #                 for k in range(surfaceOutList.shape[0]):
 #                     value_0 = ((f[ind, surfaceOutList[k]] *
@@ -713,36 +520,6 @@ def forceTorquePhase(f, f_new, solid, phi, rho, normalPhi, procBoundary,
 #                         r_0 = i - x_ref[0]
 #                         r_1 = j - x_ref[1]
 #                         torque[itr] += (r_0 * value_1 - r_1 * value_0)
-#                 tangent = normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] -\
-#                     surfaceNormalsFluid[itr, 0] * normalPhi[ind, 1]
-#                 normalCap_x = -normalPhi[ind, 1] * tangent
-#                 normalCap_y = normalPhi[ind, 0] * tangent
-#                 magNormal = np.sqrt(normalCap_x * normalCap_x +
-#                                     normalCap_y * normalCap_y)
-#                 # capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
-#                 #     (phi[ind] - 1) * (phi[ind] - 1) *\
-#                 #     (normalCap_x / (magNormal + 1e-17)) /\
-#                 #     interfaceWidth
-#                 # capForce_y = 24 * sigma * phi[ind] * phi[ind] *\
-#                 #     (phi[ind] - 1) * (phi[ind] - 1) *\
-#                 #     (normalCap_y / (magNormal + 1e-17)) /\
-#                 #     interfaceWidth
-#                 normal[itr, 0] = normalCap_x / (magNormal + 1e-17)
-#                 normal[itr, 1] = normalCap_y / (magNormal + 1e-17)
-#                 phiNormal[itr, 0] = normalPhi[ind, 0]
-#                 phiNormal[itr, 1] = normalPhi[ind, 1]
-#                 normalSolid[itr, 0] = surfaceNormalsFluid[itr, 0]
-#                 normalSolid[itr, 1] = surfaceNormalsFluid[itr, 1]
-#                 capForce_x = 4 * sigma * phi[ind] / interfaceWidth *\
-#                     (1 - phi[ind]) * (normalCap_x / (magNormal + 1e-17))\
-#                     * normalDotTangent
-#                 capForce_y = 4 * sigma * phi[ind] / interfaceWidth *\
-#                     (1 - phi[ind]) * (normalCap_y / (magNormal + 1e-17))\
-#                     * normalDotTangent
-#                 forces[itr, 0] = capForce_x
-#                 forces[itr, 1] = capForce_y
-#                 if computeTorque is True:
-#                     torque[itr] += (r_0 * capForce_y - r_1 * capForce_x)
 #             elif obstacleFlag == 1:
 #                 i, j = int(ind / Ny), int(ind % Ny)
 #                 for k in range(noOfDirections):
@@ -774,12 +551,34 @@ def forceTorquePhase(f, f_new, solid, phi, rho, normalPhi, procBoundary,
 #                             r_0 = i_global - x_ref[0]
 #                             r_1 = j_global - x_ref[1]
 #                             torque[itr] += (r_0 * value_1 - r_1 * value_0)
-#                 # forces[itr, 0] -= 0.5 * forceField[ind, 0]
-#                 # forces[itr, 1] -= 0.5 * forceField[ind, 1]
-#                 tangent = normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] -\
-#                     surfaceNormalsFluid[itr, 0] * normalPhi[ind, 1]
-#                 normalCap_x = -normalPhi[ind, 1] * tangent
-#                 normalCap_y = normalPhi[ind, 0] * tangent
+#     for itr in prange(solidNodes.shape[0]):
+#         ind = solidNodes[itr]
+#         if procBoundary[ind] != 1:
+#             i, j = int(ind / Ny), int(ind % Ny)
+#             normalSum_x, normalSum_y = 0., 0.
+#             denominator = 0.
+#             for k in range(noOfDirections):
+#                 i_nb = i + int(c[k, 0])
+#                 j_nb = j + int(c[k, 1])
+#                 if size == 1:
+#                     i_nb = (i_nb + Nx) % Nx
+#                     j_nb = (j_nb + Ny) % Ny
+#                 ind_nb = i_nb * Ny + j_nb
+#                 normalSum_x += w[k] * normalPhi[ind_nb, 0] *\
+#                     (1 - solid[ind_nb, 0])
+#                 normalSum_y += w[k] * normalPhi[ind_nb, 1] *\
+#                     (1 - solid[ind_nb, 0])
+#                 denominator += w[k] * (1 - solid[ind_nb, 0])
+#             normalInterpolated_x = normalSum_x / (denominator + 1e-17)
+#             normalInterpolated_y = normalSum_y / (denominator + 1e-17)
+#             normalDotTangent = \
+#                 np.abs(-normalInterpolated_x * surfaceNormals[itr, 1] +
+#                        normalInterpolated_y * surfaceNormals[itr, 0])
+#             if obstacleFlag == 0:
+#                 tangent = normalInterpolated_x * surfaceNormals[itr, 1] -\
+#                     surfaceNormals[itr, 0] * normalInterpolated_y
+#                 normalCap_x = -normalInterpolated_y * tangent
+#                 normalCap_y = normalInterpolated_x * tangent
 #                 magNormal = np.sqrt(normalCap_x * normalCap_x +
 #                                     normalCap_y * normalCap_y)
 #                 # capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
@@ -792,22 +591,251 @@ def forceTorquePhase(f, f_new, solid, phi, rho, normalPhi, procBoundary,
 #                 #     interfaceWidth
 #                 normal[itr, 0] = normalCap_x / (magNormal + 1e-17)
 #                 normal[itr, 1] = normalCap_y / (magNormal + 1e-17)
-#                 phiNormal[itr, 0] = normalPhi[ind, 0]
-#                 phiNormal[itr, 1] = normalPhi[ind, 1]
-#                 normalSolid[itr, 0] = surfaceNormalsFluid[itr, 0]
-#                 normalSolid[itr, 1] = surfaceNormalsFluid[itr, 1]
-#                 capForce_x = 4 * sigma * phi[ind] / interfaceWidth *\
+#                 phiNormal[itr, 0] = normalInterpolated_x
+#                 phiNormal[itr, 1] = normalInterpolated_y
+#                 normalSolid[itr, 0] = surfaceNormals[itr, 0]
+#                 normalSolid[itr, 1] = surfaceNormals[itr, 1]
+#                 capForces[itr, 0] = 4 * sigma * phi[ind] / interfaceWidth *\
 #                     (1 - phi[ind]) * (normalCap_x / (magNormal + 1e-17))\
 #                     * normalDotTangent
-#                 capForce_y = 4 * sigma * phi[ind] / interfaceWidth *\
+#                 capForces[itr, 1] = 4 * sigma * phi[ind] / interfaceWidth *\
 #                     (1 - phi[ind]) * (normalCap_y / (magNormal + 1e-17))\
 #                     * normalDotTangent
-#                 forces[itr, 0] = capForce_x
-#                 forces[itr, 1] = capForce_y
 #                 if computeTorque is True:
-#                     torque[itr] += (r_0 * capForce_y - r_1 * capForce_x)
+#                     capTorque[itr] += (r_0 * capForces[itr, 1] -
+#                                        r_1 * capForces[itr, 0])
+#             elif obstacleFlag == 1:
+#                 tangent = normalInterpolated_x * surfaceNormals[itr, 1] -\
+#                     surfaceNormals[itr, 0] * normalInterpolated_y
+#                 normalCap_x = -normalInterpolated_y * tangent
+#                 normalCap_y = normalInterpolated_x * tangent
+#                 magNormal = np.sqrt(normalCap_x * normalCap_x +
+#                                     normalCap_y * normalCap_y)
+#                 # capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
+#                 #     (phi[ind] - 1) * (phi[ind] - 1) *\
+#                 #     (normalCap_x / (magNormal + 1e-17)) /\
+#                 #     interfaceWidth
+#                 # capForce_y = 24 * sigma * phi[ind] * phi[ind] *\
+#                 #     (phi[ind] - 1) * (phi[ind] - 1) *\
+#                 #     (normalCap_y / (magNormal + 1e-17)) /\
+#                 #     interfaceWidth
+#                 normal[itr, 0] = normalCap_x / (magNormal + 1e-17)
+#                 normal[itr, 1] = normalCap_y / (magNormal + 1e-17)
+#                 phiNormal[itr, 0] = normalInterpolated_x
+#                 phiNormal[itr, 1] = normalInterpolated_y
+#                 normalSolid[itr, 0] = surfaceNormals[itr, 0]
+#                 normalSolid[itr, 1] = surfaceNormals[itr, 1]
+#                 capForces[itr, 0] = 4 * sigma * phi[ind] / interfaceWidth *\
+#                     (1 - phi[ind]) * (normalCap_x / (magNormal + 1e-17))\
+#                     * normalDotTangent
+#                 capForces[itr, 1] = 4 * sigma * phi[ind] / interfaceWidth *\
+#                     (1 - phi[ind]) * (normalCap_y / (magNormal + 1e-17))\
+#                     * normalDotTangent
+#                 if computeTorque is True:
+#                     capTorque[itr] += (r_0 * capForces[itr, 1] -
+#                                        r_1 * capForces[itr, 0])
 #     return normal, phiNormal, normalSolid, delta, pressForce,\
 #         viscForce, surfForce, phiNodes
+
+
+def forceTorquePhase(f, f_new, solid, phi, rho, normalPhi, procBoundary, sigma,
+                     interfaceWidth, surfaceNodes, surfaceNormalsFluid,
+                     surfaceInvList, surfaceOutList, c, invList, obstacleFlag,
+                     Nx, Ny, forces, torque, noOfDirections, computeForces,
+                     computeTorque, x_ref, N_local, nx, ny, nProc_x,
+                     nProc_y, size, stressTensor, p, cs, curvature, gradPhi,
+                     forceField, solidNodesWhole, w):
+    normal = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
+    phiNormal = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
+    normalSolid = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
+    delta = np.zeros(surfaceNodes.shape[0], dtype=np.float64)
+    pressForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
+    viscForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
+    surfForce = np.zeros((surfaceNodes.shape[0], 2), dtype=np.float64)
+    phiNodes = np.zeros(surfaceNodes.shape[0], dtype=np.float64)
+    for itr in prange(surfaceNodes.shape[0]):
+        ind = surfaceNodes[itr]
+        if procBoundary[ind] != 1:
+            if phi[ind] >= 0.05 and phi[ind] <= 0.95:
+                phiNodes[itr] = ind
+            # force from stress tensor
+            pressForce[itr, 0] = - p[ind] * surfaceNormalsFluid[itr, 0] *\
+                rho[ind] * cs * cs
+            pressForce[itr, 1] = - p[ind] * surfaceNormalsFluid[itr, 1] *\
+                rho[ind] * cs * cs
+            viscForce[itr, 0] = \
+                (stressTensor[ind, 0, 0] * surfaceNormalsFluid[itr, 0] +
+                 stressTensor[ind, 0, 1] * surfaceNormalsFluid[itr, 1]) *\
+                rho[ind]
+            viscForce[itr, 1] = \
+                (stressTensor[ind, 1, 0] * surfaceNormalsFluid[itr, 0] +
+                 stressTensor[ind, 1, 1] * surfaceNormalsFluid[itr, 1]) *\
+                rho[ind]
+            surfForce[itr, 0] = forceField[ind, 0]
+            surfForce[itr, 1] = forceField[ind, 1]
+            #############################################################
+            normalDotTangent = \
+                np.abs(-normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] +
+                       normalPhi[ind, 1] * surfaceNormalsFluid[itr, 0])
+            # distance_1 = ((normalPhi[ind, 0] + surfaceNormalsFluid[itr, 1]) *
+            #               (normalPhi[ind, 0] + surfaceNormalsFluid[itr, 1])) +\
+            #              ((normalPhi[ind, 1] - surfaceNormalsFluid[itr, 0]) *
+            #               (normalPhi[ind, 1] - surfaceNormalsFluid[itr, 0]))
+            # distance_2 = ((normalPhi[ind, 0] - surfaceNormalsFluid[itr, 1]) *
+            #               (normalPhi[ind, 0] - surfaceNormalsFluid[itr, 1])) +\
+            #              ((normalPhi[ind, 1] + surfaceNormalsFluid[itr, 0]) *
+            #               (normalPhi[ind, 1] + surfaceNormalsFluid[itr, 0]))
+            # if distance_1 < distance_2:
+            #     normalDotTangent = \
+            #         (-normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] +
+            #          normalPhi[ind, 1] * surfaceNormalsFluid[itr, 0])
+            # elif distance_1 >= distance_2:
+            #     normalDotTangent = \
+            #         (normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] -
+            #          normalPhi[ind, 1] * surfaceNormalsFluid[itr, 0])
+            deltaFunc = 4 * phi[ind] * (1 - phi[ind]) / interfaceWidth
+            delta[itr] = deltaFunc * normalDotTangent
+            if obstacleFlag == 0:
+                for k in range(surfaceOutList.shape[0]):
+                    value_0 = ((f[ind, surfaceOutList[k]] *
+                               c[surfaceOutList[k], 0]) -
+                               (f_new[ind, surfaceInvList[k]]
+                               * c[surfaceInvList[k], 0]))
+                    value_1 = ((f[ind, surfaceOutList[k]] *
+                               c[surfaceOutList[k], 1]) -
+                               (f_new[ind, surfaceInvList[k]]
+                               * c[surfaceInvList[k], 1]))
+                    if computeForces is True:
+                        forces[itr, 0] += value_0 * rho[ind]
+                        forces[itr, 1] += value_1 * rho[ind]
+                    if computeTorque is True:
+                        i_local, j_local = int(ind / Ny), int(ind % Ny)
+                        if size == 1:
+                            i, j = i_local, j_local
+                        else:
+                            Nx_local, Ny_local = Nx - 2, Ny - 2
+                            if nx == nProc_x - 1:
+                                Nx_local = N_local[nx - 1, ny, 0]
+                            if ny == nProc_y - 1:
+                                Ny_local = N_local[nx, ny - 1, 1]
+                            i = nx * Nx_local + i_local - 1
+                            j = ny * Ny_local + j_local - 1
+                        r_0 = i - x_ref[0]
+                        r_1 = j - x_ref[1]
+                        torque[itr] += (r_0 * value_1 - r_1 * value_0)
+                tangent = normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] -\
+                    surfaceNormalsFluid[itr, 0] * normalPhi[ind, 1]
+                normalCap_x = -normalPhi[ind, 1] * tangent
+                normalCap_y = normalPhi[ind, 0] * tangent
+                magNormal = np.sqrt(normalCap_x * normalCap_x +
+                                    normalCap_y * normalCap_y)
+                # capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
+                #     (phi[ind] - 1) * (phi[ind] - 1) *\
+                #     (normalCap_x / (magNormal + 1e-17)) /\
+                #     interfaceWidth
+                # capForce_y = 24 * sigma * phi[ind] * phi[ind] *\
+                #     (phi[ind] - 1) * (phi[ind] - 1) *\
+                #     (normalCap_y / (magNormal + 1e-17)) /\
+                #     interfaceWidth
+                normal[itr, 0] = normalCap_x / (magNormal + 1e-17)
+                normal[itr, 1] = normalCap_y / (magNormal + 1e-17)
+                phiNormal[itr, 0] = normalPhi[ind, 0]
+                phiNormal[itr, 1] = normalPhi[ind, 1]
+                normalSolid[itr, 0] = surfaceNormalsFluid[itr, 0]
+                normalSolid[itr, 1] = surfaceNormalsFluid[itr, 1]
+                delx, dely = 0, 0
+                if solidNodesWhole[int((i + 1) * Ny + j)] == 1:
+                    delx += 0.5
+                if solidNodesWhole[int((i - 1) * Ny + j)] == 1:
+                    delx += 0.5
+                if solidNodesWhole[int(i * Ny + j + 1)] == 1:
+                    dely += 0.5
+                if solidNodesWhole[int(i * Ny + j - 1)] == 1:
+                    dely += 0.5
+                delPhi = np.abs(gradPhi[ind, 0]) * delx +\
+                    np.abs(gradPhi[ind, 1]) * dely
+                capForce_x = 6 * sigma * phi[ind] * (1 - phi[ind]) *\
+                    (normalCap_x / (magNormal + 1e-17)) * delPhi
+                capForce_y = 6 * sigma * phi[ind] * (1 - phi[ind]) *\
+                    (normalCap_y / (magNormal + 1e-17)) * delPhi
+                forces[itr, 0] += capForce_x
+                forces[itr, 1] += capForce_y
+                if computeTorque is True:
+                    torque[itr] += (r_0 * capForce_y - r_1 * capForce_x)
+            elif obstacleFlag == 1:
+                i, j = int(ind / Ny), int(ind % Ny)
+                for k in range(noOfDirections):
+                    i_nb = int(i + c[k, 0] + Nx) % Nx
+                    j_nb = int(j + c[k, 1] + Ny) % Ny
+                    ind_nb = i_nb * Ny + j_nb
+                    if solid[ind_nb, 0] == 1:
+                        value_0 = ((f[ind, k] * c[k, 0]) -
+                                   (f_new[ind, invList[k]]
+                                   * c[invList[k], 0]))
+                        value_1 = ((f[ind, k] * c[k, 1]) -
+                                   (f_new[ind, invList[k]]
+                                   * c[invList[k], 1]))
+                        if computeForces is True:
+                            forces[itr, 0] += value_0 * rho[ind]
+                            forces[itr, 1] += value_1 * rho[ind]
+                        if computeTorque is True:
+                            if size > 1:
+                                i_local, j_local = i, j
+                                Nx_local, Ny_local = Nx - 2, Ny - 2
+                                if nx == nProc_x - 1:
+                                    Nx_local = N_local[nx - 1, ny, 0]
+                                if ny == nProc_y - 1:
+                                    Ny_local = N_local[nx, ny - 1, 1]
+                                i_global = nx * Nx_local + i_local - 1
+                                j_global = ny * Ny_local + j_local - 1
+                            else:
+                                i_global, j_global = i, j
+                            r_0 = i_global - x_ref[0]
+                            r_1 = j_global - x_ref[1]
+                            torque[itr] += (r_0 * value_1 - r_1 * value_0)
+                # forces[itr, 0] -= 0.5 * forceField[ind, 0]
+                # forces[itr, 1] -= 0.5 * forceField[ind, 1]
+                tangent = normalPhi[ind, 0] * surfaceNormalsFluid[itr, 1] -\
+                    surfaceNormalsFluid[itr, 0] * normalPhi[ind, 1]
+                normalCap_x = -normalPhi[ind, 1] * tangent
+                normalCap_y = normalPhi[ind, 0] * tangent
+                magNormal = np.sqrt(normalCap_x * normalCap_x +
+                                    normalCap_y * normalCap_y)
+                # capForce_x = 24 * sigma * phi[ind] * phi[ind] * \
+                #     (phi[ind] - 1) * (phi[ind] - 1) *\
+                #     (normalCap_x / (magNormal + 1e-17)) /\
+                #     interfaceWidth
+                # capForce_y = 24 * sigma * phi[ind] * phi[ind] *\
+                #     (phi[ind] - 1) * (phi[ind] - 1) *\
+                #     (normalCap_y / (magNormal + 1e-17)) /\
+                #     interfaceWidth
+                normal[itr, 0] = normalCap_x / (magNormal + 1e-17)
+                normal[itr, 1] = normalCap_y / (magNormal + 1e-17)
+                phiNormal[itr, 0] = normalPhi[ind, 0]
+                phiNormal[itr, 1] = normalPhi[ind, 1]
+                normalSolid[itr, 0] = surfaceNormalsFluid[itr, 0]
+                normalSolid[itr, 1] = surfaceNormalsFluid[itr, 1]
+                delx, dely = 0, 0
+                if solidNodesWhole[int((i + 1) * Ny + j)] == 1:
+                    delx += 0.5
+                if solidNodesWhole[int((i - 1) * Ny + j)] == 1:
+                    delx += 0.5
+                if solidNodesWhole[int(i * Ny + j + 1)] == 1:
+                    dely += 0.5
+                if solidNodesWhole[int(i * Ny + j - 1)] == 1:
+                    dely += 0.5
+                delPhi = np.abs(gradPhi[ind, 0]) * delx +\
+                    np.abs(gradPhi[ind, 1]) * dely
+                capForce_x = 6 * sigma * phi[ind] * (1 - phi[ind]) * \
+                    (normalCap_x / (magNormal + 1e-17)) * delPhi
+                capForce_y = 6 * sigma * phi[ind] * (1 - phi[ind]) *\
+                    (normalCap_y / (magNormal + 1e-17)) * delPhi
+                forces[itr, 0] += capForce_x
+                forces[itr, 1] += capForce_y
+                if computeTorque is True:
+                    torque[itr] += (r_0 * capForce_y - r_1 * capForce_x)
+    return normal, phiNormal, normalSolid, delta, pressForce,\
+        viscForce, surfForce, phiNodes
 
 
 @cuda.jit

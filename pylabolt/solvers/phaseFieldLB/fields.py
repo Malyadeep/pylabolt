@@ -43,6 +43,8 @@ class fields:
             self.boundaryNode[ind] = initialFields.boundaryNode[ind]
         self.solid = np.full((mesh.Nx * mesh.Ny, 2), fill_value=0,
                              dtype=np.int32)
+        self.solidNbNodesWhole = np.full(mesh.Nx * mesh.Ny, fill_value=0,
+                                         dtype=np.int32)
         self.procBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
         if size > 1:
             self.procBoundary = setProcBoundary(mesh.Nx, mesh.Ny)

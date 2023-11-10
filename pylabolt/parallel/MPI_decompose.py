@@ -202,6 +202,25 @@ def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
         print('Done distributing fields!', flush=True)
 
 
+def distributeSolidNbNodes_mpi(fields, mpiParams, rank, mesh, comm):
+    comm.Barrier()
+    data_send_topBottom = np.zeros(mesh.Nx + 2,
+                                   dtype=np.int32)
+    data_recv_topBottom = np.zeros(mesh.Nx + 2,
+                                   dtype=np.int32)
+    data_send_leftRight = np.zeros(mesh.Ny + 2,
+                                   dtype=np.int32)
+    data_recv_leftRight = np.zeros(mesh.Ny + 2,
+                                   dtype=np.int32)
+    args = (mesh.Nx, mesh.Ny, fields.solidNbNodesWhole,
+            data_send_topBottom, data_recv_topBottom,
+            data_send_leftRight, data_recv_leftRight,
+            mpiParams.nx, mpiParams.ny, mpiParams.nProc_x,
+            mpiParams.nProc_y, comm)
+    proc_boundary(*args)
+    comm.Barrier()
+
+
 def solidCopy(solid, fields, mpiParams, Nx_local, Ny_local, mesh):
     i_write, j_write = 0, 0
     Nx_final, Ny_final = Nx_local, Ny_local

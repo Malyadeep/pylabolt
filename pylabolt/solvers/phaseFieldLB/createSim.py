@@ -11,7 +11,8 @@ from pylabolt.solvers.phaseFieldLB import (initFields, fields)
 from pylabolt.parallel.MPI_decompose import (decompose, distributeSolid_mpi,
                                              distributeInitialFields_mpi,
                                              distributeBoundaries_mpi,
-                                             distributeForceNodes_mpi)
+                                             distributeForceNodes_mpi,
+                                             distributeSolidNbNodes_mpi)
 from pylabolt.utils.options import options
 from pylabolt.solvers.phaseFieldLB import phaseField, schemeLB
 
@@ -209,6 +210,10 @@ class simulation:
         if self.phaseField.contactAngle is not None:
             self.options.computeSolidNormals(self.fields, self.lattice,
                                              self.mesh, size, self.precision)
+            np.savez('solidNb.npz', solid=self.fields.solidNbNodesWhole)
+            if size > 1:
+                distributeSolidNbNodes_mpi(self.fields, self.mpiParams, rank,
+                                           self.mesh, comm)
         del obstacleTemp, solid
         # initialize functions
         self.equilibriumFuncFluid = self.collisionScheme.equilibriumFuncFluid
