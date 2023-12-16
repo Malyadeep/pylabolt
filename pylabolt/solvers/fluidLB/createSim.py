@@ -138,11 +138,7 @@ class simulation:
         self.obstacle = obstacle.obstacleSetup(size, self.mesh, self.precision)
         solid = self.obstacle.setObstacle(self.mesh, self.precision,
                                           self.options, initialFields_temp,
-                                          self.rank, size)
-        if (self.options.computeForces is True or self.options.computeTorque
-                is True and rank == 0):
-            self.obstacle.computeFluidSolidNb(solid, self.mesh, self.lattice,
-                                              initialFields_temp, self.size)
+                                          self.rank, size, comm)
         if rank == 0:
             print('Initializing fields done!\n', flush=True)
             print('Reading boundary conditions...', flush=True)
@@ -153,9 +149,20 @@ class simulation:
                                            self.precision)
             self.boundary.initializeBoundary(self.lattice, self.mesh,
                                              initialFields_temp,
-                                             solid, self.precision)
+                                             solid, self.precision, rank)
         if rank == 0:
             print('Reading boundary conditions done...\n', flush=True)
+        if (self.options.computeForces is True or self.options.computeTorque
+                is True and rank == 0):
+            if size > 1:
+                self.obstacle.\
+                    computeFluidSolidNb(solid, self.mesh, self.lattice,
+                                        initialFields_temp, self.size,
+                                        mpiParams=self.mpiParams)
+            else:
+                self.obstacle.\
+                    computeFluidSolidNb(solid, self.mesh, self.lattice,
+                                        initialFields_temp, self.size)
 
         if size > 1:
             distributeInitialFields_mpi(initialFields_temp, self.initialFields,
@@ -180,6 +187,7 @@ class simulation:
             if rank == 0:
                 self.options.gatherObstacleNodes(obstacleTemp)
                 self.options.gatherBoundaryNodes(self.boundary)
+                self.options.initializeForceReconstruction(self.precision)
 
         if size > 1:
             distributeBoundaries_mpi(self.boundary, self.mpiParams, self.mesh,
@@ -189,7 +197,8 @@ class simulation:
                 distributeForceNodes_mpi(self.options, self.mpiParams,
                                          self.mesh, rank, size,
                                          self.precision, comm)
-
+        # if rank == 0:
+        #     self.options.details(rank)
         del obstacleTemp, solid
         # initialize functions
         self.equilibriumFunc = self.collisionScheme.equilibriumFunc
@@ -211,13 +220,19 @@ class simulation:
             self.lattice.noOfDirections, self.precision
         )
 
+        if size == 1:
+            nx, ny = 0, 0
+            nProc_x, nProc_y = 1, 1
+        else:
+            nx, ny = self.mpiParams.nx, self.mpiParams.ny
+            nProc_x, nProc_y = self.mpiParams.nProc_x, self.mpiParams.nProc_y
         self.streamArgs = (
             self.mesh.Nx, self.mesh.Ny, self.fields.f, self.fields.f_new,
             self.fields.solid, self.fields.rho, self.fields.u,
             self.fields.boundaryNode,
             self.fields.procBoundary, self.lattice.c, self.lattice.w,
             self.lattice.noOfDirections, self.collisionScheme.cs_2,
-            self.lattice.invList, self.size
+            self.lattice.invList, nx, ny, nProc_x, nProc_y, self.size
         )
 
         self.computeFieldsArgs = (

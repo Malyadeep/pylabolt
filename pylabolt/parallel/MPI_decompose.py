@@ -167,7 +167,7 @@ def distributeInitialFields_mpi(fields_temp, fields, mpiParams, mesh,
                     initial_recv_leftRight, mpiParams.nx,
                     mpiParams.ny, mpiParams.nProc_x,
                     mpiParams.nProc_y, comm)
-            proc_boundary(*args)
+            proc_boundaryGradTerms(*args, inner=True)
             comm.Barrier()
         if (fieldName == 'rho' or fieldName == 'phi' or fieldName == 'T' or
                 fieldName == 'boundaryNode'):
@@ -283,7 +283,7 @@ def distributeSolid_mpi(solid, obstacle, fields, mpiParams, mesh,
             solid_recv_leftRight, mpiParams.nx,
             mpiParams.ny, mpiParams.nProc_x,
             mpiParams.nProc_y, comm)
-    proc_boundary(*args)
+    proc_boundaryGradTerms(*args, inner=True)
     comm.Barrier()
     # transfer solid nodes with tag
     if rank == 0:
@@ -292,19 +292,16 @@ def distributeSolid_mpi(solid, obstacle, fields, mpiParams, mesh,
                 Nx_local = N_local[nx, ny, 0]
                 Ny_local = N_local[nx, ny, 1]
                 obsNodes = []
-                obstacles = []
-                noOfObstacles = 0
-                modifyObsFunc = []
-                obsModifiable = obstacle.obsModifiable
-                momentOfInertia = []
-                obsU = []
-                obsU_old = []
-                obsOmega = []
-                obsOmega_old = []
-                obsOrigin = []
-                writeInterval = obstacle.writeInterval
-                writeProperties = obstacle.writeProperties
-                allStatic = obstacle.allStatic
+                # obstacles = []
+                # noOfObstacles = 0
+                # modifyObsFunc = []
+                # obsModifiable = obstacle.obsModifiable
+                # momentOfInertia = []
+                # obsU = []
+                # obsU_old = []
+                # obsOmega = []
+                # obsOmega_old = []
+                # obsOrigin = []
                 for itr in range(obstacle.noOfObstacles):
                     flag = 0
                     tempNodes = []
@@ -328,39 +325,44 @@ def distributeSolid_mpi(solid, obstacle, fields, mpiParams, mesh,
                             tempNodes.append((i_local + 1) * (Ny_local + 2)
                                              + (j_local + 1))
                     if flag != 0:
-                        noOfObstacles += 1
                         obsNodes.append(np.array(tempNodes, dtype=np.int64))
-                        obstacles.append(obstacle.obstacles[itr])
-                        modifyObsFunc.append(obstacle.modifyObsFunc[itr])
-                        momentOfInertia.append(obstacle.momentOfInertia[itr])
-                        obsU.append(obstacle.obsU[itr])
-                        obsU_old.append(obstacle.obsU_old[itr])
-                        obsOmega.append(obstacle.obsOmega[itr])
-                        obsOmega_old.append(obstacle.obsOmega_old[itr])
-                        obsOrigin.append(obstacle.obsOrigin[itr])
-                obsOmega = np.array(obsOmega, dtype=precision)
-                obsOmega_old = np.array(obsOmega_old, dtype=precision)
-                dataToProc = (noOfObstacles, obsNodes, obstacles,
-                              modifyObsFunc, obsModifiable, momentOfInertia,
-                              obsU, obsU_old, obsOmega, obsOmega_old,
-                              obsOrigin, writeProperties, writeInterval,
-                              allStatic)
+                # noOfObstacles += 1
+                # obstacles.append(obstacle.obstacles[itr])
+                # modifyObsFunc.append(obstacle.modifyObsFunc[itr])
+                # momentOfInertia.append(obstacle.momentOfInertia[itr])
+                # obsU.append(obstacle.obsU[itr])
+                # obsU_old.append(obstacle.obsU_old[itr])
+                # obsOmega.append(obstacle.obsOmega[itr])
+                # obsOmega_old.append(obstacle.obsOmega_old[itr])
+                # obsOrigin.append(obstacle.obsOrigin[itr])
+                # obsOmega = np.array(obsOmega, dtype=precision)
+                # obsOmega_old = np.array(obsOmega_old, dtype=precision)
+                dataToProc = (obstacle.noOfObstacles, obsNodes,
+                              obstacle.obstacles, obstacle.modifyObsFunc,
+                              obstacle.obsModifiable, obstacle.momentOfInertia,
+                              obstacle.obsU, obstacle.obsU_old,
+                              obstacle.obsOmega, obstacle.obsOmega_old,
+                              obstacle.obsOrigin, obstacle.writeProperties,
+                              obstacle.writeInterval, obstacle.allStatic,
+                              obstacle.obsType, obstacle.isPeriodic,
+                              obstacle.velType, obstacle.reconstructSolidFunc,
+                              obstacle.reconstructSolidArgs, obstacle.obsMass,
+                              obstacle.obsDensity, obstacle.displaySolidMass)
                 rank_send = nx * mpiParams.nProc_y + ny
                 if rank_send == 0:
-                    obstacle.noOfObstacles = dataToProc[0]
+                    # obstacle.noOfObstacles = dataToProc[0]
                     obstacle.obsNodes = dataToProc[1]
-                    obstacle.obstacles = dataToProc[2]
-                    obstacle.modifyObsFunc = dataToProc[3]
-                    obstacle.obsModifiable = dataToProc[4]
-                    obstacle.momentOfInertia = dataToProc[5]
-                    obstacle.obsU = dataToProc[6]
-                    obstacle.obsU_old = dataToProc[7]
-                    obstacle.obsOmega = dataToProc[8]
-                    obstacle.obsOmega_old = dataToProc[9]
-                    obstacle.obsOrigin = dataToProc[10]
-                    obstacle.writeProperties = dataToProc[11]
-                    obstacle.writeInterval = dataToProc[12]
-                    obstacle.allStatic = allStatic
+                    # obstacle.obstacles = dataToProc[2]
+                    # obstacle.modifyObsFunc = dataToProc[3]
+                    # obstacle.obsModifiable = dataToProc[4]
+                    # obstacle.momentOfInertia = dataToProc[5]
+                    # obstacle.obsU = dataToProc[6]
+                    # obstacle.obsU_old = dataToProc[7]
+                    # obstacle.obsOmega = dataToProc[8]
+                    # obstacle.obsOmega_old = dataToProc[9]
+                    # obstacle.obsOrigin = dataToProc[10]
+                    # obstacle.writeProperties = dataToProc[11]
+                    # obstacle.writeInterval = dataToProc[12]
                 else:
                     comm.send(dataToProc, dest=rank_send, tag=rank_send)
     else:
@@ -379,6 +381,14 @@ def distributeSolid_mpi(solid, obstacle, fields, mpiParams, mesh,
         obstacle.writeProperties = dataFromRoot[11]
         obstacle.writeInterval = dataFromRoot[12]
         obstacle.allStatic = dataFromRoot[13]
+        obstacle.obsType = dataFromRoot[14]
+        obstacle.isPeriodic = dataFromRoot[15]
+        obstacle.velType = dataFromRoot[16]
+        obstacle.reconstructSolidFunc = dataFromRoot[17]
+        obstacle.reconstructSolidArgs = dataFromRoot[18]
+        obstacle.obsMass = dataFromRoot[19]
+        obstacle.obsDensity = dataFromRoot[20]
+        obstacle.displaySolidMass = dataFromRoot[21]
     comm.Barrier()
     if rank == 0:
         print('Done distributing obstacle!', flush=True)
@@ -472,7 +482,8 @@ def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size,
                               boundaryFuncPhase, boundaryFuncT,
                               boundaryTypeFluid,
                               boundaryTypePhase, boundaryTypeT,
-                              fluid, phase, T)
+                              fluid, phase, T, boundary.x_periodic,
+                              boundary.y_periodic)
                 rank_send = nx * mpiParams.nProc_y + ny
                 if rank_send == 0:
                     boundary.noOfBoundaries = dataToProc[0]
@@ -507,13 +518,15 @@ def distributeBoundaries_mpi(boundary, mpiParams, mesh, rank, size,
         boundary.fluid = dataFromRoot[11]
         boundary.phase = dataFromRoot[12]
         boundary.T = dataFromRoot[13]
+        boundary.x_periodic = dataFromRoot[14]
+        boundary.y_periodic = dataFromRoot[15]
     comm.Barrier()
     if rank == 0:
         print('Distributing boundaries done!', flush=True)
 
 
-def distributeForceNodes_mpi(options, mpiParams, mesh, rank, size, precision,
-                             comm):
+def distributeForceNodes_mpi(options, mpiParams, mesh, rank, size,
+                             precision, comm):
     if rank == 0:
         print('\nMPI option with force computation selected', flush=True)
         print('Distributing nodes to sub-domains...', flush=True)
@@ -575,7 +588,21 @@ def distributeForceNodes_mpi(options, mpiParams, mesh, rank, size, precision,
                             tempSolidFaces.append((i_local + 1) *
                                                   (Ny_local + 2)
                                                   + (j_local + 1))
-                    if flag != 0:
+                    if flag != 0 and options.obstacleFlag[itr] == 0:
+                        noOfSurfaces += 1
+                        surfaceNodes.append(np.array(tempFaces,
+                                            dtype=np.int64))
+                        solidNbNodes.append(np.array(tempSolidFaces,
+                                            dtype=np.int64))
+                        surfaceNames.append(options.
+                                            surfaceNames[itr])
+                        surfaceInvList.append(options.
+                                              surfaceInvList[itr])
+                        surfaceOutList.append(options.
+                                              surfaceOutList[itr])
+                        obstacleFlag.append(options.
+                                            obstacleFlag[itr])
+                    elif options.obstacleFlag[itr] == 1:
                         noOfSurfaces += 1
                         surfaceNodes.append(np.array(tempFaces,
                                             dtype=np.int64))
@@ -591,7 +618,10 @@ def distributeForceNodes_mpi(options, mpiParams, mesh, rank, size, precision,
                                             obstacleFlag[itr])
                 dataToProc = (noOfSurfaces, surfaceNames, surfaceNodes,
                               solidNbNodes, surfaceInvList,
-                              surfaceOutList, obstacleFlag)
+                              surfaceOutList, obstacleFlag,
+                              options.forceReconstruction,
+                              options.torqueReconstruction,
+                              options.surfaceNamesGlobal)
                 rank_send = nx * mpiParams.nProc_y + ny
                 if rank_send == 0:
                     options.noOfSurfaces = dataToProc[0]
@@ -601,6 +631,8 @@ def distributeForceNodes_mpi(options, mpiParams, mesh, rank, size, precision,
                     options.surfaceInvList = dataToProc[4]
                     options.surfaceOutList = dataToProc[5]
                     options.obstacleFlag = dataToProc[6]
+                    options.forceReconstruction = dataToProc[7]
+                    options.torqueReconstruction = dataToProc[8]
                 else:
                     comm.send(dataToProc, dest=rank_send, tag=rank_send)
     else:
@@ -612,6 +644,9 @@ def distributeForceNodes_mpi(options, mpiParams, mesh, rank, size, precision,
         options.surfaceInvList = dataFromRoot[4]
         options.surfaceOutList = dataFromRoot[5]
         options.obstacleFlag = dataFromRoot[6]
+        options.forceReconstruction = dataFromRoot[7]
+        options.torqueReconstruction = dataFromRoot[8]
+        options.surfaceNamesGlobal = dataFromRoot[9]
     comm.Barrier()
     if rank == 0:
         print('Distributing nodes to sub-domains done!', flush=True)

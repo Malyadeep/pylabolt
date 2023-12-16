@@ -20,7 +20,7 @@ class MRT_def:
         self.preFactorMat = np.matmul(np.matmul(self.M_1, self.S), self.M)
 
     def setForcingGuo(self):
-        diagVecForce = 1 - self.diagVec
+        diagVecForce = 1 - 0.5 * self.diagVec
         self.S_guo = np.diag(diagVecForce, k=0)
         self.forcingPreFactorMat = np.matmul(np.matmul(self.M_1, self.S_guo),
                                              self.M)

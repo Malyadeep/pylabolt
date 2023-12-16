@@ -144,10 +144,10 @@ class simulation:
         if rank == 0:
             print('Initializing fields...', flush=True)
 
-        initialFields_temp = initFields.initFields(internalFields, self.mesh,
+        initialFields_temp = initFields.readFields(internalFields, self.mesh,
                                                    self.lattice,
                                                    self.precision, self.rank,
-                                                   comm)
+                                                   comm, self.phaseField)
         self.initialFields = initFields.initialFields(self.mesh.Nx,
                                                       self.mesh.Ny,
                                                       self.precision)
@@ -166,15 +166,22 @@ class simulation:
                                            self.precision)
             self.boundary.initializeBoundary(self.lattice, self.mesh,
                                              initialFields_temp,
-                                             solid, self.precision)
+                                             solid, self.precision, rank)
         if rank == 0:
             print('Reading boundary conditions done...\n', flush=True)
 
         if (self.options.computeForces is True or self.options.computeTorque
                 is True or self.phaseField.contactAngle is not None
                 and rank == 0):
-            self.obstacle.computeFluidSolidNb(solid, self.mesh, self.lattice,
-                                              initialFields_temp, self.size)
+            if size > 1:
+                self.obstacle.\
+                    computeFluidSolidNb(solid, self.mesh, self.lattice,
+                                        initialFields_temp, self.size,
+                                        mpiParams=self.mpiParams)
+            else:
+                self.obstacle.\
+                    computeFluidSolidNb(solid, self.mesh, self.lattice,
+                                        initialFields_temp, self.size)
 
         if size > 1:
             distributeInitialFields_mpi(initialFields_temp, self.initialFields,
@@ -198,6 +205,7 @@ class simulation:
             if rank == 0:
                 self.options.gatherObstacleNodes(obstacleTemp)
                 self.options.gatherBoundaryNodes(self.boundary)
+                self.options.initializeForceReconstruction(self.precision)
         if size > 1:
             distributeBoundaries_mpi(self.boundary, self.mpiParams, self.mesh,
                                      rank, size, self.precision, comm)
@@ -207,10 +215,12 @@ class simulation:
                 distributeForceNodes_mpi(self.options, self.mpiParams,
                                          self.mesh, rank, size,
                                          self.precision, comm)
-        if self.phaseField.contactAngle is not None:
+        if (self.options.computeForces is True or
+                self.options.computeTorque is True or
+                self.phaseField.contactAngle is not None):
             self.options.computeSolidNormals(self.fields, self.lattice,
                                              self.mesh, size, self.precision)
-            np.savez('solidNb.npz', solid=self.fields.solidNbNodesWhole)
+            # np.savez('solidNb.npz', solid=self.fields.solidNbNodesWhole)
             if size > 1:
                 distributeSolidNbNodes_mpi(self.fields, self.mpiParams, rank,
                                            self.mesh, comm)
@@ -249,12 +259,19 @@ class simulation:
             self.lattice.noOfDirections, self.precision
         ]
 
+        if size == 1:
+            nx, ny = 0, 0
+            nProc_x, nProc_y = 1, 1
+        else:
+            nx, ny = self.mpiParams.nx, self.mpiParams.ny
+            nProc_x, nProc_y = self.mpiParams.nProc_x, self.mpiParams.nProc_y
         self.streamArgsFluid = [
             self.mesh.Nx, self.mesh.Ny, self.fields.f, self.fields.f_new,
             self.fields.solid, self.fields.rho, self.fields.u,
             self.fields.procBoundary, self.fields.boundaryNode, self.lattice.c,
             self.lattice.w, self.lattice.noOfDirections,
-            self.collisionScheme.cs_2, self.lattice.invList, self.size
+            self.collisionScheme.cs_2, self.lattice.invList,
+            nx, ny, nProc_x, nProc_y, self.size
         ]
 
         self.streamArgsPhase = [
@@ -262,7 +279,7 @@ class simulation:
             self.fields.solid, self.fields.procBoundary,
             self.fields.boundaryNode, self.lattice.c,
             self.lattice.noOfDirections, self.lattice.invList,
-            self.size
+            nx, ny, nProc_x, nProc_y, self.size
         ]
 
         self.computeFieldsArgsFluid = [
@@ -293,7 +310,7 @@ class simulation:
         ]
         self.forceFluidArgs = [self.fields.f_new, self.fields.f_eq,
                                self.fields.forceField, self.fields.rho,
-                               self.fields.p,  self.fields.phi,
+                               self.fields.p, self.fields.phi,
                                self.fields.solid, self.fields.lapPhi,
                                self.fields.gradPhi, self.fields.normalPhi,
                                self.fields.stressTensor,

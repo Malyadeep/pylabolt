@@ -128,5 +128,7 @@ class parallelSetup:
         if (simulation.options.computeForces is True or
                 simulation.options.computeTorque is True):
             simulation.options.setupForcesParallel_cpu(parallel)
+        if (simulation.obstacle.displaySolidMass is True):
+            simulation.obstacle.solidMassSetup_cpu(parallel)
         if (simulation.obstacle.obsModifiable is True):
             simulation.obstacle.setupModifyObstacle_cpu(parallel)

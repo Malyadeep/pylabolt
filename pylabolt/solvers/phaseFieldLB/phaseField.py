@@ -101,8 +101,7 @@ class phaseFieldDef:
             # self.liangWetting(options.solidNbNodes[itr], fields.phi,
             #                   self.contactAngle, mesh.Nx, mesh.Ny)
             self.fakhariWetting(options.solidNbNodes[itr], options.
-                                surfaceNormals[itr], options.
-                                phiInterpolated[itr], fields.phi,
+                                surfaceNormals[itr], fields.phi,
                                 self.contactAngle, self.interfaceWidth,
                                 mesh.Nx, mesh.Ny)
 
@@ -314,8 +313,8 @@ def liangWetting(solidNodes, phi, contactAngle, Nx, Ny):
                 np.abs(tangentDotGradPhi)
 
 
-def fakhariWetting(solidNodes, surfaceNormals, phiInterpolated, phi,
-                   contactAngle, interfaceWidth, Nx, Ny):
+def fakhariWetting(solidNodes, surfaceNormals, phi, contactAngle,
+                   interfaceWidth, Nx, Ny):
     epsilon = - 2 * np.cos(contactAngle) / interfaceWidth
     epsilon_1 = 1./(epsilon + 1e-17)
     # print(solidNodes.shape, surfaceNormals.shape)
@@ -345,7 +344,6 @@ def fakhariWetting(solidNodes, surfaceNormals, phiInterpolated, phi,
                          (i_nb - i_prev) * (j_nb - j_prev) *
                          phi[i_next * Ny + j_next])/(deltaX * deltaY)
             # print(phi_fluid)
-        phiInterpolated[itr] = phi_fluid
         phi[ind] =\
             np.abs(epsilon_1 * (1 + epsilon - np.sqrt((1 + epsilon)
                    * (1 + epsilon) - 4 * epsilon * phi_fluid)) - phi_fluid)
@@ -483,7 +481,7 @@ def computeMass(mass, phi, solid, boundaryNode, procBoundary, Nx, Ny):
 
 
 @numba.njit
-def chemicalPotentialModel(phi, gradPhi, curvature, lapPhi, beta,
+def chemicalPotentialModel(phi, gradPhi, normalPhi, curvature, lapPhi, beta,
                            kappa, phi_g, phi_l):
     chemPotential = 4 * beta * (phi - phi_g) * (phi - phi_l)\
                 * (phi - 0.5) - kappa * lapPhi
@@ -493,10 +491,11 @@ def chemicalPotentialModel(phi, gradPhi, curvature, lapPhi, beta,
 
 
 @numba.njit
-def continuumModel(phi, gradPhi, curvature, lapPhi, sigma, c, w,
+def continuumModel(phi, gradPhi, normalPhi, curvature, lapPhi, sigma, c, w,
                    cs_2, noOfDirections, interfaceWidth):
-    surfaceTensionForce_x = - sigma * curvature * gradPhi[0]
-    surfaceTensionForce_y = - sigma * curvature * gradPhi[1]
+    delta = 24. * phi * phi * (1. - phi) * (1. - phi) / interfaceWidth
+    surfaceTensionForce_x = - sigma * curvature * normalPhi[0] * delta
+    surfaceTensionForce_y = - sigma * curvature * normalPhi[1] * delta
     return surfaceTensionForce_x, surfaceTensionForce_y
 
 
@@ -546,8 +545,9 @@ def forceFluid(f_new, f_eq, forceField, rho, p, phi, solid, lapPhi, gradPhi,
                 denominator += w[k] * (1 - solid[ind_nb, 0])
             curvature[ind] = cs_2 * curvatureTemp / (denominator + 1e-17)
             surfaceTensionForce_x, surfaceTensionForce_y =\
-                surfaceTensionFunc(phi[ind], gradPhi[ind], curvature[ind],
-                                   lapPhi[ind], *surfaceTensionArgs)
+                surfaceTensionFunc(phi[ind], gradPhi[ind], normalPhi[ind],
+                                   curvature[ind], lapPhi[ind],
+                                   *surfaceTensionArgs)
             pressureCorrection_x = - p[ind] * cs * cs * (rho_l - rho_g) *\
                 gradPhi[ind, 0]
             pressureCorrection_y = - p[ind] * cs * cs * (rho_l - rho_g) *\

@@ -427,6 +427,7 @@ def reduceComm(dataArray, tempArray, comm, rank, size, precision):
 
 def gatherForcesTorque_mpi(options, comm, rank, size, precision):
     if rank == 0:
+        # print(options.surfaceNamesGlobal)
         sumF = np.zeros((len(options.surfaceNamesGlobal), 2),
                         dtype=precision)
         sumT = np.zeros((len(options.surfaceNamesGlobal)),
@@ -459,6 +460,23 @@ def gatherForcesTorque_mpi(options, comm, rank, size, precision):
         comm.send(options.surfaceNames, dest=0, tag=1*rank)
         comm.send(options.forces, dest=0, tag=2*rank)
         comm.send(options.torque, dest=0, tag=3*rank)
-        sumF = comm.recv(source=0, tag=1*rank)
-        sumT = comm.recv(source=0, tag=2*rank)
+        AllForces = comm.recv(source=0, tag=1*rank)
+        AllTorque = comm.recv(source=0, tag=2*rank)
+        sumF = np.zeros((len(options.surfaceNames), 2),
+                        dtype=precision)
+        sumT = np.zeros((len(options.surfaceNames)),
+                        dtype=precision)
+        # print(options.surfaceNamesGlobal)
+        for itr_local, local_name in \
+                enumerate(options.surfaceNames):
+            for itr, name in enumerate(options.surfaceNamesGlobal):
+                if name == local_name:
+                    # print('here')
+                    sumF[itr_local, 0] = AllForces[itr][0]
+                    sumF[itr_local, 1] = AllForces[itr][1]
+                    sumT[itr_local] = AllTorque[itr]
+        # print('all', AllForces)
+        # print('sum', sumF)
+        options.forces = np.copy(sumF)
+        options.torque = np.copy(sumT)
         return options.surfaceNamesGlobal, sumF, sumT

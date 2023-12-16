@@ -20,6 +20,7 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
     diffY = indY_f - indY_i
     bottom, top = False, False
     left, right = False, False
+    direction = None
     if diffY == 1 and Ny != 1:
         if Nx > 1:
             indX_f += 2
@@ -74,13 +75,16 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                     boundaryNode[ind] = 1
                     if wall is True:
                         solid[ind, 0] = 1
+                    else:
+                        solid[ind, 0] = 0
                     if top is True and i > 0 and i < Nx - 1:
                         fluidBoundaryNode = int(i * Ny + (j - 1))
                         faceList.append(fluidBoundaryNode)
                         if periodicFlag is True:
+                            direction = 'top'
                             boundaryNode[fluidBoundaryNode] = 2
-                            if solid[fluidBoundaryNode, 0] == 1:
-                                solid[ind, 0] = 1
+                            # if solid[fluidBoundaryNode, 0] == 1:
+                            #     solid[ind, 0] = 1
                         else:
                             boundaryNode[fluidBoundaryNode] = 0
                         nbList.append(ind)
@@ -88,9 +92,10 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                         fluidBoundaryNode = int(i * Ny + (j + 1))
                         faceList.append(fluidBoundaryNode)
                         if periodicFlag is True:
+                            direction = 'bottom'
                             boundaryNode[fluidBoundaryNode] = 2
-                            if solid[fluidBoundaryNode, 0] == 1:
-                                solid[ind, 0] = 1
+                            # if solid[fluidBoundaryNode, 0] == 1:
+                            #     solid[ind, 0] = 1
                         else:
                             boundaryNode[fluidBoundaryNode] = 0
                         nbList.append(ind)
@@ -98,9 +103,10 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                         fluidBoundaryNode = int((i + 1) * Ny + j)
                         faceList.append(fluidBoundaryNode)
                         if periodicFlag is True:
+                            direction = 'left'
                             boundaryNode[fluidBoundaryNode] = 2
-                            if solid[fluidBoundaryNode, 0] == 1:
-                                solid[ind, 0] = 1
+                            # if solid[fluidBoundaryNode, 0] == 1:
+                            #     solid[ind, 0] = 1
                         else:
                             boundaryNode[fluidBoundaryNode] = 0
                         nbList.append(ind)
@@ -108,9 +114,10 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                         fluidBoundaryNode = int((i - 1) * Ny + j)
                         faceList.append(fluidBoundaryNode)
                         if periodicFlag is True:
+                            direction = 'right'
                             boundaryNode[fluidBoundaryNode] = 2
-                            if solid[fluidBoundaryNode, 0] == 1:
-                                solid[ind, 0] = 1
+                            # if solid[fluidBoundaryNode, 0] == 1:
+                            #     solid[ind, 0] = 1
                         else:
                             boundaryNode[fluidBoundaryNode] = 0
                         nbList.append(ind)
@@ -120,10 +127,9 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                     if i == Nx - 1:
                         if j == 0 or j == Ny - 1:
                             cornerList.append(ind)
-    return np.array(faceList, dtype=np.int64),\
-        outDirections,\
-        invDirections, np.array(nbList, dtype=np.int64),\
-        np.array(cornerList, dtype=np.int64)
+    return np.array(faceList, dtype=np.int64), outDirections, \
+        invDirections, np.array(nbList, dtype=np.int64), \
+        np.array(cornerList, dtype=np.int64), direction
 
 
 @numba.njit
@@ -192,6 +198,14 @@ class boundary:
         self.argsFluid = []
         self.argsPhase = []
         self.argsT = []
+        self.periodicDict = {
+            'left': False,
+            'right': False,
+            'top': False,
+            'bottom': False
+        }
+        self.x_periodic = False
+        self.y_periodic = False
 
         # Cuda device data
         self.boundaryVector_device = []
@@ -406,7 +420,8 @@ class boundary:
                       flush=True)
         return scalarValueTemp, boundaryTypeTempScalar
 
-    def initializeBoundary(self, lattice, mesh, fields, solid, precision):
+    def initializeBoundary(self, lattice, mesh, fields, solid, precision,
+                           rank):
         for name in self.nameList:
             pointArray = np.array(self.points[name])
             for k in range(pointArray.shape[0]):
@@ -436,10 +451,12 @@ class boundary:
             args = (mesh.Nx_global, mesh.Ny_global, lattice.invList,
                     lattice.noOfDirections, self.boundaryIndices[itr],
                     fields.boundaryNode, solid)
-            tempFaceList, tempOutDirections, tempInvDirections,\
-                tempNbList, tempCornerList = \
+            tempFaceList, tempOutDirections, tempInvDirections, \
+                tempNbList, tempCornerList, direction = \
                 markBoundaryElements(*args, periodicFlag=periodicFlag,
                                      wall=wallFlag)
+            if periodicFlag is True:
+                self.periodicDict[direction] = True
             self.faceList.append(tempFaceList)
             self.nbList.append(tempNbList)
             self.cornerList.append(tempCornerList)
@@ -482,6 +499,28 @@ class boundary:
                 initializeBoundaryElementsScalar(self.boundaryScalarT[itr],
                                                  fields.T, tempNbList,
                                                  tempCornerList)
+        if (self.periodicDict['left'] is True and
+                self.periodicDict['right'] is True):
+            self.x_periodic = True
+        elif (self.periodicDict['left'] is False and
+                self.periodicDict['right'] is False):
+            self.x_periodic = False
+        else:
+            if rank == 0:
+                print("ERROR! If 'left' boundary is periodic, 'right'" +
+                      " boundary must also be periodic!", flush=True)
+            os._exit(0)
+        if (self.periodicDict['top'] is True and
+                self.periodicDict['bottom'] is True):
+            self.y_periodic = True
+        elif (self.periodicDict['top'] is False and
+                self.periodicDict['bottom'] is False):
+            self.y_periodic = False
+        else:
+            if rank == 0:
+                print("ERROR! If 'top' boundary is periodic, 'bottom'" +
+                      " boundary must also be periodic!", flush=True)
+            os._exit(0)
 
     def setBoundaryArgs(self, lattice, mesh, fields, collisionScheme):
         for itr in range(self.noOfBoundaries):

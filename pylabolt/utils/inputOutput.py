@@ -82,7 +82,7 @@ def saveState(timeStep, simulation):
 
 def loadState(timeStep):
     if not os.path.isdir('states'):
-        print('ERROMPIR! no previous states present!')
+        print('ERROR! no previous states present!')
     else:
         try:
             fileName = 'states/' + str(timeStep) + '/fields.pkl'

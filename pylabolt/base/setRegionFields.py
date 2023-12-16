@@ -2,7 +2,8 @@ import numpy as np
 import os
 
 
-def initializeFields(internalFields, fields, mesh, precision, comm):
+def initializeFields(internalFields, fields, mesh, precision, comm,
+                     phaseField):
     internalFieldsKeys = list(internalFields.keys())
     if len(internalFieldsKeys) == 1:
         return fields
@@ -18,7 +19,8 @@ def initializeFields(internalFields, fields, mesh, precision, comm):
                     if status == 0:
                         comm.Abort(1)
                 elif regionType == 'circle':
-                    status = circle(fields, mesh, precision, region)
+                    status = circle(fields, mesh, precision, region,
+                                    phaseField)
                     if status == 0:
                         comm.Abort(1)
                 elif regionType == 'rectangle':
@@ -34,7 +36,8 @@ def initializeFields(internalFields, fields, mesh, precision, comm):
                 comm.Abort(1)
 
 
-def setFields(fields, ind, fieldsInitial, mesh, velType, x_ref=[1, 1]):
+def setFields(fields, ind, fieldsInitial, mesh, velType, x_ref=[1, 1],
+              eta=None):
     for itr, field in enumerate(fields.fieldList):
         if field == 'u' and velType == 'translational':
             fields.u[ind, 0] = fieldsInitial[itr][0]
@@ -51,6 +54,7 @@ def setFields(fields, ind, fieldsInitial, mesh, velType, x_ref=[1, 1]):
             fields.rho[ind] = fieldsInitial[itr]
         if field == 'phi':
             fields.phi[ind] = fieldsInitial[itr]
+            # fields.phi[ind] = 0.5 * (1 + np.tanh(2 * eta))
 
 
 def line(fields, mesh, precision, region):
@@ -135,7 +139,7 @@ def line(fields, mesh, precision, region):
     return 1
 
 
-def circle(fields, mesh, precision, region):
+def circle(fields, mesh, precision, region, phaseField):
     try:
         center = region['center']
         radius = region['radius']
@@ -149,7 +153,7 @@ def circle(fields, mesh, precision, region):
             return 0
         center_idx = np.int64(np.array(center)/mesh.delX) +\
             np.ones(2, dtype=np.int64)
-        radius_idx = np.int64(radius/mesh.delX)
+        radius_idx = radius/mesh.delX
         circleType = region['circleType']
         if circleType == 'half':
             point_0 = region['diameterPoint_0']
@@ -220,12 +224,18 @@ def circle(fields, mesh, precision, region):
     if circleType == 'full':
         for i in range(mesh.Nx_global):
             for j in range(mesh.Ny_global):
-                if ((i - center_idx[0])*(i - center_idx[0]) +
-                        (j - center_idx[1])*(j - center_idx[1]) <=
-                        radius_idx*radius_idx):
+                if (np.sqrt((i - center_idx[0])*(i - center_idx[0]) +
+                            (j - center_idx[1])*(j - center_idx[1])) <=
+                        radius_idx):
+                    # distFromCenter = np.sqrt((i - center_idx[0]) *
+                    #                         (i - center_idx[0]) +
+                    #                         (j - center_idx[1]) *
+                    #                         (j - center_idx[1]))
+                    # eta = (distFromCenter - radius_idx) / \
+                    #     phaseField.interfaceWidth
                     ind = i * mesh.Ny_global + j
                     setFields(fields, ind, fieldsInitial, mesh, velType,
-                              x_ref=x_ref_idx)
+                            x_ref=x_ref_idx, eta=None)
     elif circleType == 'half':
         for i in range(mesh.Nx_global):
             for j in range(mesh.Ny_global):

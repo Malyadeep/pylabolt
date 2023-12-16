@@ -45,6 +45,9 @@ def equilibriumRelaxationPhase(Nx, Ny, h_eq, h, h_new, u, phi, gradPhi,
             force = np.zeros(noOfDirections, dtype=precision)
             forcePhaseField(force, phi[ind], gradPhi[ind], interfaceWidth,
                             c, w, noOfDirections)
+            # if ind == int(34 * 93 + 49):
+            #     print(force)
+            #     print(gradPhi[ind])
             equilibriumFuncPhase(h_eq[ind, :], u[ind, :], phi[ind],
                                  *equilibriumArgsPhase)
 
@@ -114,34 +117,51 @@ def computeFieldsPhase(Nx, Ny, h_new, phi, solid, procBoundary,
 
 
 def streamFluid(Nx, Ny, f, f_new, solid, rho, u, procBoundary, boundaryNode,
-                c, w, noOfDirections, cs_2, invList, size):
+                c, w, noOfDirections, cs_2, invList, nx, ny, nProc_x, nProc_y,
+                size):
     for ind in prange(Nx * Ny):
-        if procBoundary[ind] != 1 and boundaryNode[ind] != 1:
+        if (procBoundary[ind] != 1 and boundaryNode[ind] != 1 and
+                solid[ind, 0] != 1):
             i, j = int(ind / Ny), int(ind % Ny)
             for k in range(noOfDirections):
                 i_old = i - int(c[k, 0])
                 j_old = j - int(c[k, 1])
+                i_solid = i - int(c[k, 0])
+                j_solid = j - int(c[k, 1])
                 if size == 1:
                     if i - int(2 * c[k, 0]) < 0 or i - int(2 * c[k, 0]) >= Nx:
                         i_old = (i_old - int(2 * c[k, 0]) + Nx) % Nx
+                        i_solid = (i_solid - int(2 * c[k, 0]) + Nx) % Nx
                     else:
                         i_old = (i_old + Nx) % Nx
+                        i_solid = (i_solid + Nx) % Nx
                     if j - int(2 * c[k, 1]) < 0 or j - int(2 * c[k, 1]) >= Ny:
                         j_old = (j_old - int(2 * c[k, 1]) + Ny) % Ny
+                        j_solid = (j_solid - int(2 * c[k, 1]) + Ny) % Ny
                     else:
                         j_old = (j_old + Ny) % Ny
-                if solid[i_old * Ny + j_old, 0] != 1:
+                        j_solid = (j_solid + Ny) % Ny
+                elif size > 1 and boundaryNode[ind] == 2:
+                    if (i - int(2 * c[k, 0]) == 0 and nx == 0 or
+                            i - int(2 * c[k, 0]) == Nx - 1 and
+                            nx == nProc_x - 1):
+                        i_solid = i_solid - int(c[k, 0])
+                    if (j - int(2 * c[k, 1]) == 0 and ny == 0 or
+                            j - int(2 * c[k, 1]) == Ny - 1 and
+                            ny == nProc_y - 1):
+                        j_solid = j_solid - int(c[k, 1])
+                if solid[i_solid * Ny + j_solid, 0] != 1:
                     f_new[ind, k] = f[i_old * Ny + j_old, k]
-                elif solid[i_old * Ny + j_old, 0] == 1:
-                    ind_old = i_old * Ny + j_old
-                    preFactor = 2 * w[invList[k]] * rho[ind] * \
-                        (c[invList[k], 0] * u[ind_old, 0] +
-                         c[invList[k], 1] * u[ind_old, 1]) * cs_2
+                elif solid[i_solid * Ny + j_solid, 0] == 1:
+                    ind_solid = i_solid * Ny + j_solid
+                    preFactor = 2 * w[invList[k]] * \
+                        (c[invList[k], 0] * u[ind_solid, 0] +
+                         c[invList[k], 1] * u[ind_solid, 1]) * cs_2
                     f_new[ind, k] = f[ind, invList[k]] - preFactor
 
 
 def streamPhase(Nx, Ny, h, h_new, solid, procBoundary, boundaryNode, c,
-                noOfDirections, invList, size):
+                noOfDirections, invList, nx, ny, nProc_x, nProc_y, size):
     for ind in prange(Nx * Ny):
         if (solid[ind, 0] != 1 and procBoundary[ind] != 1
                 and boundaryNode[ind] != 1):
@@ -149,18 +169,33 @@ def streamPhase(Nx, Ny, h, h_new, solid, procBoundary, boundaryNode, c,
             for k in range(noOfDirections):
                 i_old = i - int(c[k, 0])
                 j_old = j - int(c[k, 1])
+                i_solid = i - int(c[k, 0])
+                j_solid = j - int(c[k, 1])
                 if size == 1:
                     if i - int(2 * c[k, 0]) < 0 or i - int(2 * c[k, 0]) >= Nx:
                         i_old = (i_old - int(2 * c[k, 0]) + Nx) % Nx
+                        i_solid = (i_solid - int(2 * c[k, 0]) + Nx) % Nx
                     else:
                         i_old = (i_old + Nx) % Nx
+                        i_solid = (i_solid + Nx) % Nx
                     if j - int(2 * c[k, 1]) < 0 or j - int(2 * c[k, 1]) >= Ny:
                         j_old = (j_old - int(2 * c[k, 1]) + Ny) % Ny
+                        j_solid = (j_solid - int(2 * c[k, 1]) + Ny) % Ny
                     else:
                         j_old = (j_old + Ny) % Ny
-                if solid[i_old * Ny + j_old, 0] != 1:
+                        j_solid = (j_solid + Ny) % Ny
+                elif size > 1 and boundaryNode[ind] == 2:
+                    if (i - int(2 * c[k, 0]) == 0 and nx == 0 or
+                            i - int(2 * c[k, 0]) == Nx - 1 and
+                            nx == nProc_x - 1):
+                        i_solid = i_solid - int(c[k, 0])
+                    if (j - int(2 * c[k, 1]) == 0 and ny == 0 or
+                            j - int(2 * c[k, 1]) == Ny - 1 and
+                            ny == nProc_y - 1):
+                        j_solid = j_solid - int(c[k, 1])
+                if solid[i_solid * Ny + j_solid, 0] != 1:
                     h_new[ind, k] = h[i_old * Ny + j_old, k]
-                elif solid[i_old * Ny + j_old, 0] == 1:
+                elif solid[i_solid * Ny + j_solid, 0] == 1:
                     h_new[ind, k] = h[ind, invList[k]]
 
 
@@ -252,7 +287,7 @@ class baseAlgorithm:
             print('Beginning smooth initialization of phase field...')
             print('Calculated time steps required to initialize = ',
                   simulation.phaseField.diffusionTime, '\n')
-        for timeStep in range(0, simulation.phaseField.diffusionTime):
+        for timeStep in range(0, 0):
             self.computeFieldsPhase(*simulation.computeFieldsArgsPhase,
                                     phi_old, residues)
             if size > 1:
@@ -294,13 +329,13 @@ class baseAlgorithm:
         if rank == 0 and warmup is False:
             print('\nSmooth initialization of phase field done\n\n')
             print('Starting simulation...\n')
-        np.set_printoptions(precision=4, suppress=True)
+        if rank == 0:
+            massFile = open('mass.dat', 'w')
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
             # Compute macroscopic fields and forces #
             self.computeFieldsPhase(*simulation.computeFieldsArgsPhase,
                                     phi_old, residues)
-            # np.savez('phi.npz', phi=simulation.fields.phi)
             if size > 1:
                 comm.Barrier()
                 proc_boundaryGradTerms(*simulation.commPhiArgs, comm,
@@ -321,6 +356,7 @@ class baseAlgorithm:
             simulation.phaseField.computeGradLapPhi(*simulation.
                                                     computeGradLapPhiArgs,
                                                     initial=False)
+
             if size > 1:
                 comm.Barrier()
                 proc_boundaryGradTerms(*simulation.commNormalPhiArgs, comm,
@@ -356,27 +392,71 @@ class baseAlgorithm:
                                           simulation.phaseField.mass,
                                           comm, rank, size, simulation.
                                           precision)
+                if simulation.obstacle.displaySolidMass is True:
+                    solidMass = simulation.obstacle.\
+                        computeSolidMass(simulation.obstacle.solidMass,
+                                         simulation.fields.solid, simulation.
+                                         fields.boundaryNode, simulation.
+                                         fields.procBoundary, simulation.mesh.
+                                         Nx, simulation.mesh.Ny)
+                    # print(rank, mass)
+                    if size > 1:
+                        solidMass = reduceComm(simulation.obstacle.solidMass,
+                                               simulation.obstacle.solidMass,
+                                               comm, rank, size, simulation.
+                                               precision)
                 if (rank == 0 and warmup is False and
-                        simulation.phaseField.displayMass is True):
-                    print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
-                          ' | resU = ' + str(round(resU, 10)).ljust(16) +
-                          ' | resV = ' + str(round(resV, 10)).ljust(16) +
-                          ' | resRho = ' + str(round(resRho, 10)).ljust(16) +
-                          ' | resPhi = ' + str(round(resPhi, 10)).ljust(16) +
-                          ' | mass = ' + str(round(mass[0], 8)).ljust(10),
+                        simulation.phaseField.displayMass is True and
+                        simulation.obstacle.displaySolidMass is True):
+                    print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
+                          ' | resU = ' + str(round(resU, 10)).ljust(12) +
+                          ' | resV = ' + str(round(resV, 10)).ljust(12) +
+                          ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
+                          ' | resPhi = ' + str(round(resPhi, 10)).ljust(12) +
+                          ' | phiMass = ' + str(round(mass[0], 8)).ljust(10) +
+                          ' | solidMass = ' + str(round(solidMass[0], 8)).
+                          ljust(10), flush=True)
+                    massFile.write(str(timeStep) + '\t' + str(solidMass[0]) +
+                                   '\t' + str(mass[0]) + '\n')
+                elif (rank == 0 and warmup is False and
+                        simulation.phaseField.displayMass is False and
+                        simulation.obstacle.displaySolidMass is True):
+                    print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
+                          ' | resU = ' + str(round(resU, 10)).ljust(12) +
+                          ' | resV = ' + str(round(resV, 10)).ljust(12) +
+                          ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
+                          ' | resPhi = ' + str(round(resPhi, 10)).ljust(12) +
+                          ' | solidMass = ' + str(round(solidMass[0], 8)).
+                          ljust(10), flush=True)
+                elif (rank == 0 and warmup is False and
+                        simulation.phaseField.displayMass is True and
+                        simulation.obstacle.displaySolidMass is False):
+                    print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
+                          ' | resU = ' + str(round(resU, 10)).ljust(12) +
+                          ' | resV = ' + str(round(resV, 10)).ljust(12) +
+                          ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
+                          ' | resPhi = ' + str(round(resPhi, 10)).ljust(12) +
+                          ' | phiMass = ' + str(round(mass[0], 8)).ljust(10),
                           flush=True)
                 elif (rank == 0 and warmup is False and
-                        simulation.phaseField.displayMass is False):
-                    print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
-                          ' | resU = ' + str(round(resU, 10)).ljust(16) +
-                          ' | resV = ' + str(round(resV, 10)).ljust(16) +
-                          ' | resRho = ' + str(round(resRho, 10)).ljust(16) +
-                          ' | resPhi = ' + str(round(resPhi, 10)).ljust(16),
+                        simulation.phaseField.displayMass is False and
+                        simulation.obstacle.displaySolidMass is False):
+                    print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
+                          ' | resU = ' + str(round(resU, 10)).ljust(12) +
+                          ' | resV = ' + str(round(resV, 10)).ljust(12) +
+                          ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
+                          ' | resPhi = ' + str(round(resPhi, 10)).ljust(12),
                           flush=True)
             if timeStep % simulation.saveInterval == 0:
                 if size == 1:
                     writeFields(timeStep, simulation.fields,
                                 simulation.lattice, simulation.mesh)
+                    # np.savez('curvatureChemPot.npz', curvature=simulation.fields.
+                    #          curvature)
+                    # np.savez('normalPhiChemPot.npz', normalPhi=simulation.fields.
+                    #          normalPhi)
+                    # np.savez('gradPhiChemPot.npz', gradPhi=simulation.fields.
+                    #          gradPhi)
                 else:
                     writeFields_mpi(timeStep, simulation.fields,
                                     simulation.lattice, simulation.mesh,
@@ -421,11 +501,11 @@ class baseAlgorithm:
                         resRho < simulation.relTolRho and
                         resPhi < simulation.relTolPhi):
                     print('Convergence Criteria matched!!', flush=True)
-                    print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
-                          ' | resU = ' + str(round(resU, 10)).ljust(16) +
-                          ' | resV = ' + str(round(resV, 10)).ljust(16) +
-                          ' | resRho = ' + str(round(resRho, 10)).ljust(16) +
-                          ' | resPhi = ' + str(round(resV, 10)).ljust(16),
+                    print('timeStep = ' + str(round(timeStep, 10)).ljust(12) +
+                          ' | resU = ' + str(round(resU, 10)).ljust(12) +
+                          ' | resV = ' + str(round(resV, 10)).ljust(12) +
+                          ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
+                          ' | resPhi = ' + str(round(resV, 10)).ljust(12),
                           flush=True)
                     if size == 1:
                         writeFields(timeStep, simulation.fields,
@@ -502,37 +582,68 @@ class baseAlgorithm:
             if simulation.obstacle.obsModifiable is True:
                 args = (simulation.fields, simulation.transport,
                         simulation.lattice, simulation.mesh,
-                        simulation.precision, size)
+                        simulation.precision, size, timeStep)
                 if size == 1:
                     simulation.options. \
                         forceTorqueCalc(*args, mpiParams=None,
                                         ref_index=simulation.obstacle.
                                         obsOrigin, phaseField=simulation.
-                                        phaseField)
-                    torque = np.array(simulation.options.torque,
-                                      dtype=simulation.precision)
-                    forces = np.array(simulation.options.forces,
-                                      dtype=simulation.precision)
+                                        phaseField, warmup=warmup)
+                    # if timeStep == 2:
+                    #     np.savez('u_p.npz', u=simulation.fields.u)
+                    #     np.savez('rho_p.npz', rho=simulation.fields.rho)
+                    #     np.savez('solid_p.npz', solid=simulation.fields.solid)
+                    #     np.savez('solidNb_p.npz', solidNb=simulation.options.surfaceNodes[0])
                     simulation.obstacle.\
-                        modifyObstacle(torque, simulation.fields,
-                                       simulation.mesh, size, comm,
+                        modifyObstacle(simulation.options, simulation.fields,
+                                       simulation.mesh, simulation.lattice,
+                                       simulation.boundary,
+                                       simulation.transport,
+                                       simulation.collisionScheme, size, comm,
                                        timeStep, rank, simulation.precision,
-                                       mpiParams=None)
+                                       mpiParams=None, phaseField=simulation.
+                                       phaseField,
+                                       forces=simulation.options.forces,
+                                       torque=simulation.options.torque)
+                    simulation.options.\
+                        computeMovingSolidBoundary(simulation.mesh, simulation.
+                                                   lattice, simulation.fields,
+                                                   size, simulation.precision)
                 elif size > 1:
                     simulation.options. \
                         forceTorqueCalc(*args, mpiParams=simulation.
                                         mpiParams, ref_index=simulation.
                                         obstacle.obsOrigin,
-                                        phaseField=simulation.phaseField)
+                                        phaseField=simulation.phaseField,
+                                        warmup=warmup)
+                    # if timeStep == 1498:
+                    #     print(simulation.options.forces, rank)
+                    comm.Barrier()
                     names, forces, torque = \
                         gatherForcesTorque_mpi(simulation.options,
                                                comm, rank, size,
                                                simulation.precision)
+                    # if timeStep == 1498:
+                    #     print(forces, rank)
+                    #     np.savez('solid_' + str(rank) + '.npz', solid=simulation.fields.solid)
+                    #     np.savez('solidNb_' + str(rank) + '.npz', solid=simulation.options.surfaceNodes[0])
+                    #     np.savez('boundaryNode_' + str(rank) + '.npz', solid=simulation.fields.boundaryNode)
                     simulation.obstacle.\
-                        modifyObstacle(torque, simulation.fields,
-                                       simulation.mesh, size, comm,
+                        modifyObstacle(simulation.options, simulation.fields,
+                                       simulation.mesh, simulation.lattice,
+                                       simulation.boundary,
+                                       simulation.transport,
+                                       simulation.collisionScheme, size, comm,
                                        timeStep, rank, simulation.precision,
-                                       mpiParams=simulation.mpiParams)
+                                       mpiParams=simulation.mpiParams,
+                                       phaseField=simulation.phaseField,
+                                       forces=forces, torque=torque)
+                    simulation.options.\
+                        computeMovingSolidBoundary(simulation.mesh, simulation.
+                                                   lattice, simulation.fields,
+                                                   size, simulation.precision,
+                                                   mpiParams=simulation.
+                                                   mpiParams)
             # Obstacle modification done #
 
             # Equilibrium and Collision
@@ -561,6 +672,8 @@ class baseAlgorithm:
                                             equilibriumArgs=simulation.
                                             collisionScheme.
                                             equilibriumArgsPhase)
+        if rank == 0:
+            massFile.close()
 
     def solver_cuda(self, simulation, parallel):
         resU, resV = 1e6, 1e6

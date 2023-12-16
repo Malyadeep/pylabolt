@@ -8,7 +8,7 @@ from pylabolt.utils.inputOutput import (writeFields, saveState,
 from pylabolt.solvers.fluidLB.kernels import (equilibriumRelaxation_cuda,
                                               computeFields_cuda, stream_cuda,
                                               computeResiduals_cuda)
-from pylabolt.parallel.MPI_comm import (residueComm, proc_boundary,
+from pylabolt.parallel.MPI_comm import (reduceComm, proc_boundary,
                                         gatherForcesTorque_mpi)
 
 
@@ -28,7 +28,6 @@ def equilibriumRelaxation(Nx, Ny, f_eq, f, f_new, u, rho, solid, boundaryNode,
                                 *forceArgs_force)
             equilibriumFunc(f_eq[ind, :], u[ind, :],
                             rho[ind], *equilibriumArgs)
-
             collisionFunc(f[ind], f_new[ind], f_eq[ind], preFactor,
                           forcingPreFactor, source[ind], force=force)
 
@@ -51,8 +50,8 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, boundaryNode,
                 uSum += c[k, 0] * f_new[ind, k]
                 vSum += c[k, 1] * f_new[ind, k]
             rho[ind] = rhoSum
-            u[ind, 0] = uSum/rho[ind]
-            u[ind, 1] = vSum/rho[ind]
+            u[ind, 0] = uSum / (rho[ind] + 1e-17)
+            u[ind, 1] = vSum / (rho[ind] + 1e-17)
             if forceFunc_vel is not None:
                 gravityForce = rho[ind] * gravity
                 forceFunc_vel(u[ind], rho[ind], gravityForce, forceCoeffVel)
@@ -75,34 +74,50 @@ def computeFields(Nx, Ny, f_new, u, rho, solid, boundaryNode,
 
 
 def stream(Nx, Ny, f, f_new, solid, rho, u, boundaryNode, procBoundary, c, w,
-           noOfDirections, cs_2, invList, size):
+           noOfDirections, cs_2, invList, nx, ny, nProc_x, nProc_y, size):
     for ind in prange(Nx * Ny):
-        if procBoundary[ind] != 1 and boundaryNode[ind] != 1:
+        if (procBoundary[ind] != 1 and boundaryNode[ind] != 1 and
+                solid[ind, 0] != 1):
             i, j = int(ind / Ny), int(ind % Ny)
             for k in range(noOfDirections):
                 i_old = i - int(c[k, 0])
                 j_old = j - int(c[k, 1])
+                i_solid = i - int(c[k, 0])
+                j_solid = j - int(c[k, 1])
                 if size == 1:
                     if i - int(2 * c[k, 0]) < 0 or i - int(2 * c[k, 0]) >= Nx:
                         i_old = (i_old - int(2 * c[k, 0]) + Nx) % Nx
+                        i_solid = (i_solid - int(2 * c[k, 0]) + Nx) % Nx
                     else:
                         i_old = (i_old + Nx) % Nx
+                        i_solid = (i_solid + Nx) % Nx
                     if j - int(2 * c[k, 1]) < 0 or j - int(2 * c[k, 1]) >= Ny:
                         j_old = (j_old - int(2 * c[k, 1]) + Ny) % Ny
+                        j_solid = (j_solid - int(2 * c[k, 1]) + Ny) % Ny
                     else:
                         j_old = (j_old + Ny) % Ny
-                if solid[i_old * Ny + j_old, 0] != 1:
+                        j_solid = (j_solid + Ny) % Ny
+                elif size > 1 and boundaryNode[ind] == 2:
+                    if (i - int(2 * c[k, 0]) == 0 and nx == 0 or
+                            i - int(2 * c[k, 0]) == Nx - 1 and
+                            nx == nProc_x - 1):
+                        i_solid = i_solid - int(c[k, 0])
+                    if (j - int(2 * c[k, 1]) == 0 and ny == 0 or
+                            j - int(2 * c[k, 1]) == Ny - 1 and
+                            ny == nProc_y - 1):
+                        j_solid = j_solid - int(c[k, 1])
+                if solid[i_solid * Ny + j_solid, 0] != 1:
                     f_new[ind, k] = f[i_old * Ny + j_old, k]
-                elif solid[i_old * Ny + j_old, 0] == 1:
-                    ind_old = i_old * Ny + j_old
+                elif solid[i_solid * Ny + j_solid, 0] == 1:
+                    ind_solid = i_solid * Ny + j_solid
                     preFactor = 2 * w[invList[k]] * rho[ind] * \
-                        (c[invList[k], 0] * u[ind_old, 0] +
-                         c[invList[k], 1] * u[ind_old, 1]) * cs_2
+                        (c[invList[k], 0] * u[ind_solid, 0] +
+                         c[invList[k], 1] * u[ind_solid, 1]) * cs_2
                     f_new[ind, k] = f[ind, invList[k]] - preFactor
 
 
 def computeResiduals(residues, tempResidues, comm, rank, size, precision):
-    finalSum = residueComm(residues, tempResidues, comm, rank, size, precision)
+    finalSum = reduceComm(residues, tempResidues, comm, rank, size, precision)
     sum_u = finalSum[0]
     sum_v = finalSum[2]
     sum_rho = finalSum[4]
@@ -149,12 +164,12 @@ class baseAlgorithm:
         tempSim.stdOutputInterval = 100
         tempSim.saveInterval = 100
         tempSim.saveStateInterval = None
-        self.solver(tempSim, size, rank, comm)
+        self.solver(tempSim, size, rank, comm, warmup=True)
         if rank == 0:
             print('JIT warmup done!!\n\n', flush=True)
         del tempSim
 
-    def solver(self, simulation, size, rank, comm):
+    def solver(self, simulation, size, rank, comm, warmup=False):
         # np.set_printoptions(precision=5, suppress=True)
         # print(simulation.fields.boundaryNode.reshape(simulation.mesh.Nx,
         #       simulation.mesh.Ny))
@@ -169,23 +184,56 @@ class baseAlgorithm:
         residues = np.zeros(6, dtype=simulation.precision)
         tempResidues = np.zeros(6, dtype=simulation.precision)
 
+        if rank == 0:
+            massFile = open('mass.dat', 'w')
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
-            # Compute macroscopic fields and residues #
+            # Compute macroscopic fields #
             self.computeFields(*simulation.computeFieldsArgs,
                                u_old, rho_old, residues)
-            resU, resV, resRho = computeResiduals(residues, tempResidues,
-                                                  comm, rank, size,
-                                                  simulation.precision)
-            # Compute macroscopic fields and residues done #
+            # Compute macroscopic fields done #
+            # if timeStep == 3800:
+            #     np.savez('u_f.npz', u=simulation.fields.u)
+            #     np.savez('rho_f.npz', rho=simulation.fields.rho)
+            #     np.savez('solid_f.npz', solid=simulation.fields.solid)
+            #     np.savez('solidNb_f.npz', solidNb=simulation.options.surfaceNodes[0])
 
             # Write data #
-            if timeStep % simulation.stdOutputInterval == 0 and rank == 0:
-                print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
-                      ' | resU = ' + str(round(resU, 10)).ljust(16) +
-                      ' | resV = ' + str(round(resV, 10)).ljust(16) +
-                      ' | resRho = ' + str(round(resRho, 10)).ljust(16),
-                      flush=True)
+            if timeStep % simulation.stdOutputInterval == 0:
+                resU, resV, resRho = computeResiduals(residues, tempResidues,
+                                                      comm, rank, size,
+                                                      simulation.precision)
+                if simulation.obstacle.displaySolidMass is True:
+                    solidMass = simulation.obstacle.\
+                        computeSolidMass(simulation.obstacle.solidMass,
+                                         simulation.fields.solid, simulation.
+                                         fields.boundaryNode, simulation.
+                                         fields.procBoundary, simulation.mesh.
+                                         Nx, simulation.mesh.Ny)
+                    # print(rank, mass)
+                    if size > 1:
+                        solidMass = reduceComm(simulation.obstacle.solidMass,
+                                               simulation.obstacle.solidMass,
+                                               comm, rank, size, simulation.
+                                               precision)
+                # print('mass done', rank)
+                if rank == 0:
+                    massFile.write(str(timeStep) + '\t' + str(solidMass[0]) + '\n')
+                if (rank == 0 and simulation.obstacle.displaySolidMass is True
+                        and warmup is False):
+                    print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
+                          ' | resU = ' + str(round(resU, 10)).ljust(16) +
+                          ' | resV = ' + str(round(resV, 10)).ljust(16) +
+                          ' | resRho = ' + str(round(resRho, 10)).ljust(16) +
+                          ' | solidMass = ' + str(round(solidMass[0], 10)).
+                          ljust(16), flush=True)
+                elif (rank == 0 and simulation.obstacle.displaySolidMass is
+                      False and warmup is False):
+                    print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
+                          ' | resU = ' + str(round(resU, 10)).ljust(16) +
+                          ' | resV = ' + str(round(resV, 10)).ljust(16) +
+                          ' | resRho = ' + str(round(resRho, 10)).ljust(16),
+                          flush=True)
             if timeStep % simulation.saveInterval == 0:
                 if size == 1:
                     writeFields(timeStep, simulation.fields,
@@ -196,13 +244,14 @@ class baseAlgorithm:
                                     simulation.mesh, rank, comm)
                 if (simulation.options.computeForces is True
                         or simulation.options.computeTorque is True):
-                    args = (simulation.fields, simulation.lattice,
-                            simulation.mesh, simulation.precision,
-                            size)
+                    args = (simulation.fields, simulation.transport,
+                            simulation.lattice, simulation.mesh,
+                            simulation.precision, size, timeStep)
                     if size > 1:
                         simulation.options. \
                             forceTorqueCalc(*args, mpiParams=simulation.
-                                            mpiParams, ref_index=None)
+                                            mpiParams, ref_index=None,
+                                            warmup=warmup)
                         names, forces, torque = \
                             gatherForcesTorque_mpi(simulation.options,
                                                    comm, rank, size,
@@ -210,7 +259,7 @@ class baseAlgorithm:
                     else:
                         simulation.options. \
                             forceTorqueCalc(*args, mpiParams=None,
-                                            ref_index=None)
+                                            ref_index=None, warmup=warmup)
                         names = simulation.options.surfaceNamesGlobal
                         forces = np.array(simulation.options.forces,
                                           dtype=simulation.precision)
@@ -240,12 +289,12 @@ class baseAlgorithm:
                                     simulation.lattice, simulation.mesh)
                         if (simulation.options.computeForces is True or
                                 simulation.options.computeTorque is True):
-                            args = (simulation.fields, simulation.lattice,
-                                    simulation.mesh, simulation.precision,
-                                    size)
+                            args = (simulation.fields, simulation.transport,
+                                    simulation.lattice, simulation.mesh,
+                                    simulation.precision, size, timeStep)
                             simulation.options. \
                                 forceTorqueCalc(*args, mpiParams=None,
-                                                ref_index=None)
+                                                ref_index=None, warmup=warmup)
                             names = simulation.options.surfaceNamesGlobal
                             forces = np.array(simulation.options.forces,
                                               dtype=simulation.precision)
@@ -265,7 +314,8 @@ class baseAlgorithm:
                                 simulation.options.computeTorque is True):
                             simulation.options. \
                                 forceTorqueCalc(*args, mpiParams=simulation.
-                                                mpiParams, ref_index=None)
+                                                mpiParams, ref_index=None,
+                                                warmup=warmup)
                             names, forces, torque = \
                                 gatherForcesTorque_mpi(simulation.options,
                                                        comm, rank, size,
@@ -286,12 +336,13 @@ class baseAlgorithm:
                                     simulation.mesh, rank, comm)
                     if (simulation.options.computeForces is True or
                             simulation.options.computeTorque is True):
-                        args = (simulation.fields, simulation.lattice,
-                                simulation.mesh, simulation.precision,
-                                size)
+                        args = (simulation.fields, simulation.transport,
+                                simulation.lattice, simulation.mesh,
+                                simulation.precision, size, timeStep)
                         simulation.options. \
                             forceTorqueCalc(*args, mpiParams=simulation.
-                                            mpiParams, ref_index=None)
+                                            mpiParams, ref_index=None,
+                                            warmup=warmup)
                         names, forces, torque = \
                             gatherForcesTorque_mpi(simulation.options,
                                                    comm, rank, size,
@@ -299,45 +350,72 @@ class baseAlgorithm:
                     break
             comm.Barrier()
             # Check for convergence done!#
-
+            # print('before obstacle mod', rank, timeStep)
             # Obstacle modification #
             if simulation.obstacle.obsModifiable is True:
-                args = (simulation.fields, simulation.lattice,
-                        simulation.mesh, simulation.precision,
-                        size)
+                args = (simulation.fields, simulation.transport,
+                        simulation.lattice, simulation.mesh,
+                        simulation.precision, size, timeStep)
                 if size == 1:
                     simulation.options. \
                         forceTorqueCalc(*args, mpiParams=None,
                                         ref_index=simulation.obstacle.
-                                        obsOrigin)
-                    torque = np.array(simulation.options.torque,
-                                      dtype=simulation.precision)
-                    forces = np.array(simulation.options.forces,
-                                      dtype=simulation.precision)
+                                        obsOrigin, warmup=warmup)
+                    # if timeStep == 2:
+                    #     np.savez('u_f.npz', u=simulation.fields.u)
+                    #     np.savez('rho_f.npz', rho=simulation.fields.rho)
+                    #     np.savez('solid_f.npz', solid=simulation.fields.solid)
+                    #     np.savez('solidNb_f.npz', solidNb=simulation.options.surfaceNodes[0])
                     simulation.obstacle.\
-                        modifyObstacle(torque, simulation.fields,
-                                       simulation.mesh, size, comm,
+                        modifyObstacle(simulation.options, simulation.fields,
+                                       simulation.mesh, simulation.lattice,
+                                       simulation.boundary,
+                                       simulation.transport,
+                                       simulation.collisionScheme, size, comm,
                                        timeStep, rank, simulation.precision,
-                                       mpiParams=None)
+                                       mpiParams=None, forces=simulation.
+                                       options.forces, torque=simulation.
+                                       options.torque)
+                    simulation.options.\
+                        computeMovingSolidBoundary(simulation.mesh, simulation.
+                                                   lattice, simulation.fields,
+                                                   size, simulation.precision)
                 elif size > 1:
                     simulation.options. \
                         forceTorqueCalc(*args, mpiParams=simulation.
                                         mpiParams, ref_index=simulation.
-                                        obstacle.obsOrigin)
+                                        obstacle.obsOrigin, warmup=warmup)
+                    # if timeStep == 1498:
+                    #     print(simulation.options.forces, rank)
+                    comm.Barrier()
                     names, forces, torque = \
                         gatherForcesTorque_mpi(simulation.options,
                                                comm, rank, size,
                                                simulation.precision)
+                    # if timeStep == 1498:
+                    #     print(forces, rank)
+                    #     np.savez('solid_' + str(rank) + '.npz', solid=simulation.fields.solid)
+                    #     np.savez('solidNb_' + str(rank) + '.npz', solid=simulation.options.surfaceNodes[0])
+                    #     np.savez('boundaryNode_' + str(rank) + '.npz', solid=simulation.fields.boundaryNode)
                     simulation.obstacle.\
-                        modifyObstacle(torque, simulation.fields,
-                                       simulation.mesh, size, comm,
+                        modifyObstacle(simulation.options, simulation.fields,
+                                       simulation.mesh, simulation.lattice,
+                                       simulation.boundary,
+                                       simulation.transport,
+                                       simulation.collisionScheme, size, comm,
                                        timeStep, rank, simulation.precision,
-                                       mpiParams=simulation.mpiParams)
+                                       mpiParams=simulation.mpiParams,
+                                       forces=forces, torque=torque)
+                    simulation.options.\
+                        computeMovingSolidBoundary(simulation.mesh, simulation.
+                                                   lattice, simulation.fields,
+                                                   size, simulation.precision,
+                                                   mpiParams=simulation.
+                                                   mpiParams)
             # Obstacle modification done #
 
             # Equilibrium and Collision
             self.equilibriumRelaxation(*simulation.collisionArgs)
-
             if size > 1:
                 comm.Barrier()
                 proc_boundary(*simulation.proc_boundaryArgs, comm, inner=True)
@@ -349,6 +427,8 @@ class baseAlgorithm:
             # Boundary condition
             simulation.setBoundaryFunc(simulation.fields, simulation.lattice,
                                        simulation.mesh)
+        if rank == 0:
+            massFile.close()
 
     def solver_cuda(self, simulation, parallel):
         resU, resV = 1e6, 1e6

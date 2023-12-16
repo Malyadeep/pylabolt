@@ -159,6 +159,18 @@ class collisionScheme:
                         secondOrder
                     self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
                                                  self.c, self.w)
+            elif fluid['equilibrium'] == 'secondOrder':
+                if parallelization == 'cuda':
+                    self.equilibriumTypeFluid = 3     # Stands for second order
+                    self.equilibriumFuncFluid = equilibriumModels.\
+                        secondOrder
+                    self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
+                                                 self.c, self.w)
+                else:
+                    self.equilibriumFuncFluid = equilibriumModels.\
+                        secondOrder
+                    self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
+                                                 self.c, self.w)
             else:
                 if rank == 0:
                     print("ERROR! Unsupported equilibrium model for 'fluid': "

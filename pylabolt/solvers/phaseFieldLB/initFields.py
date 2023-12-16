@@ -45,7 +45,8 @@ def setFields(fields, rho_initial, phi_initial, mesh, lattice, velType,
                 fields.phi[ind] = phi_initial
 
 
-def initFields(internalFields, mesh, lattice, precision, rank, comm):
+def readFields(internalFields, mesh, lattice, precision, rank, comm,
+               phaseField):
     if rank == 0:
         fields = initialFields(mesh.Nx_global, mesh.Ny_global,
                                precision)
@@ -96,7 +97,8 @@ def initFields(internalFields, mesh, lattice, precision, rank, comm):
                       x_ref=x_ref_idx)
 
     if rank == 0:
-        initializeFields(internalFields, fields, mesh, precision, comm)
+        initializeFields(internalFields, fields, mesh, precision, comm,
+                         phaseField)
 
     if rank == 0:
         return fields
