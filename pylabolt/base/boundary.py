@@ -9,11 +9,13 @@ from pylabolt.base import (boundaryConditions, boundaryConditions_cuda,
 
 @numba.njit
 def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
-                         boundaryNode, solid, periodicFlag=False, wall=False):
+                         boundaryNode, solid, precision, periodicFlag=False,
+                         wall=False):
     faceList = []
     nbList = []
     cornerList = []
     # print(boundaryIndices)
+    normalBoundary = np.zeros(2, dtype=precision)
     indX_i, indX_f = boundaryIndices[0, 0], boundaryIndices[1, 0]
     indY_i, indY_f = boundaryIndices[0, 1], boundaryIndices[1, 1]
     diffX = indX_f - indX_i
@@ -33,6 +35,8 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
             if noOfDirections == 3:
                 outDirections = np.array([2], dtype=np.int32)
                 invDirections = np.array([invList[2]], dtype=np.int32)
+            normalBoundary[0] = 0
+            normalBoundary[1] = 1
         elif indY_i + 2 == Ny - 1:
             indY_i += 2
             indY_f += 2
@@ -44,6 +48,8 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
             if noOfDirections == 3:
                 outDirections = np.array([1], dtype=np.int32)
                 invDirections = np.array([invList[1]], dtype=np.int32)
+            normalBoundary[0] = 0
+            normalBoundary[1] = -1
     if diffX == 1 and Nx != 1:
         if Ny > 1:
             indY_f += 2
@@ -56,6 +62,8 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
             if noOfDirections == 3:
                 outDirections = np.array([2], dtype=np.int32)
                 invDirections = np.array([invList[2]], dtype=np.int32)
+            normalBoundary[0] = 1
+            normalBoundary[1] = 0
         elif indX_i + 2 == Nx - 1:
             indX_i += 2
             indX_f += 2
@@ -67,6 +75,8 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
             if noOfDirections == 3:
                 outDirections = np.array([1], dtype=np.int32)
                 invDirections = np.array([invList[1]], dtype=np.int32)
+            normalBoundary[0] = -1
+            normalBoundary[1] = 0
     for ind in range(Nx * Ny):
         for i in range(indX_i, indX_f):
             for j in range(indY_i, indY_f):
@@ -129,25 +139,31 @@ def markBoundaryElements(Nx, Ny, invList, noOfDirections, boundaryIndices,
                             cornerList.append(ind)
     return np.array(faceList, dtype=np.int64), outDirections, \
         invDirections, np.array(nbList, dtype=np.int64), \
-        np.array(cornerList, dtype=np.int64), direction
+        np.array(cornerList, dtype=np.int64), direction, normalBoundary
 
 
 @numba.njit
 def initializeBoundaryElementsFluid(scalar, vector, rho, u, nbList,
-                                    cornerList):
+                                    cornerList, cs_2, p=None):
     for ind in nbList:
         rho[ind] = scalar
+        # print(rho[ind], int(ind / 13), int(ind % 13))
+        if p is not None:
+            p[ind] = scalar
+            # print(p[ind], int(ind / 43), int(ind % 43))
         u[ind, 0] = vector[0]
         u[ind, 1] = vector[1]
     for ind in cornerList:
         rho[ind] = scalar
+        if p is not None:
+            p[ind] = scalar
         u[ind, 0] = vector[0]
         u[ind, 1] = vector[1]
 
 
 @numba.njit
 def initializeVariableElementsFluid(scalar, vector, rho, u, nbList,
-                                    cornerList):
+                                    cornerList, cs_2, p=None):
     itr = 0
     for ind in nbList:
         rho[ind] = scalar
@@ -193,6 +209,7 @@ class boundary:
         self.cornerList = []
         self.invDirections = []
         self.outDirections = []
+        self.normalBoundary = []
         self.fluid, self.phase = False, False
         self.T = False
         self.argsFluid = []
@@ -312,7 +329,9 @@ class boundary:
                         print("'value' keyword required for type " +
                               "'fixedU'", flush=True)
                     os._exit(1)
-            elif boundaryTypeTempFluid == 'fixedPressure':
+            elif (boundaryTypeTempFluid == 'fixedPressure' or
+                    boundaryTypeTempFluid == 'fixedPressureRegularized' or
+                    boundaryTypeTempFluid == 'fixedPressureRegularizedMRT'):
                 try:
                     if isinstance(fluidBoundary['value'],
                                   float):
@@ -450,9 +469,9 @@ class boundary:
                     periodicFlag = True
             args = (mesh.Nx_global, mesh.Ny_global, lattice.invList,
                     lattice.noOfDirections, self.boundaryIndices[itr],
-                    fields.boundaryNode, solid)
+                    fields.boundaryNode, solid, precision)
             tempFaceList, tempOutDirections, tempInvDirections, \
-                tempNbList, tempCornerList, direction = \
+                tempNbList, tempCornerList, direction, normalBoundary = \
                 markBoundaryElements(*args, periodicFlag=periodicFlag,
                                      wall=wallFlag)
             if periodicFlag is True:
@@ -462,6 +481,7 @@ class boundary:
             self.cornerList.append(tempCornerList)
             self.invDirections.append(tempInvDirections)
             self.outDirections.append(tempOutDirections)
+            self.normalBoundary.append(normalBoundary)
             if self.boundaryTypeFluid[itr] == 'variableU':
                 boundaryVectorTemp = []
                 for ind in tempNbList:
@@ -477,20 +497,26 @@ class boundary:
                 self.boundaryVectorFluid[itr] = np.array(boundaryVectorTemp,
                                                          dtype=precision)
             if self.fluid is True:
+                if self.phase is True:
+                    p = fields.p
+                else:
+                    p = None
                 if self.boundaryTypeFluid[itr] != 'variableU':
                     initializeBoundaryElementsFluid(self.boundaryScalarFluid
                                                     [itr], self.
                                                     boundaryVectorFluid
                                                     [itr], fields.rho,
                                                     fields.u, tempNbList,
-                                                    tempCornerList)
+                                                    tempCornerList,
+                                                    lattice.cs_2, p=p)
                 else:
                     initializeVariableElementsFluid(self.boundaryScalarFluid
                                                     [itr], self.
                                                     boundaryVectorFluid
                                                     [itr], fields.rho,
                                                     fields.u, tempNbList,
-                                                    tempCornerList)
+                                                    tempCornerList,
+                                                    lattice.cs_2, p=p)
             if self.phase is True:
                 initializeBoundaryElementsScalar(self.boundaryScalarPhase[itr],
                                                  fields.phi, tempNbList,
@@ -530,21 +556,65 @@ class boundary:
                             fields.solid, self.faceList[itr],
                             self.outDirections[itr], self.invDirections[itr],
                             lattice.c, lattice.w, lattice.cs,
-                            mesh.Nx, mesh.Ny]
+                            mesh.Nx, mesh.Ny, self.phase]
                     self.argsFluid.append(args)
                 elif self.boundaryTypeFluid[itr] == 'variableU':
                     args = [fields.f, fields.f_new, fields.rho, fields.u,
                             fields.solid, self.faceList[itr],
                             self.outDirections[itr], self.invDirections[itr],
                             lattice.c, lattice.w, lattice.cs,
-                            mesh.Nx, mesh.Ny]
+                            mesh.Nx, mesh.Ny, self.phase]
                     self.argsFluid.append(args)
-                elif self.boundaryTypeFluid[itr] == 'fixedPressure':
-                    args = [fields.f, fields.f_new, fields.rho, fields.u,
-                            fields.solid, self.faceList[itr],
-                            self.outDirections[itr], self.invDirections[itr],
-                            self.nbList[itr], lattice.c, lattice.w, lattice.cs,
-                            mesh.Nx, mesh.Ny]
+                elif (self.boundaryTypeFluid[itr] == 'fixedPressure' or
+                        self.boundaryTypeFluid[itr] ==
+                        'fixedPressureRegularized' or
+                        self.boundaryTypeFluid[itr] ==
+                        'fixedPressureRegularizedMRT'):
+                    if self.phase is False:
+                        p = np.zeros(2)
+                        if (collisionScheme.equilibriumModel == "linear"
+                                or collisionScheme.equilibriumModel ==
+                                "incompressible"):
+                            rho_ref = collisionScheme.rho_ref
+                        else:
+                            rho_ref = None
+                    else:
+                        p = fields.p
+                        rho_ref = 0
+                    if self.boundaryTypeFluid[itr] == 'fixedPressure':
+                        args = \
+                            [fields.f, fields.f_new, fields.rho, p, fields.u,
+                             fields.solid, rho_ref, self.faceList[itr],
+                             self.outDirections[itr], self.invDirections[itr],
+                             self.nbList[itr], lattice.c, lattice.w,
+                             lattice.cs, mesh.Nx, mesh.Ny, self.phase]
+                    elif (self.boundaryTypeFluid[itr] ==
+                          'fixedPressureRegularized'):
+                        args = \
+                            [fields.f, fields.f_new, fields.f_eq, fields.rho,
+                             p, fields.u, fields.solid, fields.boundaryNode,
+                             rho_ref, self.faceList[itr],
+                             self.outDirections[itr], self.invDirections[itr],
+                             self.normalBoundary[itr], self.nbList[itr],
+                             lattice.c, lattice.w, lattice.cs,
+                             lattice.noOfDirections, mesh.Nx, mesh.Ny,
+                             collisionScheme.equilibriumFuncFluid,
+                             collisionScheme.equilibriumArgsFluid, self.phase]
+                    elif (self.boundaryTypeFluid[itr] ==
+                          'fixedPressureRegularizedMRT'):
+                        args = \
+                            [fields.f, fields.f_new, fields.f_eq, fields.rho,
+                             p, fields.u, fields.solid, fields.boundaryNode,
+                             rho_ref, self.faceList[itr],
+                             self.outDirections[itr], self.invDirections[itr],
+                             self.normalBoundary[itr], self.nbList[itr],
+                             lattice.c, lattice.w, lattice.cs,
+                             lattice.noOfDirections, mesh.Nx, mesh.Ny,
+                             collisionScheme.equilibriumFuncFluid,
+                             collisionScheme.equilibriumArgsFluid,
+                             collisionScheme.preFactor,
+                             collisionScheme.preFactorInv,
+                             collisionScheme.tau_nu, self.phase]
                     self.argsFluid.append(args)
                 elif self.boundaryTypeFluid[itr] == 'bounceBack':
                     args = [fields.f, fields.f_new, fields.solid,
@@ -598,22 +668,38 @@ class boundary:
         print(self.boundaryFuncPhase, self.boundaryFuncFluid)
         print(self.fluid)
         print(self.argsFluid)
+        print(self.normalBoundary)
         # print(self.argsFluid[2])
 
     def setupBoundary_cpu(self, parallel):
         for itr in range(self.noOfBoundaries):
             if self.fluid is True:
-                self.boundaryFuncFluid[itr] = \
-                    numba.njit(self.boundaryFuncFluid[itr], parallel=parallel,
-                               cache=False, nogil=True)
+                if self.boundaryTypeFluid[itr] != 'periodic':
+                    self.boundaryFuncFluid[itr] = \
+                        numba.njit(self.boundaryFuncFluid[itr],
+                                   parallel=parallel, cache=False, nogil=True)
+                else:
+                    self.boundaryFuncFluid[itr] = \
+                        numba.njit(self.boundaryFuncFluid[itr],
+                                   parallel=False, cache=False, nogil=True)
             if self.phase is True:
-                self.boundaryFuncPhase[itr] = \
-                    numba.njit(self.boundaryFuncPhase[itr], parallel=parallel,
-                               cache=False, nogil=True)
+                if self.boundaryTypePhase[itr] != 'periodic':
+                    self.boundaryFuncPhase[itr] = \
+                        numba.njit(self.boundaryFuncPhase[itr],
+                                   parallel=parallel, cache=False, nogil=True)
+                else:
+                    self.boundaryFuncPhase[itr] = \
+                        numba.njit(self.boundaryFuncPhase[itr],
+                                   parallel=False, cache=False, nogil=True)
             if self.T is True:
-                self.boundaryFuncT[itr] = \
-                    numba.njit(self.boundaryFuncT[itr], parallel=parallel,
-                               cache=False, nogil=True)
+                if self.boundaryTypeT[itr] != 'periodic':
+                    self.boundaryFuncT[itr] = \
+                        numba.njit(self.boundaryFuncT[itr],
+                                   parallel=parallel, cache=False, nogil=True)
+                else:
+                    self.boundaryFuncT[itr] = \
+                        numba.njit(self.boundaryFuncT[itr],
+                                   parallel=False, cache=False, nogil=True)
 
     def setBoundary(self, fields, lattice, mesh, equilibriumFunc=None,
                     equilibriumArgs=None, initialPhase=False):
@@ -625,6 +711,8 @@ class boundary:
                         self.boundaryTypePhase[itr] == 'fixedValue'):
                     args = self.argsPhase[itr]
                     args[1] = fields.u_initialize
+                    # if itr == 3:
+                    #     print(args)
                     self.boundaryFuncPhase[itr](*args)
                 else:
                     self.boundaryFuncPhase[itr](*self.argsPhase[itr])

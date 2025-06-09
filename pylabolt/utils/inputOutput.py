@@ -33,24 +33,25 @@ def writeFields(timeStep, fields, lattice, mesh):
             TFile = open('output/' + str(timeStep) + '/T.dat', 'w')
     for ind in range(mesh.Nx * mesh.Ny):
         if fields.boundaryNode[ind] != 1:
-            pointsFile.write(str(np.round(ind, 10)).ljust(12) + '\t' +
-                             str(np.round(mesh.x[ind], 10)).ljust(12) + '\t' +
-                             str(np.round(mesh.y[ind], 10)).ljust(12) + '\n')
+            i, j = mesh.x[ind] - 1, mesh.y[ind] - 1
+            pointNo = i * (mesh.Ny - 2) + j
+            pointsFile.write(str(np.round(pointNo, 10)).ljust(12) + '\t' +
+                             str(np.round(i, 10)).ljust(12) + '\t' +
+                             str(np.round(j, 10)).ljust(12) + '\n')
             if u is True:
                 uFile.\
-                    write(str(np.round(fields.u[ind, 0], 10)).ljust(12) + '\t'
-                          + str(np.round(fields.u[ind, 1], 10)).ljust(12) +
+                    write(str(fields.u[ind, 0]).ljust(12) + '\t'
+                          + str(fields.u[ind, 1]).ljust(12) +
                           '\n')
             if rho is True:
                 rhoFile.write(str(np.round(fields.rho[ind], 10)).ljust(12) +
                               '\n')
             if p is True:
-                pFile.write(str(np.round(fields.p[ind] * fields.rho[ind]
-                            * lattice.cs * lattice.cs, 10)).ljust(12) +
+                pFile.write(str(fields.p[ind] * fields.rho[ind]
+                            * lattice.cs * lattice.cs).ljust(12) +
                             '\n')
             if phi is True:
-                phiFile.write(str(np.round(fields.phi[ind], 10)).ljust(12) +
-                              '\n')
+                phiFile.write(str(fields.phi[ind]).ljust(12) + '\n')
             if T is True:
                 TFile.write(str(np.round(fields.T[ind], 10)).ljust(12) +
                             '\n')

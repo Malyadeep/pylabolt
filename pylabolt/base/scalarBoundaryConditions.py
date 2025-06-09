@@ -9,6 +9,7 @@ def fixedValue(h_new, u, phi, solid, faceList, nbList, equilibriumFunc,
         if solid[ind, 0] != 1:
             equilibriumFunc(h_new[ind, :], u[ind, :],
                             phi[nbList[itr]], *equilibriumArgs)
+            # print(phi[nbList[itr]])
 
 
 def zeroGradient(h, h_new, solid, faceList, outDirections, invDirections,

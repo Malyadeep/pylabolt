@@ -25,6 +25,9 @@ class fields:
             self.boundaryNode[ind] = initialFields.boundaryNode[ind]
         self.solid = np.full((mesh.Nx * mesh.Ny, 2), fill_value=0,
                              dtype=np.int32)
+        self.solid_old = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=np.int32)
+        self.fluidBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
+        self.solidBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
         self.procBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
         if size > 1:
             self.procBoundary = setProcBoundary(mesh.Nx, mesh.Ny)
@@ -33,6 +36,13 @@ class fields:
             self.f_send_leftRight = np.zeros((mesh.Ny, 9), dtype=precision)
             self.f_recv_leftRight = np.zeros((mesh.Ny, 9), dtype=precision)
 
+    def createObsModificationFields(self, mesh, precision):
+        self.solid_old = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=np.int32)
+        self.forceCreation = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
+        self.forceDes = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
+        self.torqueCreation = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
+        self.torqueDes = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
+        self.deltaM = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
 
 @numba.njit
 def setProcBoundary(Nx, Ny):

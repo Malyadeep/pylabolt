@@ -12,6 +12,13 @@ def secondOrder(f_eq, u, rho, cs_2, cs_4, c, w):
 
 
 @numba.njit
+def firstOrder(f_eq, u, rho, cs_2, c, w):
+    for k in range(f_eq.shape[0]):
+        cu = c[k, 0] * u[0] + c[k, 1] * u[1]
+        f_eq[k] = w[k] * rho * (1 + cu * cs_2)
+
+
+@numba.njit
 def linear(f_eq, u, rho, rho_0, cs_2, c, w):
     for k in range(f_eq.shape[0]):
         cu = c[k, 0] * u[0] + c[k, 1] * u[1]

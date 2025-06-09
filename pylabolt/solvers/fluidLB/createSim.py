@@ -17,12 +17,12 @@ from pylabolt.solvers.fluidLB import schemeLB
 
 @numba.njit
 def initializePopulations(Nx, Ny, f_eq, f, f_new, u, rho,
-                          noOfDirections, equilibriumFunc,
-                          equilibriumArgs, procBoundary, boundaryNode):
+                          noOfDirections, equilibriumFuncFluid,
+                          equilibriumArgsFluid, procBoundary, boundaryNode):
     for ind in range(Nx * Ny):
         if procBoundary[ind] != 1 and boundaryNode[ind] != 1:
-            equilibriumFunc(f_eq[ind, :], u[ind, :], rho[ind],
-                            *equilibriumArgs)
+            equilibriumFuncFluid(f_eq[ind, :], u[ind, :], rho[ind],
+                                 *equilibriumArgsFluid)
             for k in range(noOfDirections):
                 f[ind, k] = f_eq[ind, k]
                 f_new[ind, k] = f_eq[ind, k]
@@ -173,7 +173,8 @@ class simulation:
         self.fields = fields.fields(self.mesh, self.lattice,
                                     self.initialFields,
                                     self.precision, size, rank)
-
+        if self.obstacle.obsModifiable is True:
+            self.fields.createObsModificationFields(self.mesh, self.precision)
         obstacleTemp = deepcopy(self.obstacle)
         if size == 1 and solid is not None:
             self.fields.solid = solid
@@ -197,12 +198,14 @@ class simulation:
                 distributeForceNodes_mpi(self.options, self.mpiParams,
                                          self.mesh, rank, size,
                                          self.precision, comm)
+        if rank == 0:
+            self.boundary.details()
         # if rank == 0:
         #     self.options.details(rank)
         del obstacleTemp, solid
         # initialize functions
-        self.equilibriumFunc = self.collisionScheme.equilibriumFunc
-        self.equilibriumArgs = self.collisionScheme.equilibriumArgs
+        self.equilibriumFuncFluid = self.collisionScheme.equilibriumFuncFluid
+        self.equilibriumArgsFluid = self.collisionScheme.equilibriumArgsFluid
         self.collisionFunc = self.collisionScheme.collisionFunc
         self.setBoundaryFunc = self.boundary.setBoundary
 
@@ -212,9 +215,9 @@ class simulation:
             self.fields.f, self.fields.f_new, self.fields.u, self.fields.rho,
             self.fields.solid, self.fields.boundaryNode,
             self.fields.source, self.forcingScheme.gravity, self.collisionFunc,
-            self.equilibriumFunc, self.collisionScheme.preFactor,
-            self.collisionScheme.equilibriumArgs, self.fields.procBoundary,
-            self.forcingScheme.forceFunc_force,
+            self.equilibriumFuncFluid, self.collisionScheme.preFactor,
+            self.collisionScheme.equilibriumArgsFluid,
+            self.fields.procBoundary, self.forcingScheme.forceFunc_force,
             self.forcingScheme.forceArgs_force,
             self.forcingScheme.forcingPreFactor,
             self.lattice.noOfDirections, self.precision
@@ -272,8 +275,8 @@ class simulation:
         initializePopulations(
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq, self.fields.f,
             self.fields.f_new, self.fields.u, self.fields.rho,
-            self.lattice.noOfDirections, self.equilibriumFunc,
-            self.equilibriumArgs,
+            self.lattice.noOfDirections, self.equilibriumFuncFluid,
+            self.equilibriumArgsFluid,
             self.fields.procBoundary, self.fields.boundaryNode
         )
 

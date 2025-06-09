@@ -7,28 +7,30 @@ from copy import deepcopy
 
 from pylabolt.base import (mesh, lattice, boundary, transport,
                            obstacle)
-from pylabolt.solvers.phaseFieldLB import (initFields, fields)
+from pylabolt.solvers.cgLB import (initFields, fields)
 from pylabolt.parallel.MPI_decompose import (decompose, distributeSolid_mpi,
                                              distributeInitialFields_mpi,
                                              distributeBoundaries_mpi,
                                              distributeForceNodes_mpi,
                                              distributeSolidNbNodes_mpi)
 from pylabolt.utils.options import options
-from pylabolt.solvers.phaseFieldLB import phaseField, schemeLB
+from pylabolt.solvers.cgLB import phaseField, schemeLB
 
 
 @numba.njit
-def initializePopulations(Nx, Ny, pop_eq, pop, pop_new, u, scalar,
-                          noOfDirections, equilibriumFunc,
-                          equilibriumArgs, solid, procBoundary, boundaryNode):
+def initializePopulations(Nx, Ny, f_eq, f, f_new, h_eq, h, h_new, u, p, phi,
+                          noOfDirections, equilibriumFuncFluid,
+                          equilibriumArgsFluid, procBoundary, boundaryNode):
     for ind in range(Nx * Ny):
-        if (procBoundary[ind] != 1 and boundaryNode[ind] != 1
-                and solid[ind, 0] == 0):
-            equilibriumFunc(pop_eq[ind, :], u[ind, :], scalar[ind],
-                            *equilibriumArgs)
+        if procBoundary[ind] != 1 and boundaryNode[ind] != 1:
+            equilibriumFuncFluid(f_eq[ind, :], u[ind, :], p[ind],
+                                 *equilibriumArgsFluid)
             for k in range(noOfDirections):
-                pop[ind, k] = pop_eq[ind, k]
-                pop_new[ind, k] = pop_eq[ind, k]
+                f[ind, k] = f_eq[ind, k]
+                f_new[ind, k] = f_eq[ind, k]
+                h[ind, k] = phi[ind] * f_eq[ind, k]
+                h_eq[ind, k] = phi[ind] * f_eq[ind, k]
+                h_new[ind, k] = phi[ind] * f_eq[ind, k]
 
 
 class simulation:
@@ -121,7 +123,6 @@ class simulation:
         self.forcingScheme = schemeLB.forcingScheme(self.precision,
                                                     self.lattice)
         self.forcingScheme.setForcingScheme(self.lattice,
-                                            self.phaseField,
                                             self.collisionScheme,
                                             self.rank,
                                             self.precision)
@@ -258,25 +259,25 @@ class simulation:
             self.forcingScheme.forceArgs_force,
             self.forcingScheme.forcingPreFactorFluid, self.lattice.cs_2]
 
-        if self.phaseField.contactAngleHysteresis is True:
-            preFactorPhaseSolid = self.collisionScheme.preFactorPhaseSolid
-            forcingPreFactorPhaseSolid = self.forcingScheme.\
-                forcingPreFactorPhaseSolid
-        else:
-            preFactorPhaseSolid = self.collisionScheme.preFactorPhase
-            forcingPreFactorPhaseSolid = self.forcingScheme.\
-                forcingPreFactorPhase
-        self.collisionArgsPhase = [
-            self.mesh.Nx, self.mesh.Ny, self.fields.h_eq,
-            self.fields.h, self.fields.h_new, self.fields.u, self.fields.phi,
-            self.fields.gradPhi, self.fields.solid, self.fields.solidBoundary,
-            self.fields.boundaryNode, self.phaseField.interfaceWidth,
-            self.lattice.c, self.lattice.w, self.collisionFuncPhase,
-            self.equilibriumFuncPhase, self.collisionScheme.preFactorPhase,
-            self.collisionScheme.equilibriumArgsPhase,
-            self.fields.procBoundary, self.forcingScheme.forcingPreFactorPhase,
-            preFactorPhaseSolid, forcingPreFactorPhaseSolid,
-            self.lattice.noOfDirections, self.precision
+        # self.collisionArgsPhase = [
+        #     self.mesh.Nx, self.mesh.Ny, self.fields.h_eq,
+        #     self.fields.h, self.fields.h_new, self.fields.u, self.fields.phi,
+        #     self.fields.gradPhi, self.fields.solid, self.fields.boundaryNode,
+        #     self.phaseField.interfaceWidth, self.lattice.c, self.lattice.w,
+        #     self.collisionFuncPhase, self.equilibriumFuncPhase,
+        #     self.collisionScheme.preFactorPhase,
+        #     self.collisionScheme.equilibriumArgsPhase,
+        #     self.fields.procBoundary, self.forcingScheme.forcingPreFactorPhase,
+        #     self.lattice.noOfDirections, self.precision
+        # ]
+        self.segregationArgs = [
+            self.mesh.Nx, self.mesh.Ny, self.fields.h, self.fields.f,
+            self.fields.f_eq, self.fields.p, self.fields.phi,
+            self.fields.gradPhi, self.fields.solid, self.fields.boundaryNode,
+            self.phaseField.interfaceWidth, self.lattice.c,
+            self.lattice.noOfDirections, self.equilibriumFuncFluid,
+            self.collisionScheme.equilibriumArgsFluid,
+            self.fields.procBoundary, self.precision
         ]
 
         if size == 1:
@@ -297,8 +298,8 @@ class simulation:
         self.streamArgsPhase = [
             self.mesh.Nx, self.mesh.Ny, self.fields.h, self.fields.h_new,
             self.fields.phi, self.fields.u, self.fields.massAdded,
-            self.fields.solid, self.fields.solidBoundary,
-            self.fields.procBoundary, self.fields.boundaryNode, self.lattice.c,
+            self.fields.solid, self.fields.procBoundary,
+            self.fields.boundaryNode, self.lattice.c,
             self.lattice.w, self.lattice.cs_2, self.lattice.noOfDirections,
             self.lattice.invList, nx, ny, nProc_x, nProc_y, self.size
         ]
@@ -306,19 +307,19 @@ class simulation:
         self.computeFieldsArgsFluid = [
             self.mesh.Nx, self.mesh.Ny, self.fields.f_new,
             self.fields.u, self.fields.p, self.fields.rho,
-            self.fields.phi, self.fields.forceField, self.fields.solid,
-            self.lattice.c, self.lattice.cs, self.lattice.noOfDirections,
-            self.fields.boundaryNode, self.fields.procBoundary, self.size,
-            self.forcingScheme.forceFunc_vel,
-            self.forcingScheme.forceCoeffVel, self.transport.rho_l,
-            self.transport.rho_g, self.transport.phi_g,
-            self.precision
+            self.fields.phi, self.fields.gradPhi, self.fields.forceField,
+            self.fields.surfaceTensionForce, self.fields.viscousCorrection,
+            self.fields.pressureCorrection, self.fields.solid,
+            self.forcingScheme.gravity, self.lattice.c,
+            self.lattice.w, self.lattice.cs, self.lattice.noOfDirections,
+            self.phaseField.phiWeight, self.fields.boundaryNode,
+            self.fields.procBoundary, self.size, self.transport.rho_l,
+            self.transport.rho_g, self.transport.phi_g, self.precision
         ]
 
         self.computeFieldsArgsPhase = [
             self.mesh.Nx, self.mesh.Ny, self.fields.h_new,
-            self.fields.phi, self.fields.solid,
-            self.fields.solidBoundary, self.fields.procBoundary,
+            self.fields.phi, self.fields.solid, self.fields.procBoundary,
             self.fields.boundaryNode, self.lattice.noOfDirections,
             self.precision
         ]
@@ -330,39 +331,6 @@ class simulation:
             self.lattice.cs_2, self.lattice.c, self.lattice.w,
             self.lattice.noOfDirections, self.size
         ]
-
-        self.gradPhiFluidBoundaryArgs = [
-            self.mesh.Nx, self.mesh.Ny, self.fields.phi, self.fields.gradPhi,
-            self.fields.normalPhi, self.fields.solid, self.fields.
-            fluidBoundary, self.fields.procBoundary, self.fields.boundaryNode,
-            self.lattice.cs_2, self.lattice.c, self.lattice.w,
-            self.lattice.noOfDirections, self.size
-        ]
-
-        self.gradPhiSolidArgs = [
-            self.mesh.Nx, self.mesh.Ny, self.fields.phi, self.fields.gradPhi,
-            self.fields.normalPhi, self.fields.solidBoundary,
-            self.fields.procBoundary, self.fields.boundaryNode,
-            self.lattice.cs_2, self.lattice.c, self.lattice.w,
-            self.lattice.noOfDirections, self.size
-        ]
-
-        self.copyPhiArgs = [
-            self.mesh.Nx, self.mesh.Ny, self.fields.phi, self.fields.phi_temp,
-            self.fields.normalPhi, self.fields.gradPhi,
-            self.fields.normalPhi_temp, self.fields.gradPhi_temp,
-            self.fields.phiFSolidBoundary, self.fields.phiAdvect
-        ]
-
-        self.valuesNewGhostNodesArgs = [
-            self.fields.normalPhi, self.fields.phi, self.fields.phi_temp,
-            self.fields.solidBoundary, self.fields.solidBoundary_old,
-            self.fields.solid, self.fields.solid_old,
-            self.fields.nodesIdentified, self.fields.boundaryNode,
-            self.lattice.c, self.lattice.w, self.lattice.noOfDirections, nx,
-            ny, nProc_x, nProc_y, self.size, self.mesh.Nx, self.mesh.Ny
-        ]
-
         # self.forceFluidArgs = [self.fields.f_new, self.fields.f_eq,
         #                        self.fields.forceField, self.fields.rho,
         #                        self.fields.p, self.fields.phi,
@@ -393,6 +361,9 @@ class simulation:
                                self.fields.solid, self.fields.lapPhi,
                                self.fields.gradPhi, self.fields.normalPhi,
                                self.fields.stressTensor,
+                               self.fields.surfaceTensionForce,
+                               self.fields.viscousCorrection,
+                               self.fields.pressureCorrection,
                                self.fields.procBoundary, self.fields.
                                boundaryNode, self.forcingScheme.gravity,
                                self.collisionScheme.preFactorFluid,
@@ -468,16 +439,10 @@ class simulation:
         elif u_initial == 'u_initial':
             u = self.fields.u_initialize
         initializePopulations(
-            self.mesh.Nx, self.mesh.Ny, self.fields.h_eq, self.fields.h,
-            self.fields.h_new, u, self.fields.phi,
-            self.lattice.noOfDirections, self.equilibriumFuncPhase,
-            self.equilibriumArgsPhase, self.fields.solid,
-            self.fields.procBoundary, self.fields.boundaryNode
-        )
-        initializePopulations(
             self.mesh.Nx, self.mesh.Ny, self.fields.f_eq, self.fields.f,
-            self.fields.f_new, u, self.fields.p,
+            self.fields.f_new, self.fields.h_eq, self.fields.h,
+            self.fields.h_new, u, self.fields.p, self.fields.phi,
             self.lattice.noOfDirections, self.equilibriumFuncFluid,
-            self.equilibriumArgsFluid, self.fields.solid,
-            self.fields.procBoundary, self.fields.boundaryNode
+            self.equilibriumArgsFluid, self.fields.procBoundary,
+            self.fields.boundaryNode
         )

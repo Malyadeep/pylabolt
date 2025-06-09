@@ -6,15 +6,24 @@ def circle(center, radius, solid, initialFields, rho_s, mesh, obsNo,
            velType='fixedTranslational', velValue=[0.0, 0.0],
            velOrigin=0, velOmega=0, periodic=False):
     obsNodes = []
-    center_idx = np.int64(np.divide(center, mesh.delX)) + \
+    center_idx = np.divide(center, mesh.delX) + \
         np.ones(2, dtype=np.int64)
-    radius_idx = np.int64(radius / mesh.delX)
-    origin_idx = np.int64(np.divide(velOrigin, mesh.delX)) + \
+    radius_idx = radius / mesh.delX
+    origin_idx = np.divide(velOrigin, mesh.delX) + \
         np.ones(2, dtype=np.int64)
     for i in range(mesh.Nx_global):
         for j in range(mesh.Ny_global):
+            # dist = (i - center_idx[0])*(i - center_idx[0]) + \
+            #     (j - center_idx[1])*(j - center_idx[1])
+            # solidInterfaceWidth = 3
+            # solidFractionValue = 0.5 * (1 - np.tanh(2 * (np.sqrt(dist) -
+            #                             radius) / solidInterfaceWidth))
+            # if solidFractionValue >= 0.5:
+            #     cond1 = True
+            # else:
+            #     cond1 = False
             cond1 = ((i - center_idx[0])*(i - center_idx[0]) +
-                     (j - center_idx[1])*(j - center_idx[1]) <
+                     (j - center_idx[1])*(j - center_idx[1]) <=
                      radius_idx * radius_idx)
             cond2, cond3 = False, False
             cond4, cond5 = False, False
@@ -24,42 +33,42 @@ def circle(center, radius, solid, initialFields, rho_s, mesh, obsNo,
                 cond2 = ((i - center_idx[0] - mesh.Nx_global + 2) *
                          (i - center_idx[0] - mesh.Nx_global + 2) +
                          (j - center_idx[1]) *
-                         (j - center_idx[1]) <
+                         (j - center_idx[1]) <=
                          radius_idx * radius_idx)
                 cond3 = ((i - center_idx[0] + mesh.Nx_global - 2) *
                          (i - center_idx[0] + mesh.Nx_global - 2) +
                          (j - center_idx[1]) *
-                         (j - center_idx[1]) <
+                         (j - center_idx[1]) <=
                          radius_idx * radius_idx)
                 cond4 = ((i - center_idx[0]) *
                          (i - center_idx[0]) +
                          (j - center_idx[1] - mesh.Ny_global + 2) *
-                         (j - center_idx[1] - mesh.Ny_global + 2) <
+                         (j - center_idx[1] - mesh.Ny_global + 2) <=
                          radius_idx * radius_idx)
                 cond5 = ((i - center_idx[0]) *
                          (i - center_idx[0]) +
                          (j - center_idx[1] + mesh.Ny_global - 2) *
-                         (j - center_idx[1] + mesh.Ny_global - 2) <
+                         (j - center_idx[1] + mesh.Ny_global - 2) <=
                          radius_idx * radius_idx)
                 cond6 = ((i - center_idx[0] - mesh.Nx_global + 2) *
                          (i - center_idx[0] - mesh.Nx_global + 2) +
                          (j - center_idx[1] - mesh.Ny_global + 2) *
-                         (j - center_idx[1] - mesh.Ny_global + 2) <
+                         (j - center_idx[1] - mesh.Ny_global + 2) <=
                          radius_idx * radius_idx)
                 cond7 = ((i - center_idx[0] + mesh.Nx_global - 2) *
                          (i - center_idx[0] + mesh.Nx_global - 2) +
                          (j - center_idx[1] - mesh.Ny_global + 2) *
-                         (j - center_idx[1] - mesh.Ny_global + 2) <
+                         (j - center_idx[1] - mesh.Ny_global + 2) <=
                          radius_idx * radius_idx)
                 cond8 = ((i - center_idx[0] - mesh.Nx_global + 2) *
                          (i - center_idx[0] - mesh.Nx_global + 2) +
                          (j - center_idx[1] + mesh.Ny_global - 2) *
-                         (j - center_idx[1] + mesh.Ny_global - 2) <
+                         (j - center_idx[1] + mesh.Ny_global - 2) <=
                          radius_idx * radius_idx)
                 cond9 = ((i - center_idx[0] + mesh.Nx_global - 2) *
                          (i - center_idx[0] + mesh.Nx_global - 2) +
                          (j - center_idx[1] + mesh.Ny_global - 2) *
-                         (j - center_idx[1] + mesh.Ny_global - 2) <
+                         (j - center_idx[1] + mesh.Ny_global - 2) <=
                          radius_idx * radius_idx)
             if (cond1 or cond2 or cond3 or cond4 or cond5 or cond6 or
                     cond7 or cond8 or cond9):
@@ -71,16 +80,18 @@ def circle(center, radius, solid, initialFields, rho_s, mesh, obsNo,
                     if field == 'rho':
                         initialFields.rho[ind] = rho_s
                     if field == 'u':
-                        if velType == 'fixedTranslational':
-                            initialFields.u[ind, 0] = velValue[0]
-                            initialFields.u[ind, 1] = velValue[1]
+                        x = i - origin_idx[0]
+                        y = j - origin_idx[1]
+                        theta = np.arctan2(y, x)
+                        r = np.sqrt(x**2 + y**2)
+                        if velType == 'fixedVelocity':
+                            initialFields.u[ind, 0] = velValue[0] -\
+                                r * velOmega * np.sin(theta)
+                            initialFields.u[ind, 1] = velValue[1] +\
+                                r * velOmega * np.cos(theta)
                         elif (velType == 'fixedRotational' or
                                 velType == 'calculatedRotational' or
                                 velType == 'calculated'):
-                            x = i - origin_idx[0]
-                            y = j - origin_idx[1]
-                            theta = np.arctan2(y, x)
-                            r = np.sqrt(x**2 + y**2)
                             if velType == 'calculated':
                                 initialFields.u[ind, 0] = velValue[0] - r *\
                                     velOmega * np.sin(theta)
@@ -106,9 +117,9 @@ def rectangle(boundingBox, solid, initialFields, rho_s, mesh, obsNo,
               velType='fixedTranslational', velValue=[0.0, 0.0],
               velOrigin=0, velOmega=0, periodic=False):
     obsNodes = []
-    boundingBox_idx = np.int64(np.divide(boundingBox, mesh.delX)) +\
+    boundingBox_idx = np.divide(boundingBox, mesh.delX) +\
         np.ones((2, 2), dtype=np.int64)
-    origin_idx = np.int64(np.divide(velOrigin, mesh.delX)) + \
+    origin_idx = np.divide(velOrigin, mesh.delX) + \
         np.ones(2, dtype=np.int64)
     for i in range(mesh.Nx_global):
         for j in range(mesh.Ny_global):
@@ -123,26 +134,21 @@ def rectangle(boundingBox, solid, initialFields, rho_s, mesh, obsNo,
                     if field == 'rho':
                         initialFields.rho[ind] = rho_s
                     if field == 'u':
-                        if velType == 'fixedTranslational':
+                        if velType == 'fixedVelocity':
                             initialFields.u[ind, 0] = velValue[0]
                             initialFields.u[ind, 1] = velValue[1]
-                        elif (velType == 'fixedRotational' or
-                                velType == 'calculatedRotational'):
-                            x = i - origin_idx[0]
-                            y = j - origin_idx[1]
-                            theta = np.arctan2(y, x)
-                            r = np.sqrt(x**2 + y**2)
-                            initialFields.u[ind, 0] = - r * velOmega *\
-                                np.sin(theta)
-                            initialFields.u[ind, 1] = r * velOmega *\
-                                np.cos(theta)
+                        elif velType == 'calculated':
+                            initialFields.u[ind, 0] = velValue[0]
+                            initialFields.u[ind, 1] = velValue[1]
                     if field == 'p':
                         initialFields.p[ind] = 0
                     if field == 'phi':
                         initialFields.phi[ind] = 0
     obsNodes = np.array(obsNodes, dtype=np.int64)
-    dist_x = (np.abs(boundingBox_idx[1, 0] - boundingBox_idx[0, 0]))/mesh.delX
-    dist_y = (np.abs(boundingBox_idx[1, 1] - boundingBox_idx[0, 1]))/mesh.delX
+    dist_x = (np.abs(boundingBox_idx[1, 0] - boundingBox_idx[0, 0])) \
+        / mesh.delX + 1
+    dist_y = (np.abs(boundingBox_idx[1, 1] - boundingBox_idx[0, 1])) \
+        / mesh.delX + 1
     volume = dist_x * dist_y * 1
     mass = rho_s * volume
     momentofInertia = mass * (dist_x**2 + dist_y**2) / 12
@@ -154,9 +160,9 @@ def inclinedRectangle(centerLine, width, solid, initialFields,
                       velValue=[0.0, 0.0], velOrigin=0, velOmega=0,
                       periodic=False):
     obsNodes = []
-    centerLine_idx = np.int64(np.divide(centerLine, mesh.delX)) +\
+    centerLine_idx = np.divide(centerLine, mesh.delX) +\
         np.ones((2, 2), dtype=np.int64)
-    origin_idx = np.int64(np.divide(velOrigin, mesh.delX)) + \
+    origin_idx = np.divide(velOrigin, mesh.delX) + \
         np.ones(2, dtype=np.int64)
     Nx_i, Nx_f = centerLine_idx[0, 0], centerLine_idx[1, 0]
     Ny_i, Ny_f = centerLine_idx[0, 1], centerLine_idx[1, 1]
@@ -229,8 +235,8 @@ def circularConfinement(center, radius, solid, initialFields, rho_s, mesh, obsNo
     obsNodes = []
     center_idx = np.int64(np.divide(center, mesh.delX)) + \
         np.ones(2, dtype=np.int64)
-    radius_idx = np.int64(radius/mesh.delX)
-    origin_idx = np.int64(np.divide(velOrigin, mesh.delX)) + \
+    radius_idx = radius / mesh.delX
+    origin_idx = np.divide(velOrigin, mesh.delX) + \
         np.ones(2, dtype=np.int64)
     for i in range(mesh.Nx_global):
         for j in range(mesh.Ny_global):
@@ -273,7 +279,14 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
     x = i_global - obsOrigin[0]
     y = j_global - obsOrigin[1]
     leastDist = x * x + y * y
-    cond1 = (leastDist < radius * radius)
+    # solidInterfaceWidth = 3
+    # solidFractionValue = 0.5 * (1 - np.tanh(2 * (np.sqrt(leastDist) - radius)
+    #                             / solidInterfaceWidth))
+    # if solidFractionValue >= 0.5:
+    #     cond1 = True
+    # else:
+    #     cond1 = False
+    cond1 = (leastDist <= radius * radius)
     cond2, cond3 = False, False
     cond4, cond5 = False, False
     cond6, cond7 = False, False
@@ -284,7 +297,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] - Nx_global + 2) +
                 (j_global - obsOrigin[1]) *
                 (j_global - obsOrigin[1]))
-        cond2 = dist < radius * radius
+        cond2 = dist <= radius * radius
         if cond2:
             insideSolid = True
             leastDist = dist
@@ -294,7 +307,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] + Nx_global - 2) +
                 (j_global - obsOrigin[1]) *
                 (j_global - obsOrigin[1]))
-        cond3 = dist < radius * radius
+        cond3 = dist <= radius * radius
         if cond3:
             insideSolid = True
             leastDist = dist
@@ -307,7 +320,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0]) +
                 (j_global - obsOrigin[1] - Ny_global + 2) *
                 (j_global - obsOrigin[1] - Ny_global + 2))
-        cond2 = dist < radius * radius
+        cond2 = dist <= radius * radius
         if cond2:
             insideSolid = True
             leastDist = dist
@@ -317,7 +330,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0]) +
                 (j_global - obsOrigin[1] + Ny_global - 2) *
                 (j_global - obsOrigin[1] + Ny_global - 2))
-        cond3 = dist < radius * radius
+        cond3 = dist <= radius * radius
         if cond3:
             insideSolid = True
             leastDist = dist
@@ -330,7 +343,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] - Nx_global + 2) +
                 (j_global - obsOrigin[1]) *
                 (j_global - obsOrigin[1]))
-        cond2 = dist < radius * radius
+        cond2 = dist <= radius * radius
         if cond2:
             insideSolid = True
             leastDist = dist
@@ -340,7 +353,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] + Nx_global - 2) +
                 (j_global - obsOrigin[1]) *
                 (j_global - obsOrigin[1]))
-        cond3 = dist < radius * radius
+        cond3 = dist <= radius * radius
         if cond3:
             insideSolid = True
             leastDist = dist
@@ -350,7 +363,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0]) +
                 (j_global - obsOrigin[1] - Ny_global + 2) *
                 (j_global - obsOrigin[1] - Ny_global + 2))
-        cond4 = dist < radius * radius
+        cond4 = dist <= radius * radius
         if cond4:
             insideSolid = True
             leastDist = dist
@@ -360,7 +373,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0]) +
                 (j_global - obsOrigin[1] + Ny_global - 2) *
                 (j_global - obsOrigin[1] + Ny_global - 2))
-        cond5 = dist < radius * radius
+        cond5 = dist <= radius * radius
         if cond5:
             insideSolid = True
             leastDist = dist
@@ -370,7 +383,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] - Nx_global + 2) +
                 (j_global - obsOrigin[1] - Ny_global + 2) *
                 (j_global - obsOrigin[1] - Ny_global + 2))
-        cond6 = dist < radius * radius
+        cond6 = dist <= radius * radius
         if cond6:
             insideSolid = True
             leastDist = dist
@@ -380,7 +393,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] + Nx_global - 2) +
                 (j_global - obsOrigin[1] - Ny_global + 2) *
                 (j_global - obsOrigin[1] - Ny_global + 2))
-        cond7 = dist < radius * radius
+        cond7 = dist <= radius * radius
         if cond7:
             insideSolid = True
             leastDist = dist
@@ -390,7 +403,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] - Nx_global + 2) +
                 (j_global - obsOrigin[1] + Ny_global - 2) *
                 (j_global - obsOrigin[1] + Ny_global - 2))
-        cond8 = dist < radius * radius
+        cond8 = dist <= radius * radius
         if cond8:
             insideSolid = True
             leastDist = dist
@@ -400,7 +413,7 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] + Nx_global - 2) +
                 (j_global - obsOrigin[1] + Ny_global - 2) *
                 (j_global - obsOrigin[1] + Ny_global - 2))
-        cond9 = dist < radius * radius
+        cond9 = dist <= radius * radius
         if cond9:
             insideSolid = True
             leastDist = dist
@@ -420,15 +433,58 @@ def reconstructCircle(i_global, j_global, Nx_global, Ny_global,
 
 @numba.njit
 def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
-                         obsOrigin, x_periodic, y_periodic, length,
-                         breadth):
+                         obsOrigin, x_periodic, y_periodic, lengthAhead,
+                         lengthBehind, breadthAhead, breadthBehind,
+                         adjustForFloatError):
+    # if np.abs(u[0]) < 1e-13:
+    #     latticeTime_x = np.int64(1)
+    # else:
+    #     latticeTime_x = np.int64(np.abs(1 / u[0]))
+    # noOfDigitsX = 0
+    # if latticeTime_x != 1:
+    #     temp = latticeTime_x
+    #     while temp > 0:
+    #         temp = np.int64(temp / 10)
+    #         noOfDigitsX += 1
+    # if np.abs(u[1]) < 1e-13:
+    #     latticeTime_y = np.int64(1)
+    # else:
+    #     latticeTime_y = np.int64(np.abs(1 / u[1]))
+    # noOfDigitsY = 0
+    # if latticeTime_y != 1:
+    #     temp = latticeTime_y
+    #     while temp > 0:
+    #         temp = np.int64(temp / 10)
+    #         noOfDigitsY += 1
+    # print(latticeTime_x, latticeTime_y)
     x = i_global - obsOrigin[0]
     y = j_global - obsOrigin[1]
     leastDist = x * x + y * y
-    cond1 = (i_global <= obsOrigin[0] + length / 2 and
-             i_global >= obsOrigin[0] - length / 2 and
-             j_global <= obsOrigin[1] + breadth / 2 and
-             j_global >= obsOrigin[1] - breadth / 2)
+    # xAhead = np.int64((obsOrigin[0] + lengthAhead) * latticeTime_x) / latticeTime_x
+    # xBehind = np.int64((obsOrigin[0] - lengthBehind) * latticeTime_x) / latticeTime_x
+    # yAhead = np.int64((obsOrigin[1] + breadthAhead) * latticeTime_y) / latticeTime_y
+    # yBehind = np.int64((obsOrigin[1] - breadthBehind) * latticeTime_y) / latticeTime_y
+    xAhead = np.round(obsOrigin[0] + lengthAhead, 6)\
+        - adjustForFloatError[0, 1]
+    xBehind = np.round(obsOrigin[0] - lengthBehind, 6)\
+        + adjustForFloatError[0, 0]
+    yAhead = np.round(obsOrigin[1] + breadthAhead, 6)\
+        - adjustForFloatError[1, 1]
+    yBehind = np.round(obsOrigin[1] - breadthBehind, 6)\
+        + adjustForFloatError[1, 0]
+    # print(xAhead, xBehind, yAhead, yBehind)
+    # xAhead = np.round(obsOrigin[0] + lengthAhead, 6)
+    # xBehind = np.round(obsOrigin[0] - lengthBehind, 6)
+    # yAhead = np.round(obsOrigin[1] + breadthAhead, 6)
+    # yBehind = np.round(obsOrigin[1] - breadthBehind, 6)
+    # if i_global == 151 and j_global == 137:
+    #     print(xAhead, xBehind, yAhead, yBehind)
+    # cond1 = (i_global <= obsOrigin[0] + lengthAhead and
+    #          i_global >= obsOrigin[0] - lengthBehind and
+    #          j_global <= obsOrigin[1] + breadthAhead and
+    #          j_global >= obsOrigin[1] - breadthBehind)
+    cond1 = (i_global <= xAhead and i_global >= xBehind and
+             j_global <= yAhead and j_global >= yBehind)
     cond2, cond3 = False, False
     cond4, cond5 = False, False
     cond6, cond7 = False, False
@@ -439,10 +495,9 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] - Nx_global + 2) +
                 (j_global - obsOrigin[1]) *
                 (j_global - obsOrigin[1]))
-        cond2 = (i_global - Nx_global + 2 <= obsOrigin[0] + length / 2 and
-                 i_global - Nx_global + 2 >= obsOrigin[0] - length / 2 and
-                 j_global <= obsOrigin[1] + breadth / 2 and
-                 j_global >= obsOrigin[1] - breadth / 2)
+        cond2 = (i_global - Nx_global + 2 <= xAhead and
+                 i_global - Nx_global + 2 >= xBehind and
+                 j_global <= yAhead and j_global >= yBehind)
         if cond2:
             insideSolid = True
             leastDist = dist
@@ -452,10 +507,9 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] + Nx_global - 2) +
                 (j_global - obsOrigin[1]) *
                 (j_global - obsOrigin[1]))
-        cond3 = (i_global + Nx_global - 2 <= obsOrigin[0] + length / 2 and
-                 i_global + Nx_global - 2 >= obsOrigin[0] - length / 2 and
-                 j_global <= obsOrigin[1] + breadth / 2 and
-                 j_global >= obsOrigin[1] - breadth / 2)
+        cond3 = (i_global + Nx_global - 2 <= xAhead and
+                 i_global + Nx_global - 2 >= xBehind and
+                 j_global <= yAhead and j_global >= yBehind)
         if cond3:
             insideSolid = True
             leastDist = dist
@@ -468,10 +522,9 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0]) +
                 (j_global - obsOrigin[1] - Ny_global + 2) *
                 (j_global - obsOrigin[1] - Ny_global + 2))
-        cond2 = (i_global <= obsOrigin[0] + length / 2 and
-                 i_global >= obsOrigin[0] - length / 2 and
-                 j_global - Ny_global + 2 <= obsOrigin[1] + breadth / 2 and
-                 j_global - Ny_global + 2 >= obsOrigin[1] - breadth / 2)
+        cond2 = (i_global <= xAhead and i_global >= xBehind and
+                 j_global - Ny_global + 2 <= yAhead and
+                 j_global - Ny_global + 2 >= yBehind)
         if cond2:
             insideSolid = True
             leastDist = dist
@@ -481,10 +534,9 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0]) +
                 (j_global - obsOrigin[1] + Ny_global - 2) *
                 (j_global - obsOrigin[1] + Ny_global - 2))
-        cond3 = (i_global <= obsOrigin[0] + length / 2 and
-                 i_global >= obsOrigin[0] - length / 2 and
-                 j_global + Ny_global - 2 <= obsOrigin[1] + breadth / 2 and
-                 j_global + Ny_global - 2 >= obsOrigin[1] - breadth / 2)
+        cond3 = (i_global <= xAhead and i_global >= xBehind and
+                 j_global + Ny_global - 2 <= yAhead and
+                 j_global + Ny_global - 2 >= yBehind)
         if cond3:
             insideSolid = True
             leastDist = dist
@@ -497,10 +549,9 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] - Nx_global + 2) +
                 (j_global - obsOrigin[1]) *
                 (j_global - obsOrigin[1]))
-        cond2 = (i_global - Nx_global + 2 <= obsOrigin[0] + length / 2 and
-                 i_global - Nx_global + 2 >= obsOrigin[0] - length / 2 and
-                 j_global <= obsOrigin[1] + breadth / 2 and
-                 j_global >= obsOrigin[1] - breadth / 2)
+        cond2 = (i_global - Nx_global + 2 <= xAhead and
+                 i_global - Nx_global + 2 >= xBehind and
+                 j_global <= yAhead and j_global >= yBehind)
         if cond2:
             insideSolid = True
             leastDist = dist
@@ -510,10 +561,9 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] + Nx_global - 2) +
                 (j_global - obsOrigin[1]) *
                 (j_global - obsOrigin[1]))
-        cond3 = (i_global + Nx_global - 2 <= obsOrigin[0] + length / 2 and
-                 i_global + Nx_global - 2 >= obsOrigin[0] - length / 2 and
-                 j_global <= obsOrigin[1] + breadth / 2 and
-                 j_global >= obsOrigin[1] - breadth / 2)
+        cond3 = (i_global + Nx_global - 2 <= xAhead and
+                 i_global + Nx_global - 2 >= xBehind and
+                 j_global <= yAhead and j_global >= yBehind)
         if cond3:
             insideSolid = True
             leastDist = dist
@@ -523,10 +573,9 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0]) +
                 (j_global - obsOrigin[1] - Ny_global + 2) *
                 (j_global - obsOrigin[1] - Ny_global + 2))
-        cond4 = (i_global <= obsOrigin[0] + length / 2 and
-                 i_global >= obsOrigin[0] - length / 2 and
-                 j_global - Ny_global + 2 <= obsOrigin[1] + breadth / 2 and
-                 j_global - Ny_global + 2 >= obsOrigin[1] - breadth / 2)
+        cond4 = (i_global <= xAhead and i_global >= xBehind and
+                 j_global - Ny_global + 2 <= yAhead and
+                 j_global - Ny_global + 2 >= yBehind)
         if cond4:
             insideSolid = True
             leastDist = dist
@@ -536,10 +585,9 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0]) +
                 (j_global - obsOrigin[1] + Ny_global - 2) *
                 (j_global - obsOrigin[1] + Ny_global - 2))
-        cond5 = (i_global <= obsOrigin[0] + length / 2 and
-                 i_global >= obsOrigin[0] - length / 2 and
-                 j_global + Ny_global - 2 <= obsOrigin[1] + breadth / 2 and
-                 j_global + Ny_global - 2 >= obsOrigin[1] - breadth / 2)
+        cond5 = (i_global <= xAhead and i_global >= xBehind and
+                 j_global + Ny_global - 2 <= yAhead and
+                 j_global + Ny_global - 2 >= yBehind)
         if cond5:
             insideSolid = True
             leastDist = dist
@@ -549,10 +597,10 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] - Nx_global + 2) +
                 (j_global - obsOrigin[1] - Ny_global + 2) *
                 (j_global - obsOrigin[1] - Ny_global + 2))
-        cond6 = (i_global - Nx_global + 2 <= obsOrigin[0] + length / 2 and
-                 i_global - Nx_global + 2 >= obsOrigin[0] - length / 2 and
-                 j_global - Ny_global + 2 <= obsOrigin[1] + breadth / 2 and
-                 j_global - Ny_global + 2 >= obsOrigin[1] - breadth / 2)
+        cond6 = (i_global - Nx_global + 2 <= xAhead and
+                 i_global - Nx_global + 2 >= xBehind and
+                 j_global - Ny_global + 2 <= yAhead and
+                 j_global - Ny_global + 2 >= yBehind)
         if cond6:
             insideSolid = True
             leastDist = dist
@@ -562,10 +610,10 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] + Nx_global - 2) +
                 (j_global - obsOrigin[1] - Ny_global + 2) *
                 (j_global - obsOrigin[1] - Ny_global + 2))
-        cond7 = (i_global + Nx_global - 2 <= obsOrigin[0] + length / 2 and
-                 i_global + Nx_global - 2 >= obsOrigin[0] - length / 2 and
-                 j_global - Ny_global + 2 <= obsOrigin[1] + breadth / 2 and
-                 j_global - Ny_global + 2 >= obsOrigin[1] - breadth / 2)
+        cond7 = (i_global + Nx_global - 2 <= xAhead and
+                 i_global + Nx_global - 2 >= xBehind and
+                 j_global - Ny_global + 2 <= yAhead and
+                 j_global - Ny_global + 2 >= yBehind)
         if cond7:
             insideSolid = True
             leastDist = dist
@@ -575,10 +623,10 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] - Nx_global + 2) +
                 (j_global - obsOrigin[1] + Ny_global - 2) *
                 (j_global - obsOrigin[1] + Ny_global - 2))
-        cond8 = (i_global - Nx_global + 2 <= obsOrigin[0] + length / 2 and
-                 i_global - Nx_global + 2 >= obsOrigin[0] - length / 2 and
-                 j_global + Ny_global - 2 <= obsOrigin[1] + breadth / 2 and
-                 j_global + Ny_global - 2 >= obsOrigin[1] - breadth / 2)
+        cond8 = (i_global - Nx_global + 2 <= xAhead and
+                 i_global - Nx_global + 2 >= xBehind and
+                 j_global + Ny_global - 2 <= yAhead and
+                 j_global + Ny_global - 2 >= yBehind)
         if cond8:
             insideSolid = True
             leastDist = dist
@@ -588,10 +636,10 @@ def reconstructRectangle(i_global, j_global, Nx_global, Ny_global,
                 (i_global - obsOrigin[0] + Nx_global - 2) +
                 (j_global - obsOrigin[1] + Ny_global - 2) *
                 (j_global - obsOrigin[1] + Ny_global - 2))
-        cond9 = (i_global + Nx_global - 2 <= obsOrigin[0] + length / 2 and
-                 i_global + Nx_global - 2 >= obsOrigin[0] - length / 2 and
-                 j_global + Ny_global - 2 <= obsOrigin[1] + breadth / 2 and
-                 j_global + Ny_global - 2 >= obsOrigin[1] - breadth / 2)
+        cond9 = (i_global + Nx_global - 2 <= xAhead and
+                 i_global + Nx_global - 2 >= xBehind and
+                 j_global + Ny_global - 2 <= yAhead and
+                 j_global + Ny_global - 2 >= yBehind)
         if cond9:
             insideSolid = True
             leastDist = dist

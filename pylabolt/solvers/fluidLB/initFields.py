@@ -15,6 +15,10 @@ class initialFields:
                             dtype=precision)
         self.boundaryNode = np.zeros((Nx * Ny),
                                      dtype=np.int32)
+        self.fluidBoundary = np.zeros((Nx * Ny),
+                                      dtype=np.int32)
+        self.solidBoundary = np.zeros((Nx * Ny),
+                                      dtype=np.int32)
 
 
 def setFields(fields, rho_initial, mesh, velType,

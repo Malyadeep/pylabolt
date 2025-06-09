@@ -13,9 +13,7 @@ from pylabolt.solvers.phaseFieldLB.kernels import (equilibriumRelaxation_cuda,
 from pylabolt.parallel.MPI_comm import (reduceComm, proc_boundary,
                                         gatherForcesTorque_mpi,
                                         proc_boundaryGradTerms)
-from pylabolt.solvers.phaseFieldLB.phaseField import (forcePhaseField,
-                                                      replaceTanh,
-                                                      replaceTanhCircle)
+from pylabolt.solvers.phaseFieldLB.phaseField import forcePhaseField
 
 
 def equilibriumRelaxationFluid(Nx, Ny, f_eq, f, f_new, u, p, rho, solid,
@@ -36,55 +34,55 @@ def equilibriumRelaxationFluid(Nx, Ny, f_eq, f, f_new, u, p, rho, solid,
                                source[ind], force=True)
 
 
-def equilibriumRelaxationPhase(Nx, Ny, h_eq, h, h_new, u, phi, gradPhi,
-                               solid, solidBoundary, boundaryNode,
-                               interfaceWidth, c, w, collisionFuncPhase,
-                               equilibriumFuncPhase, preFactorPhase,
-                               equilibriumArgsPhase, procBoundary,
-                               forcingPreFactorPhase, preFactorPhaseSolid,
-                               forcingPreFactorPhaseSolid, noOfDirections,
-                               precision, hysteresis=False,
-                               equilibriating=False):
+# def equilibriumRelaxationPhase(Nx, Ny, h_eq, h, h_new, u, phi, gradPhi,
+#                                solid, boundaryNode, interfaceWidth, c, w,
+#                                collisionFuncPhase, equilibriumFuncPhase,
+#                                preFactorPhase, equilibriumArgsPhase,
+#                                procBoundary, forcingPreFactorPhase,
+#                                noOfDirections, precision):
+#     for ind in prange(Nx * Ny):
+#         if (solid[ind, 0] != 1 and procBoundary[ind] != 1
+#                 and boundaryNode[ind] != 1):
+#             force = np.zeros(noOfDirections, dtype=precision)
+#             forcePhaseField(force, phi[ind], gradPhi[ind], interfaceWidth,
+#                             c, w, noOfDirections)
+#             # if ind == int(34 * 93 + 49):
+#             #     print(force)
+#             #     print(gradPhi[ind])
+#             equilibriumFuncPhase(h_eq[ind, :], u[ind, :], phi[ind],
+#                                  *equilibriumArgsPhase)
+
+#             collisionFuncPhase(h[ind, :], h_new[ind, :], h_eq[ind, :],
+#                                preFactorPhase, forcingPreFactorPhase,
+#                                force, force=True)
+
+
+def segregation(Nx, Ny, h, f, f_eq, p, phi, gradPhi, solid,
+                boundaryNode, interfaceWidth, c, noOfDirections,
+                equilibriumFuncFluid, equilibriumArgsFluid,
+                procBoundary, precision):
+    u_zero = np.zeros(2, dtype=precision)
     for ind in prange(Nx * Ny):
-        force = np.zeros(noOfDirections, dtype=precision)
         if (solid[ind, 0] != 1 and procBoundary[ind] != 1
                 and boundaryNode[ind] != 1):
-            forcePhaseField(force, phi[ind], gradPhi[ind], interfaceWidth,
-                            c, w, noOfDirections)
-            equilibriumFuncPhase(h_eq[ind, :], u[ind, :], phi[ind],
-                                 *equilibriumArgsPhase)
-            collisionFuncPhase(h[ind, :], h_new[ind, :], h_eq[ind, :],
-                               preFactorPhase, forcingPreFactorPhase,
-                               force, force=True)
-        # if (hysteresis is True and equilibriating is False and
-        #         solidBoundary[ind] == 1 and procBoundary[ind] != 1
-        #         and boundaryNode[ind] != 1):
-        #     forcePhaseField(force, phi[ind], gradPhi[ind], interfaceWidth,
-        #                     c, w, noOfDirections)
-        #     equilibriumFuncPhase(h_eq[ind, :], u[ind, :], phi[ind],
-        #                          *equilibriumArgsPhase)
-        #     collisionFuncPhase(h[ind, :], h_new[ind, :], h_eq[ind, :],
-        #                        preFactorPhaseSolid, forcingPreFactorPhaseSolid,
-        #                        force, force=True)
+            equilibriumFuncFluid(f_eq[ind, :], u_zero, p[ind],
+                                 *equilibriumArgsFluid)
+            magGradPhi = np.sqrt(gradPhi[ind, 0] * gradPhi[ind, 0] +
+                                 gradPhi[ind, 1] * gradPhi[ind, 1]) + 1e-20
+            normalPhi_x = gradPhi[ind, 0] / magGradPhi
+            normalPhi_y = gradPhi[ind, 1] / magGradPhi
+            for k in range(noOfDirections):
+                cDotn = c[k, 0] * normalPhi_x + c[k, 1] * normalPhi_y
+                h[ind, k] = phi[ind] * f[ind, k] + 2 * cDotn *\
+                    phi[ind] * (1 - phi[ind]) * f_eq[ind, k] / interfaceWidth
 
 
-def initializeSolidBoundaryPop(h, h_new, h_eq, u, phi, solidBoundary,
-                               equilibriumFuncPhase, equilibriumArgsPhase,
-                               Nx, Ny):
-    for ind in prange(Nx * Ny):
-        if solidBoundary[ind] == 1:
-            equilibriumFuncPhase(h_eq[ind, :], u[ind, :], phi[ind],
-                                 *equilibriumArgsPhase)
-            equilibriumFuncPhase(h[ind, :], u[ind, :], phi[ind],
-                                 *equilibriumArgsPhase)
-            equilibriumFuncPhase(h_new[ind, :], u[ind, :], phi[ind],
-                                 *equilibriumArgsPhase)
-
-
-def computeFieldsFluid(Nx, Ny, f_new, u, p, rho, phi, forceField, solid, c,
-                       cs, noOfDirections, boundaryNode, procBoundary, size,
-                       forceFunc_vel, forceCoeffVel, rho_l, rho_g, phi_g,
-                       precision, u_old, rho_old, residues):
+def computeFieldsFluid(Nx, Ny, f_new, u, p, rho, phi, gradPhi, forceField,
+                       surfaceTensionForce, viscousCorrection,
+                       pressureCorrection, solid, gravity, c, w, cs,
+                       noOfDirections, phiWeight, boundaryNode,
+                       procBoundary, size, rho_l, rho_g, phi_g, precision,
+                       u_old, rho_old, residues):
     u_sq, u_err_sq = 0., 0.
     v_sq, v_err_sq = 0., 0.
     rho_sq, rho_err_sq = 0., 0.
@@ -92,21 +90,39 @@ def computeFieldsFluid(Nx, Ny, f_new, u, p, rho, phi, forceField, solid, c,
         if (solid[ind, 0] != 1 and procBoundary[ind] != 1
                 and boundaryNode[ind] != 1):
             rho[ind] = rho_g + (phi[ind] - phi_g) * (rho_l - rho_g)
+            forceCorrection_x = surfaceTensionForce[ind, 0] +\
+                viscousCorrection[ind, 0] + rho[ind] * gravity[0]
+            forceCorrection_y = surfaceTensionForce[ind, 1] +\
+                viscousCorrection[ind, 1] + rho[ind] * gravity[1]
             pSum = precision(0)
             uSum = precision(0)
             vSum = precision(0)
             for k in range(noOfDirections):
-                pSum += f_new[ind, k]
+                if k > 0:
+                    pSum += f_new[ind, k]
                 uSum += c[k, 0] * f_new[ind, k]
                 vSum += c[k, 1] * f_new[ind, k]
-            p[ind] = pSum
-            u[ind, 0] = uSum
-            u[ind, 1] = vSum
-            forceFunc_vel(u[ind, :], rho[ind], forceField[ind, :],
-                          forceCoeffVel)
-            # Temporary
-            # u[ind, 0] = obsVel[0]
-            # u[ind, 1] = obsVel[1]
+            for innerIter in range(5):
+                pressureCorrection_x = - p[ind] * cs * cs * (rho_l - rho_g) *\
+                    gradPhi[ind, 0]
+                pressureCorrection_y = - p[ind] * cs * cs * (rho_l - rho_g) *\
+                    gradPhi[ind, 1]
+                u[ind, 0] = \
+                    uSum + 0.5 * (forceCorrection_x + pressureCorrection_x) /\
+                    rho[ind]
+                u[ind, 1] = \
+                    vSum + 0.5 * (forceCorrection_y + pressureCorrection_y) /\
+                    rho[ind]
+                uDotu = u[ind, 0] * u[ind, 0] + u[ind, 1] * u[ind, 1]
+                # p[ind] = (pSum - (1 - phiWeight[0]) - w[0] * uDotu /
+                #           (2 * cs * cs)) / (1 - w[0])
+                p[ind] = (pSum - w[0] * uDotu / (2 * cs * cs)) / (1 - w[0])
+            pressureCorrection[ind, 0] = - p[ind] * cs * cs * (rho_l - rho_g)\
+                * gradPhi[ind, 0]
+            pressureCorrection[ind, 1] = - p[ind] * cs * cs * (rho_l - rho_g)\
+                * gradPhi[ind, 1]
+            forceField[ind, 0] = forceCorrection_x + pressureCorrection[ind, 0]
+            forceField[ind, 1] = forceCorrection_y + pressureCorrection[ind, 1]
         # Residue calculation
         u_err_sq += (u[ind, 0] - u_old[ind, 0]) * \
             (u[ind, 0] - u_old[ind, 0])
@@ -125,10 +141,9 @@ def computeFieldsFluid(Nx, Ny, f_new, u, p, rho, phi, forceField, solid, c,
     residues[4], residues[5] = rho_sq, rho_err_sq
 
 
-def computeFieldsPhase(Nx, Ny, h_new, phi, solid, solidBoundary,
-                       boundaryNode, procBoundary, noOfDirections,
-                       precision, phi_old, residues, hysteresis=False,
-                       equilibriating=False):
+def computeFieldsPhase(Nx, Ny, h_new, phi, solid, boundaryNode,
+                       procBoundary, noOfDirections,
+                       precision, phi_old, residues):
     phi_sq, phi_err_sq = 0., 0.
     for ind in prange(Nx * Ny):
         if (solid[ind, 0] != 1 and procBoundary[ind] != 1
@@ -137,13 +152,6 @@ def computeFieldsPhase(Nx, Ny, h_new, phi, solid, solidBoundary,
             for k in range(noOfDirections):
                 phiSum += h_new[ind, k]
             phi[ind] = phiSum
-        # if (solidBoundary[ind] == 1 and procBoundary[ind] != 1
-        #         and boundaryNode[ind] != 1 and hysteresis is True
-        #         and equilibriating is False):
-        #     phiSum = precision(0)
-        #     for k in range(noOfDirections):
-        #         phiSum += h_new[ind, k]
-        #     phi[ind] = phiSum
         # Residue calculation
         phi_err_sq += (phi[ind] - phi_old[ind]) * \
             (phi[ind] - phi_old[ind])
@@ -152,26 +160,20 @@ def computeFieldsPhase(Nx, Ny, h_new, phi, solid, solidBoundary,
     residues[6], residues[7] = phi_sq, phi_err_sq
 
 
-def adjustMass(phi, phiMass, initialMass, boundaryNode, fluidBoundary,
-               procBoundary, interfaceRegion, solid, Nx, Ny, timeStep):
+def adjustMass(phi, phiMass, initialMass, boundaryNode,
+               procBoundary, solid, Nx, Ny):
     difference = initialMass - phiMass
     noOfNodes = 0
-    for ind in range(Nx * Ny):
-        if (solid[ind, 0] == 0 and procBoundary[ind] != 1
-                and boundaryNode[ind] != 1 and fluidBoundary[ind] == 0
-                and phi[ind] > 0.05 and phi[ind] < 0.95):
-            noOfNodes += 1
-            interfaceRegion[ind] = 1
-    massAdd = difference / noOfNodes
-    # print(timeStep, phiMass, initialMass, noOfNodes, difference, massAdd)
-    # if timeStep % 10000 == 0:
     for ind in prange(Nx * Ny):
-        if (solid[ind, 0] == 0 and procBoundary[ind] != 1
-                and boundaryNode[ind] != 1 and fluidBoundary[ind] == 0
-                and phi[ind] > 0.05 and phi[ind] < 0.95):
-            # if phi[ind] + massAdd <= 1:
+        if (solid[ind, 0] != 1 and procBoundary[ind] != 1
+                and boundaryNode[ind] != 1 and phi[ind] > 0.9):
+            noOfNodes += 1
+    # print(phiMass, initialMass, noOfNodes, difference)
+    massAdd = difference / noOfNodes
+    for ind in prange(Nx * Ny):
+        if (solid[ind, 0] != 1 and procBoundary[ind] != 1
+                and boundaryNode[ind] != 1 and phi[ind] > 0.9):
             phi[ind] += massAdd
-    return massAdd, difference, noOfNodes, phiMass
 
 
 def streamFluid(Nx, Ny, f, f_new, solid, rho, u, procBoundary, boundaryNode,
@@ -181,6 +183,8 @@ def streamFluid(Nx, Ny, f, f_new, solid, rho, u, procBoundary, boundaryNode,
         if (procBoundary[ind] != 1 and boundaryNode[ind] != 1 and
                 solid[ind, 0] != 1):
             i, j = int(ind / Ny), int(ind % Ny)
+            force_x = rho[ind] * 1.8140589569161001e-06
+            force_y = 0
             for k in range(noOfDirections):
                 i_old = i - int(c[k, 0])
                 j_old = j - int(c[k, 1])
@@ -218,13 +222,16 @@ def streamFluid(Nx, Ny, f, f_new, solid, rho, u, procBoundary, boundaryNode,
                              c[invList[k], 1] * u[ind_solid, 1]) * cs_2
                     else:
                         preFactor = 0
-                    f_new[ind, k] = f[ind, invList[k]] - preFactor
+                    forceTerm = w[invList[k]] *\
+                        (c[invList[k], 0] * force_x +
+                         c[invList[k], 1] * force_y) * cs_2 / rho[ind]
+                    f_new[ind, k] = f[ind, invList[k]] - preFactor +\
+                        forceTerm
 
 
-def streamPhase(Nx, Ny, h, h_new, phi, u, massAdded, solid, solidBoundary,
-                procBoundary, boundaryNode, c, w, cs_2, noOfDirections,
-                invList, nx, ny, nProc_x, nProc_y, size, equilibriating=False,
-                hysteresis=False):
+def streamPhase(Nx, Ny, h, h_new, phi, u, massAdded, solid, procBoundary,
+                boundaryNode, c, w, cs_2, noOfDirections, invList, nx, ny,
+                nProc_x, nProc_y, size, equilibriating=False):
     for ind in prange(Nx * Ny):
         if (solid[ind, 0] != 1 and procBoundary[ind] != 1
                 and boundaryNode[ind] != 1):
@@ -261,54 +268,13 @@ def streamPhase(Nx, Ny, h, h_new, phi, u, massAdded, solid, solidBoundary,
                 elif solid[i_solid * Ny + j_solid, 0] == 1:
                     ind_solid = i_solid * Ny + j_solid
                     if equilibriating is False:
-                        # preFactor = 0
                         preFactor = 2 * w[invList[k]] * phi[ind] *\
                             (c[invList[k], 0] * u[ind_solid, 0] +
                              c[invList[k], 1] * u[ind_solid, 1]) * cs_2
                         massAdded[ind] += -preFactor
                     else:
-                        preFactor = 0
+                        preFactor = False
                     h_new[ind, k] = h[ind, invList[k]] - preFactor
-        # if (solidBoundary[ind] == 1 and procBoundary[ind] != 1
-        #         and boundaryNode[ind] != 1 and hysteresis is True
-        #         and equilibriating is False):
-        #     i, j = int(ind / Ny), int(ind % Ny)
-        #     for k in range(noOfDirections):
-        #         i_old = i - int(c[k, 0])
-        #         j_old = j - int(c[k, 1])
-        #         i_solid = i - int(c[k, 0])
-        #         j_solid = j - int(c[k, 1])
-        #         if size == 1:
-        #             if i - int(2 * c[k, 0]) < 0 or i - int(2 * c[k, 0]) >= Nx:
-        #                 i_old = (i_old - int(2 * c[k, 0]) + Nx) % Nx
-        #                 i_solid = (i_solid - int(2 * c[k, 0]) + Nx) % Nx
-        #             else:
-        #                 i_old = (i_old + Nx) % Nx
-        #                 i_solid = (i_solid + Nx) % Nx
-        #             if j - int(2 * c[k, 1]) < 0 or j - int(2 * c[k, 1]) >= Ny:
-        #                 j_old = (j_old - int(2 * c[k, 1]) + Ny) % Ny
-        #                 j_solid = (j_solid - int(2 * c[k, 1]) + Ny) % Ny
-        #             else:
-        #                 j_old = (j_old + Ny) % Ny
-        #                 j_solid = (j_solid + Ny) % Ny
-        #         elif size > 1 and boundaryNode[ind] == 2:
-        #             if (i - int(2 * c[k, 0]) == 0 and nx == 0 or
-        #                     i - int(2 * c[k, 0]) == Nx - 1 and
-        #                     nx == nProc_x - 1):
-        #                 i_solid = i_solid - int(c[k, 0])
-        #             if (j - int(2 * c[k, 1]) == 0 and ny == 0 or
-        #                     j - int(2 * c[k, 1]) == Ny - 1 and
-        #                     ny == nProc_y - 1):
-        #                 j_solid = j_solid - int(c[k, 1])
-        #         if solidBoundary[i_solid * Ny + j_solid] == 1:
-        #             h_new[ind, k] = h[i_old * Ny + j_old, k]
-        #         elif solidBoundary[i_solid * Ny + j_solid] == 0:
-        #             # ind_solid = i_solid * Ny + j_solid
-        #             if j == 20:
-        #                 h_new[ind, k] = h[int(i_old * Ny + j), k]
-        #             else:
-        #                 h_new[ind, k] = h[ind, invList[k]]
-        #             # h_new[ind, k] = h[i_old * Ny + j, k]
 
 
 def computeResiduals(residues, tempResidues, comm, rank, size, precision):
@@ -356,8 +322,6 @@ def obstacleModification(simulation, timeStep, size, rank, comm, warmup,
         # if timeStep % simulation.saveInterval == 0:
         #     np.savez('output/massAdded_' + str(timeStep) + '.npz', massAdded=simulation.fields.massAdded)
         #     np.savez('output/phi_' + str(timeStep) + '.npz', phi=simulation.fields.phi)
-        simulation.phaseField.\
-            copyPhi(*simulation.copyPhiArgs)
         simulation.obstacle.\
             modifyObstacle(simulation.options, simulation.fields,
                            simulation.mesh, simulation.lattice,
@@ -450,7 +414,8 @@ class baseAlgorithm:
         self.equilibriumRelaxationFluid = equilibriumRelaxationFluid
         self.streamFluid = streamFluid
         self.computeFieldsFluid = computeFieldsFluid
-        self.equilibriumRelaxationPhase = equilibriumRelaxationPhase
+        # self.equilibriumRelaxationPhase = equilibriumRelaxationPhase
+        self.segregation = segregation
         self.streamPhase = streamPhase
         self.computeFieldsPhase = computeFieldsPhase
 
@@ -463,9 +428,11 @@ class baseAlgorithm:
         self.computeFieldsFluid = numba.njit(self.computeFieldsFluid,
                                              parallel=parallel, cache=False,
                                              nogil=True)
-        self.equilibriumRelaxationPhase = \
-            numba.njit(self.equilibriumRelaxationPhase, parallel=parallel,
-                       cache=False, nogil=True)
+        # self.equilibriumRelaxationPhase = \
+        #     numba.njit(self.equilibriumRelaxationPhase, parallel=parallel,
+        #                cache=False, nogil=True)
+        self.segregation = numba.njit(self.segregation, parallel=parallel,
+                                      cache=False, nogil=True)
         self.streamPhase = numba.njit(self.streamPhase, parallel=parallel,
                                       cache=False, nogil=True)
         self.computeFieldsPhase = numba.njit(self.computeFieldsPhase,
@@ -473,9 +440,6 @@ class baseAlgorithm:
                                              nogil=True)
         self.adjustMass = numba.njit(adjustMass, parallel=parallel,
                                      cache=False, nogil=True)
-        self.initializeSolidBoundaryPop = \
-            numba.njit(initializeSolidBoundaryPop, parallel=parallel,
-                       cache=False, nogil=True)
 
     def jitWarmUp(self, simulation, size, rank, comm):
         if rank == 0:
@@ -503,36 +467,21 @@ class baseAlgorithm:
                            dtype=simulation.precision)
         residues = np.zeros(8, dtype=simulation.precision)
         tempResidues = np.zeros(8, dtype=simulation.precision)
-
         # if warmup is False:
         #     phiMass_all = computePartialMass(simulation)
         #     print(phiMass_all[0], phiMass_all[1], phiMass_all[2])
 
         # Smooth Initialization for interface
-        simulation.collisionArgsPhase[5] = simulation.fields.u_initialize
+        simulation.segregationArgs[3] = simulation.fields.f_eq
         simulation.streamArgsPhase[5] = simulation.fields.u_initialize
         if rank == 0 and warmup is False:
             print('Beginning smooth initialization of phase field...')
             print('Calculated time steps required to initialize = ',
                   simulation.phaseField.diffusionTime, '\n')
-        # np.savez("output/phiData_t_0_beforePhaseDiff.npz",
-        #          phi=simulation.fields.phi,
-        #          h_new=simulation.fields.h_new)
-        # xl, xr = 35.5, 86.5
-        # for i in range(simulation.mesh.Nx):
-        #     ind = int(i * simulation.mesh.Ny + 4)
-        #     if i < simulation.mesh.Nx // 2:
-        #         simulation.fields.phi[ind] =\
-        #             0.5 * (1 + np.tanh(2 * (i - xl) /
-        #                    simulation.phaseField.interfaceWidth))
-        #     else:
-        #         simulation.fields.phi[ind] =\
-        #             0.5 * (1 - np.tanh(2 * (i - xr) /
-        #                    simulation.phaseField.interfaceWidth))
         for timeStep in range(0, 10 * simulation.phaseField.diffusionTime):
             # for timeStep in range(0, 0):
             self.computeFieldsPhase(*simulation.computeFieldsArgsPhase,
-                                    phi_old, residues, equilibriating=True)
+                                    phi_old, residues)
             if size > 1:
                 comm.Barrier()
                 proc_boundaryGradTerms(*simulation.commPhiArgs, comm,
@@ -540,12 +489,6 @@ class baseAlgorithm:
                 comm.Barrier()
 
             if simulation.phaseField.contactAngle is not None:
-                simulation.phaseField.\
-                    copyPhi(*simulation.copyPhiArgs)
-                simulation.phaseField.\
-                    computePhiSolid(simulation.options, simulation.fields,
-                                    simulation.mesh, size, timeStep,
-                                    simulation.saveInterval, initial=True)
                 simulation.phaseField.setSolidPhaseField(simulation.options,
                                                          simulation.fields,
                                                          simulation.boundary,
@@ -571,14 +514,13 @@ class baseAlgorithm:
                     print('timeStep = ' + str(round(timeStep, 10)).ljust(16) +
                           ' | resPhi = ' + str(round(resPhi, 10)).ljust(16),
                           flush=True)
-            self.equilibriumRelaxationPhase(*simulation.collisionArgsPhase,
-                                            equilibriating=True)
+            self.segregation(*simulation.segregationArgs)
             if size > 1:
                 comm.Barrier()
                 proc_boundary(*simulation.procBoundaryArgsPhase, comm,
                               inner=True)
                 comm.Barrier()
-            self.streamPhase(*simulation.streamArgsPhase, equilibriating=True)
+            self.streamPhase(*simulation.streamArgsPhase)
             simulation.boundary.setBoundary(simulation.fields, simulation
                                             .lattice, simulation.mesh,
                                             equilibriumFunc=simulation.
@@ -589,7 +531,7 @@ class baseAlgorithm:
                                             equilibriumArgsPhase,
                                             initialPhase=True)
 
-        simulation.collisionArgsPhase[5] = simulation.fields.u
+        simulation.segregationArgs[3] = simulation.fields.f
         simulation.streamArgsPhase[5] = simulation.fields.u
         simulation.initializePopulations(u_initial='u')
 
@@ -607,47 +549,35 @@ class baseAlgorithm:
         # capillaryTime = np.sqrt(rho * D * D / sigma)
         # totalTime = -1  #20 * np.int64(viscousTime + capillaryTime)
         print(simulation.equilibriumTime)
-        if not os.path.isdir("output"):
-            os.makedirs("output")
         # if warmup is False:
         #     np.savez("output/phi.npz", phi=simulation.fields.phi)
 
         # if warmup is False:
         #     phiMass_all = computePartialMass(simulation)
         #     print(phiMass_all[0], phiMass_all[1], phiMass_all[2])
-        # np.savez("output/phiData_t_0_beforeEq.npz",
-        #          phi=simulation.fields.phi,
-        #          h_new=simulation.fields.h_new)
+
         #####################################################################
         # Equilibriating system
         #####################################################################
         if warmup is False:
             print("\nEquilibriating system....\n")
-            totalTime = simulation.equilibriumTime
         else:
-            totalTime = 0
+            totalTime = -1
         obsFlag = False
         if simulation.obstacle.obsModifiable is True:
             obsFlag = True
             simulation.obstacle.obsModifiable = False
-        gravity = simulation.forcingScheme.gravity
+        # gravity = simulation.forcingScheme.gravity
         # simulation.forceFluidArgs[13] = np.zeros(2, simulation.precision)
         # simulation.forcingScheme.gravity = \
         #     np.zeros(2, simulation.precision)
-        print(simulation.forcingScheme.gravity, simulation.forceFluidArgs[13])
 
-        for timeStep in range(simulation.startTime, totalTime + 1,
-                              simulation.lattice.deltaT):
+        for timeStep in range(simulation.startTime, simulation.equilibriumTime
+                              + 1, simulation.lattice.deltaT):
             self.computeFieldsPhase(*simulation.computeFieldsArgsPhase,
-                                    phi_old, residues, equilibriating=True)
+                                    phi_old, residues)
 
             if simulation.phaseField.contactAngle is not None:
-                simulation.phaseField.\
-                    copyPhi(*simulation.copyPhiArgs)
-                simulation.phaseField.\
-                    computePhiSolid(simulation.options, simulation.fields,
-                                    simulation.mesh, size, timeStep,
-                                    simulation.saveInterval, initial=True)
                 simulation.phaseField.setSolidPhaseField(simulation.options,
                                                          simulation.fields,
                                                          simulation.boundary,
@@ -662,6 +592,7 @@ class baseAlgorithm:
             simulation.phaseField.forceFluid(*simulation.forceFluidArgs)
             self.computeFieldsFluid(*simulation.computeFieldsArgsFluid,
                                     u_old, rho_old, residues)
+
             # if timeStep % simulation.stdOutputInterval == 0:
             if timeStep % 10000 == 0:
                 resU, resV, resRho, resPhi = \
@@ -702,9 +633,9 @@ class baseAlgorithm:
                           ' | phiMass = ' + str(round(mass[0], 8)).ljust(10) +
                           ' | solidMass = ' + str(round(solidMass[0], 8)).
                           ljust(10), flush=True)
-            self.equilibriumRelaxationPhase(*simulation.collisionArgsPhase,
-                                            equilibriating=True)
+            # self.equilibriumRelaxationPhase(*simulation.collisionArgsPhase)
             self.equilibriumRelaxationFluid(*simulation.collisionArgsFluid)
+            self.segregation(*simulation.segregationArgs)
             self.streamPhase(*simulation.streamArgsPhase, equilibriating=True)
             self.streamFluid(*simulation.streamArgsFluid, equilibriating=True)
             simulation.boundary.setBoundary(simulation.fields, simulation
@@ -720,9 +651,7 @@ class baseAlgorithm:
 
         if obsFlag is True:
             simulation.obstacle.obsModifiable = True
-        # simulation.forcingScheme.gravity = gravity
         # simulation.forceFluidArgs[13] = simulation.forcingScheme.gravity
-        print(simulation.forcingScheme.gravity, simulation.forceFluidArgs[13])
 
         # if warmup is False:
         #     phiMass_all = computePartialMass(simulation)
@@ -743,116 +672,11 @@ class baseAlgorithm:
             hysteresis = simulation.phaseField.contactAngleHysteresis
         else:
             hysteresis = False
-        # np.savez("output/phiData_t_0_afterEq.npz",
-        #          phi=simulation.fields.phi,
-        #          h_new=simulation.fields.h_new)
-        # simulation.collisionArgsPhase[5] = simulation.fields.u
-        # simulation.streamArgsPhase[5] = simulation.fields.u
-        # simulation.initializePopulations(u_initial='u')
-        cylinder = simulation.phaseField.cylinder
-        plate = simulation.phaseField.plate
-        if plate is True:
-            xl = np.zeros(2, dtype=simulation.precision)
-            xr = np.zeros(2, dtype=simulation.precision)
-            center = np.zeros(2, dtype=simulation.precision)
-            xl_0 = np.zeros(2, dtype=simulation.precision)
-            xr_0 = np.zeros(2, dtype=simulation.precision)
-            center_0 = np.zeros(2, dtype=simulation.precision)
-        elif cylinder is True:
-            thetaLeft = np.zeros(1, dtype=simulation.precision)
-            thetaRight = np.zeros(1, dtype=simulation.precision)
-            center = np.zeros(1, dtype=simulation.precision)
-            thetaLeft_0 = np.zeros(1, dtype=simulation.precision)
-            thetaRight_0 = np.zeros(1, dtype=simulation.precision)
-            center_0 = np.zeros(1, dtype=simulation.precision)
-        if (plate is True and simulation.phaseField.
-                contactAngleHysteresis is True):
-            x, phiLine = \
-                replaceTanh(simulation.mesh.Nx, simulation.mesh.Ny,
-                            simulation.fields.phi, simulation.fields.
-                            solidBoundary, simulation.phaseField.
-                            interfaceWidth, xl_0, xr_0, center_0)
-            # if warmup is False:
-            #     np.savez("output/phiLine.npz", x=x, xl_0=xl_0, xr_0=xr_0,
-            #              center=center, phiLine=phiLine, phi=simulation.fields.
-            #              phi)
-            xl = np.copy(xl_0)
-            xr = np.copy(xr_0)
-            center = np.copy(center_0)
-            simulation.phaseField.interfaceWidthEffLeft[0] =\
-                simulation.phaseField.interfaceWidth
-            simulation.phaseField.interfaceWidthEffLeft[1] =\
-                simulation.phaseField.interfaceWidth
-            simulation.phaseField.interfaceWidthEffRight[0] =\
-                simulation.phaseField.interfaceWidth
-            simulation.phaseField.interfaceWidthEffRight[1] =\
-                simulation.phaseField.interfaceWidth
-        elif (cylinder is True and simulation.phaseField.
-                contactAngleHysteresis is True):
-            simulation.phaseField.noOfSolidBoundary[0] = 0
-            for ind in range(simulation.mesh.Nx * simulation.mesh.Ny):
-                if (simulation.fields.boundaryNode[ind] != 1 and
-                        simulation.fields.solidBoundary[ind] == 1):
-                    simulation.phaseField.noOfSolidBoundary[0] += 1
-            r, theta, phiTheta, thetaInterpolate, phiInterpolate, \
-                phiThetaSolid, sortedIndex, indexMap = \
-                replaceTanhCircle(simulation.mesh.Nx, simulation.mesh.Ny,
-                                  simulation.fields.phi, simulation.fields.
-                                  solidBoundary, simulation.phaseField.
-                                  interfaceWidth, thetaLeft_0,
-                                  thetaRight_0, center_0, simulation.
-                                  obstacle.obsOrigin[0, 0], simulation.
-                                  obstacle.obsOrigin[0, 1],
-                                  simulation.phaseField.noOfSolidBoundary[0],
-                                  simulation.obstacle.radius[0])
-            if warmup is False:
-                np.savez("output/phiTheta.npz", r=r, theta=theta,
-                         thetaLeft_0=thetaLeft_0, thetaRight_0=thetaRight_0,
-                         center=center, phiTheta=phiTheta, phi=simulation.
-                         fields.phi, thetaInterpolate=thetaInterpolate,
-                         phiInterpolate=phiInterpolate,
-                         phiThetaSolid=phiThetaSolid, indexMap=indexMap,
-                         solidNbNodes=simulation.options.solidNbNodes[0],
-                         sortedIndex=sortedIndex)
-            thetaLeft[0] = thetaLeft_0[0]
-            thetaRight[0] = thetaRight_0[0]
-            center[0] = center_0[0]
-            simulation.phaseField.sortedIndex[0] = sortedIndex
-            simulation.phaseField.thetaSolid[0] = theta
-            simulation.phaseField.phiThetaSolid[0] = phiThetaSolid
-            simulation.phaseField.contactAngleThetaSolid[0] =\
-                np.zeros_like(phiThetaSolid)
-            simulation.phaseField.interfaceWidthEffLeft[0] =\
-                simulation.phaseField.interfaceWidth
-            simulation.phaseField.interfaceWidthEffRight[0] =\
-                simulation.phaseField.interfaceWidth
-        # if hysteresis is True:
-        #     args = (simulation.fields.h, simulation.fields.h_new,
-        #             simulation.fields.h_eq, simulation.fields.u,
-        #             simulation.fields.phi, simulation.fields.solidBoundary,
-        #             simulation.equilibriumFuncPhase, simulation.
-        #             equilibriumArgsPhase, simulation.mesh.Nx,
-        #             simulation.mesh.Ny)
-        #     self.initializeSolidBoundaryPop(*args)
-        interfaceRegion = np.zeros(simulation.mesh.Nx * simulation.mesh.Ny,
-                                   dtype=np.int32)
-        # phiBeforeUpdate = np.zeros(simulation.mesh.Nx * simulation.mesh.Ny,
-        #                            dtype=np.float64)
-        # phiInitialGuess = np.zeros(simulation.mesh.Nx * simulation.mesh.Ny,
-        #                            dtype=np.float64)
         for timeStep in range(simulation.startTime, simulation.endTime + 1,
                               simulation.lattice.deltaT):
-            # if timeStep == 0:
-            #     np.savez("output/phiData_t_0_beforeUpdate.npz",
-            #              phi=simulation.fields.phi,
-            #              h_new=simulation.fields.h_new)
             # Compute macroscopic fields and forces #
             self.computeFieldsPhase(*simulation.computeFieldsArgsPhase,
-                                    phi_old, residues, hysteresis=hysteresis)
-            # if timeStep == 0:
-            #     np.savez("output/phiData_t_0_afterUpdate.npz",
-            #              phi=simulation.fields.phi,
-            #              h_new=simulation.fields.h_new)
+                                    phi_old, residues)
             if size > 1:
                 comm.Barrier()
                 proc_boundaryGradTerms(*simulation.commPhiArgs, comm,
@@ -865,180 +689,26 @@ class baseAlgorithm:
                                      comm, warmup, hysteresis=hysteresis)
             # Obstacle modification done #
 
-            if (simulation.phaseField.massCorrection is True and
-                    timeStep % simulation.phaseField.
-                    massCorrectionInterval == 0):
-                phiMass = simulation.phaseField.\
-                    computeMass(simulation.phaseField.mass,
-                                simulation.fields.phi, simulation.fields.
-                                solid, simulation.fields.boundaryNode,
-                                simulation.fields.procBoundary,
-                                simulation.mesh.Nx, simulation.mesh.Ny)
-                massAdd, difference, noOfNodes, phiMass = \
-                    self.adjustMass(simulation.fields.phi, phiMass[0],
-                                    initialMass, simulation.fields.
-                                    boundaryNode, simulation.fields.
-                                    fluidBoundary, simulation.fields.
-                                    procBoundary, interfaceRegion,
-                                    simulation.fields.solid,
-                                    simulation.mesh.Nx, simulation.mesh.Ny,
-                                    timeStep)
-                if timeStep % simulation.saveInterval == 0:
-                    np.savez("output/massAddData_t_" + str(timeStep) + ".npz",
-                             massAdd=massAdd, difference=difference,
-                             noOfNodes=noOfNodes, phiMass=phiMass,
-                             interfaceRegion=interfaceRegion)
-
+            # phiMass = simulation.phaseField.\
+            #     computeMass(simulation.phaseField.mass,
+            #                 simulation.fields.phi, simulation.fields.
+            #                 solid, simulation.fields.boundaryNode,
+            #                 simulation.fields.procBoundary,
+            #                 simulation.mesh.Nx, simulation.mesh.Ny)
+            # self.adjustMass(simulation.fields.phi, phiMass[0], initialMass,
+            #                 simulation.fields.boundaryNode,
+            #                 simulation.fields.procBoundary,
+            #                 simulation.fields.solid, simulation.mesh.Nx,
+            #                 simulation.mesh.Ny)
             if simulation.phaseField.contactAngle is not None:
-                simulation.phaseField.\
-                    valuesNewGhostNodes(*simulation.valuesNewGhostNodesArgs)
-                # if np.sum(simulation.fields.nodesIdentified) > 0:
-                #     print(timeStep, np.sum(simulation.fields.nodesIdentified))
-                simulation.phaseField.\
-                    copyPhi(*simulation.copyPhiArgs)
-                simulation.phaseField.\
-                    computePhiSolid(simulation.options, simulation.fields,
-                                    simulation.mesh, size, timeStep,
-                                    simulation.saveInterval, initial=False)
-                if simulation.phaseField.contactAngleHysteresis is True:
-                    # simulation.phaseField.\
-                    #     gradPhiSolidBoundary(*simulation.
-                    #                          gradPhiSolidArgs)
-                    if plate is True:
-                        pass
-                        simulation.phaseField.\
-                            ghostNodeHysteresis(simulation.options,
-                                                simulation.fields,
-                                                simulation.obstacle,
-                                                simulation.mesh, xl, xr,
-                                                center, xl_0, xr_0, center_0,
-                                                timeStep, cylinder=cylinder,
-                                                plate=plate)
-                        phiInitialGuess = np.copy(simulation.fields.phi)
-                    elif cylinder is True:
-                        # pass
-                        simulation.phaseField.\
-                            recomputeSortedIndex(simulation.mesh, simulation.
-                                                 obstacle, simulation.fields)
-                        simulation.phaseField.\
-                            ghostNodeHysteresis(simulation.options,
-                                                simulation.fields,
-                                                simulation.obstacle,
-                                                simulation.mesh, thetaLeft,
-                                                thetaRight, center,
-                                                thetaLeft_0, thetaRight_0,
-                                                center_0, timeStep,
-                                                cylinder=cylinder, plate=plate)
-                        phiInitialGuess = np.copy(simulation.fields.phi)
-                # simulation.phaseField.\
-                #     gradPhiFluidBoundary(*simulation.gradPhiFluidBoundaryArgs)
-                # simulation.phaseField.\
-                #     copyPhi(*simulation.copyPhiArgs)
-                # print(center, xl, xr)
-                if simulation.phaseField.contactAngleHysteresis is True:
-                    if plate is True:
-                        simulation.phaseField.\
-                            checkPinning(simulation.fields, simulation.options,
-                                         simulation.obstacle, simulation.mesh,
-                                         center, xl, xr, plate=plate,
-                                         cylinder=cylinder)
-                        simulation.phaseField.\
-                            setSolidPhaseFieldHysteresis(simulation.fields,
-                                                         simulation.options,
-                                                         simulation.obstacle,
+                simulation.phaseField.setSolidPhaseField(simulation.options,
+                                                         simulation.fields,
+                                                         simulation.boundary,
+                                                         simulation.lattice,
                                                          simulation.mesh,
-                                                         center, xl, xr, size,
-                                                         plate=plate,
-                                                         cylinder=cylinder)
-                    elif cylinder is True:
-                        simulation.phaseField.\
-                            checkPinning(simulation.fields, simulation.options,
-                                         simulation.obstacle, simulation.mesh,
-                                         center, thetaLeft, thetaRight,
-                                         plate=plate, cylinder=cylinder)
-                        simulation.phaseField.\
-                            setSolidPhaseFieldHysteresis(simulation.fields,
-                                                         simulation.options,
-                                                         simulation.obstacle,
-                                                         simulation.mesh,
-                                                         center, thetaLeft,
-                                                         thetaRight, size,
-                                                         plate=plate,
-                                                         cylinder=cylinder)
-                else:
-                    simulation.phaseField.\
-                        setSolidPhaseField(simulation.options,
-                                           simulation.fields,
-                                           simulation.boundary,
-                                           simulation.lattice,
-                                           simulation.mesh,
-                                           size, timeStep,
-                                           simulation.saveInterval)
-                if simulation.phaseField.contactAngleHysteresis is True:
-                    if plate is True:
-                        pass
-                        # simulation.phaseField.\
-                        #     computeAvgContactAngle(simulation.obstacle,
-                        #                            simulation.fields,
-                        #                            simulation.mesh, xl, xr,
-                        #                            plate=plate,
-                        #                            cylinder=cylinder)
-                        simulation.phaseField.\
-                            updateInterfaceLocation(simulation.obstacle,
-                                                    xl, xr, center,
-                                                    simulation.mesh,
-                                                    simulation.fields,
-                                                    plate=plate,
-                                                    cylinder=cylinder)
-                        if timeStep % simulation.saveInterval == 0:
-                            print(timeStep, center, xl, xr)
-                            print(simulation.phaseField.leftReceding,
-                                  simulation.phaseField.leftAdvancing)
-                            print(simulation.phaseField.rightReceding,
-                                  simulation.phaseField.rightAdvancing)
-                        phiWetting = np.copy(simulation.fields.phi)
-                        # simulation.phaseField.\
-                        #     ghostNodeHysteresis(simulation.options,
-                        #                         simulation.fields,
-                        #                         simulation.obstacle,
-                        #                         simulation.mesh, xl, xr,
-                        #                         center, xl_0, xr_0, center_0,
-                        #                         timeStep, cylinder=cylinder,
-                        #                         plate=plate, smoothening=True)
-                        # print("Hi")
-                    elif cylinder is True:
-                        # pass
-                        # print(timeStep)
-                        simulation.phaseField.\
-                            updatePhiTheta(simulation.fields, simulation.mesh)
-                        # print("Hi")
-                        if timeStep % simulation.saveInterval == 0:
-                            print(timeStep, simulation.phaseField.interfaceWidthEffLeft,
-                                  simulation.phaseField.interfaceWidthEffRight,
-                                  simulation.phaseField.contactAngleLeft * 180 / np.pi,
-                                  simulation.phaseField.contactAngleRight * 180 / np.pi)
-                            print(simulation.phaseField.leftReceding,
-                                  simulation.phaseField.leftAdvancing)
-                            print(simulation.phaseField.rightReceding,
-                                  simulation.phaseField.rightAdvancing)
-                        simulation.phaseField.\
-                            updateInterfaceLocation(simulation.obstacle,
-                                                    thetaLeft, thetaRight,
-                                                    center, simulation.mesh,
-                                                    simulation.fields,
-                                                    plate=plate,
-                                                    cylinder=cylinder)
-                        phiWetting = np.copy(simulation.fields.phi)
-                        # simulation.phaseField.\
-                        #     ghostNodeHysteresis(simulation.options,
-                        #                         simulation.fields,
-                        #                         simulation.obstacle,
-                        #                         simulation.mesh, thetaLeft,
-                        #                         thetaRight, center,
-                        #                         thetaLeft_0, thetaRight_0,
-                        #                         center_0, timeStep,
-                        #                         cylinder=cylinder, plate=plate,
-                        #                         smoothening=True)
+                                                         size, timeStep,
+                                                         simulation.
+                                                         saveInterval,)
                 if size > 1:
                     comm.Barrier()
                     proc_boundaryGradTerms(*simulation.commPhiArgs, comm,
@@ -1057,8 +727,31 @@ class baseAlgorithm:
             # scalene_profiler.start()
             simulation.phaseField.forceFluid(*simulation.forceFluidArgs)
             # scalene_profiler.stop()
+
+            # if timeStep % simulation.saveInterval == 0:
+            #     np.savez("output/checkData_" + str(timeStep) + ".npz",
+            #              forceField=simulation.fields.forceField,
+            #              surfaceTensionForce=simulation.fields.
+            #              surfaceTensionForce, viscousCorrection=simulation.
+            #              fields.viscousCorrection,
+            #              pressureCorrection=simulation.fields.
+            #              pressureCorrection, phi=simulation.fields.phi,
+            #              u=simulation.fields.u, p=simulation.fields.p,
+            #              rho=simulation.fields.rho)
+
             self.computeFieldsFluid(*simulation.computeFieldsArgsFluid,
                                     u_old, rho_old, residues)
+
+            # if timeStep % simulation.saveInterval == 0:
+            #     np.savez("output/checkData_" + str(timeStep) + ".npz",
+            #              forceField=simulation.fields.forceField,
+            #              surfaceTensionForce=simulation.fields.
+            #              surfaceTensionForce, viscousCorrection=simulation.
+            #              fields.viscousCorrection,
+            #              pressureCorrection=simulation.fields.
+            #              pressureCorrection, phi=simulation.fields.phi,
+            #              u=simulation.fields.u, p=simulation.fields.p,
+            #              rho=simulation.fields.rho)
 
             if timeStep % simulation.stdOutputInterval == 0:
                 # print(phiMass)
@@ -1133,11 +826,10 @@ class baseAlgorithm:
                           ' | resRho = ' + str(round(resRho, 10)).ljust(12) +
                           ' | resPhi = ' + str(round(resPhi, 10)).ljust(12),
                           flush=True)
-
-            # if timeStep >= 19995 and timeStep <= 20005:
-            # if timeStep % simulation.saveInterval == 0:
             if timeStep % simulation.saveInterval == 0:
-                # if timeStep >= 219858:
+                # np.savez("output/phi_" + str(timeStep) + ".npz",
+                #          phi=simulation.fields.phi,
+                #          gradPhi=simulation.fields.gradPhi)
                 if size == 1:
                     writeFields(timeStep, simulation.fields,
                                 simulation.lattice, simulation.mesh)
@@ -1189,87 +881,6 @@ class baseAlgorithm:
                                                        forces, torque,
                                                        capForces, hydForces,
                                                        capTorque, hydTorque)
-                if simulation.phaseField.contactAngleHysteresis is False:
-                    # pass
-                    np.savez("output/phiData_t_" + str(timeStep) + ".npz",
-                             phi=simulation.fields.phi,
-                             solidBoundary=simulation.fields.solidBoundary,
-                             fluidBoundary=simulation.fields.fluidBoundary,
-                             phiFSolid=simulation.fields.phiFSolidBoundary,
-                             deltaFuncFluid=simulation.fields.deltaFuncFluid,
-                             delPhiFluid=simulation.fields.delPhiFluid,
-                             contactAngleLocalFluid=simulation.fields.
-                             contactAngleLocalFluid, deltaFuncSolid=simulation.
-                             fields.deltaFuncSolid, delPhiSolid=simulation.
-                             fields.delPhiSolid,
-                             contactAngleLocalSolid=simulation.fields.
-                             contactAngleLocalSolid,
-                             solidNormal=simulation.options.surfaceNormals[0],
-                             solidNbNodes=simulation.options.solidNbNodes[0])
-                if (plate is True and simulation.phaseField.
-                        contactAngleHysteresis is True):
-                    pass
-                    # np.savez("output/phiData_t_" + str(timeStep) + ".npz",
-                    #          phi=simulation.fields.phi,
-                    #          phiAdvect=simulation.fields.phiAdvect,
-                    #          phiWetting=phiWetting,
-                    #          phiInitialGuess=phiInitialGuess,
-                    #          phiTemp=simulation.fields.phi_temp,
-                    #          normalPhiTemp=simulation.fields.normalPhi_temp,
-                    #          nodesIdentified=simulation.fields.nodesIdentified,
-                    #          gradPhi=simulation.fields.gradPhi,
-                    #          lapPhi=simulation.fields.lapPhi,
-                    #          u=simulation.fields.u,
-                    #          solid=simulation.fields.solid,
-                    #          normalPhi=simulation.fields.normalPhi,
-                    #          solidBoundary=simulation.fields.solidBoundary,
-                    #          fluidBoundary=simulation.fields.fluidBoundary,
-                    #          boundaryNode=simulation.fields.boundaryNode,
-                    #          center=center, xl=xl,
-                    #          xr=xr, xl_0=xl_0, xr_0=xr_0, center_0=center_0,
-                    #          obsU=simulation.obstacle.obsU[0],
-                    #          obsOrigin=simulation.obstacle.obsOrigin[0],
-                    #          normalPhiDotNormalSolid=simulation.fields.
-                    #          normalPhiDotNormalSolid, phiFSolid=simulation.
-                    #          fields.phiFSolidBoundary,
-                    #          deltaFuncFluid=simulation.fields.deltaFuncFluid,
-                    #          delPhiFluid=simulation.fields.delPhiFluid,
-                    #          contactAngleLocalFluid=simulation.fields.
-                    #          contactAngleLocalFluid, deltaFuncSolid=simulation.
-                    #          fields.deltaFuncSolid, delPhiSolid=simulation.
-                    #          fields.delPhiSolid,
-                    #          contactAngleLocalSolid=simulation.fields.
-                    #          contactAngleLocalSolid,
-                    #          solidNormal=simulation.options.surfaceNormals[0],
-                    #          solidNbNodes=simulation.options.solidNbNodes[0])
-                elif (cylinder is True and simulation.phaseField.
-                        contactAngleHysteresis is True):
-                    # pass
-                    np.savez("output/phiData_t_" + str(timeStep) + ".npz",
-                             phi=simulation.fields.phi,
-                             solid=simulation.fields.solid,
-                             solidBoundary=simulation.fields.solidBoundary,
-                             fluidBoundary=simulation.fields.fluidBoundary,
-                             center=center, thetaLeft=thetaLeft,
-                             thetaRight=thetaRight,
-                             deltaFuncFluid=simulation.fields.deltaFuncFluid,
-                             delPhiFluid=simulation.fields.delPhiFluid,
-                             contactAngleLocalFluid=simulation.fields.
-                             contactAngleLocalFluid, deltaFuncSolid=simulation.
-                             fields.deltaFuncSolid, delPhiSolid=simulation.
-                             fields.delPhiSolid,
-                             contactAngleLocalSolid=simulation.fields.
-                             contactAngleLocalSolid,
-                             sortedIndex=simulation.phaseField.sortedIndex[0],
-                             thetaSolid=simulation.phaseField.thetaSolid[0],
-                             phiThetaSolid=simulation.phaseField.
-                             phiThetaSolid[0], normalPhi=simulation.fields.
-                             normalPhi, gradPhi=simulation.fields.gradPhi,
-                             solidNormal=simulation.options.surfaceNormals[0],
-                             solidNbNodes=simulation.options.solidNbNodes[0],
-                             contactAngleLeft=simulation.phaseField.
-                             contactAngleLeft, contactAngleRight=simulation.
-                             phaseField.contactAngleLeft)
             if simulation.saveStateInterval is not None:
                 if timeStep % simulation.saveStateInterval == 0:
                     saveState(timeStep, simulation)
@@ -1368,9 +979,8 @@ class baseAlgorithm:
             # Check for convergence done!#
 
             # Equilibrium and Collision
-            self.equilibriumRelaxationPhase(*simulation.collisionArgsPhase,
-                                            hysteresis=hysteresis)
             self.equilibriumRelaxationFluid(*simulation.collisionArgsFluid)
+            self.segregation(*simulation.segregationArgs)
 
             # Share data between processors
             if size > 1:
@@ -1382,14 +992,7 @@ class baseAlgorithm:
                 comm.Barrier()
 
             # Streaming
-            self.streamPhase(*simulation.streamArgsPhase,
-                             hysteresis=hysteresis)
-            # print(timeStep, mass, phiSum2, simulation.obstacle.obsOrigin)
-            # if timeStep < 1000:
-            #     # print(phiSum)
-            #     allTimeSumPreFactor += sumPreFactor
-            # if timeStep == 999:
-            #     print(sumPreFactor)
+            self.streamPhase(*simulation.streamArgsPhase)
             self.streamFluid(*simulation.streamArgsFluid)
 
             # Boundary condition

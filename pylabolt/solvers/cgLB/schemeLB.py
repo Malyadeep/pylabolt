@@ -7,8 +7,8 @@ from pylabolt.base.models import (collisionModels, equilibriumModels,
 from pylabolt.base.models.collisionParams import (MRT_def,
                                                   constructBGKOperator,
                                                   constructMRTOperator)
-from pylabolt.solvers.phaseFieldLB.phaseField import (stressTensorBGK,
-                                                      stressTensorMRT)
+from pylabolt.solvers.cgLB.phaseField import (stressTensorBGK,
+                                              stressTensorMRT)
 
 
 class collisionScheme:
@@ -25,8 +25,9 @@ class collisionScheme:
             self.setCollisionSchemePhase(phase, precision, phaseField,
                                          rank, lattice, parallelization)
             fluid = collisionDict['fluid']
-            self.setCollisionSchemeFluid(fluid, precision, transport,
-                                         rank, lattice, mesh, parallelization)
+            self.setCollisionSchemeFluid(fluid, precision, phaseField,
+                                         transport, rank, lattice, mesh,
+                                         parallelization)
         except KeyError as e:
             if rank == 0:
                 print("ERROR! Keyword: " + str(e) +
@@ -48,55 +49,26 @@ class collisionScheme:
                             fill_value=(self.deltaT/self.tauPhase),
                             dtype=precision)
                 self.preFactorPhase = np.diag(diagValue, k=0)
-                if phaseField.contactAngleHysteresis is True:
-                    self.tauPhaseSolid = self.cs_2 * phaseField.\
-                        solidPhaseFieldMobility + 0.5
-                    diagValue = \
-                        np.full(lattice.noOfDirections,
-                                fill_value=(self.deltaT/self.tauPhaseSolid),
-                                dtype=precision)
-                    self.preFactorPhaseSolid = np.diag(diagValue, k=0)
             else:
                 if rank == 0:
                     print("ERROR! Unsupported collision model for 'phase': " +
                           phase['model'])
                 os._exit(1)
             self.collisionModelPhase = phase['model']
-            if phase['equilibrium'] == 'linear':
-                try:
-                    self.rho_ref = precision(phase['rho_ref'])
-                except KeyError:
-                    if rank == 0:
-                        print("ERROR! Missing keyword 'rho_ref' " +
-                              "in collisionDict!")
-                    os._exit(1)
+            if phase['equilibrium'] == 'segregation':
                 if parallelization == 'cuda':
-                    self.equilibriumTypePhase = 1     # Stands for first order
-                    self.equilibriumFuncPhase = equilibriumModels.stokesLinear
-                    self.equilibriumArgsPhase = (self.rho_ref, self.cs_2,
-                                                 self.c, self.w)
-                else:
-                    self.equilibriumFuncPhase = equilibriumModels.stokesLinear
-                    self.equilibriumArgsPhase = (self.rho_ref, self.cs_2,
-                                                 self.c, self.w)
-            elif phase['equilibrium'] == 'secondOrder':
-                if parallelization == 'cuda':
-                    self.equilibriumTypePhase = 2     # Stands for second order
-                    self.equilibriumFuncPhase = equilibriumModels.secondOrder
+                    self.equilibriumTypePhase = 1     # Stands for segregation
+                    self.equilibriumFuncPhase = velocityEquilibriumModels.\
+                        segregationEquilibrium
                     self.equilibriumArgsPhase = (self.cs_2, self.cs_4,
-                                                 self.c, self.w)
+                                                 self.c, self.w, phaseField.
+                                                 phiWeight)
                 else:
-                    self.equilibriumFuncPhase = equilibriumModels.secondOrder
+                    self.equilibriumFuncPhase = velocityEquilibriumModels.\
+                        segregationEquilibrium
                     self.equilibriumArgsPhase = (self.cs_2, self.cs_4,
-                                                 self.c, self.w)
-            elif phase['equilibrium'] == 'firstOrder':
-                if parallelization == 'cuda':
-                    self.equilibriumTypePhase = 3     # Stands for first order
-                    self.equilibriumFuncPhase = equilibriumModels.firstOrder
-                    self.equilibriumArgsPhase = (self.cs_2, self.c, self.w)
-                else:
-                    self.equilibriumFuncPhase = equilibriumModels.firstOrder
-                    self.equilibriumArgsPhase = (self.cs_2, self.c, self.w)
+                                                 self.c, self.w, phaseField.
+                                                 phiWeight)
             else:
                 if rank == 0:
                     print("ERROR! Unsupported equilibrium model for 'phase': "
@@ -109,8 +81,9 @@ class collisionScheme:
                       " missing in 'phase'")
             os._exit(1)
 
-    def setCollisionSchemeFluid(self, fluid, precision, transport, rank,
-                                lattice, mesh, parallelization):
+    def setCollisionSchemeFluid(self, fluid, precision, phaseField,
+                                transport, rank, lattice, mesh,
+                                parallelization):
         try:
             if fluid['model'] == 'BGK':
                 self.collisionTypeFluidNo = 1        # Stands for BGK
@@ -170,28 +143,30 @@ class collisionScheme:
                          lattice.noOfDirections), dtype=precision)
             if fluid['equilibrium'] == 'velocityBased':
                 if parallelization == 'cuda':
+                    self.equilibriumTypeFluid = 1     # Stands for second order
+                    self.equilibriumFuncFluid = velocityEquilibriumModels.\
+                        secondOrder
+                    self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
+                                                 self.c, self.w)
+                else:
+                    self.equilibriumFuncFluid = velocityEquilibriumModels.\
+                        secondOrder
+                    self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
+                                                 self.c, self.w)
+            elif fluid['equilibrium'] == 'zuHe':
+                if parallelization == 'cuda':
                     self.equilibriumTypeFluid = 2     # Stands for second order
                     self.equilibriumFuncFluid = velocityEquilibriumModels.\
-                        secondOrder
+                        zuHe
                     self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
-                                                 self.c, self.w)
+                                                 self.c, self.w, phaseField.
+                                                 phiWeight)
                 else:
                     self.equilibriumFuncFluid = velocityEquilibriumModels.\
-                        secondOrder
+                        zuHe
                     self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
-                                                 self.c, self.w)
-            elif fluid['equilibrium'] == 'secondOrder':
-                if parallelization == 'cuda':
-                    self.equilibriumTypeFluid = 3     # Stands for second order
-                    self.equilibriumFuncFluid = equilibriumModels.\
-                        secondOrder
-                    self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
-                                                 self.c, self.w)
-                else:
-                    self.equilibriumFuncFluid = equilibriumModels.\
-                        secondOrder
-                    self.equilibriumArgsFluid = (self.cs_2, self.cs_4,
-                                                 self.c, self.w)
+                                                 self.c, self.w, phaseField.
+                                                 phiWeight)
             else:
                 if rank == 0:
                     print("ERROR! Unsupported equilibrium model for 'fluid': "
@@ -216,8 +191,7 @@ class forcingScheme:
                                          dtype=precision)
         self.forcingFlag = 0
 
-    def setForcingScheme(self, lattice, phaseField, collisionScheme, rank,
-                         precision):
+    def setForcingScheme(self, lattice, collisionScheme, rank, precision):
         try:
             from simulation import forcingDict
             keyList = list(forcingDict.keys())
@@ -235,10 +209,6 @@ class forcingScheme:
             self.forcingPreFactorPhase = \
                 np.diag(1 - 0.5 * np.diag(collisionScheme.
                         preFactorPhase, k=0), k=0)
-            if phaseField.contactAngleHysteresis is True:
-                self.forcingPreFactorPhaseSolid = \
-                    np.diag(1 - 0.5 * np.diag(collisionScheme.
-                            preFactorPhaseSolid, k=0), k=0)
             try:
                 self.gravity = forcingDict['g']
                 if not isinstance(self.gravity, list) is True:

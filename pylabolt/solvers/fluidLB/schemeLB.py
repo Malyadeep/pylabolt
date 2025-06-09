@@ -30,7 +30,7 @@ class collisionScheme:
         try:
             if fluid['model'] == 'BGK':
                 if parallelization == 'cuda':
-                    self.collisionType = 1      # Stands for BGK
+                    self.collisionTypeFluid = 1      # Stands for BGK
                     self.collisionFunc = collisionModels.BGK
                 else:
                     self.collisionFunc = collisionModels.BGK
@@ -42,7 +42,7 @@ class collisionScheme:
                 self.preFactor = np.diag(diagVec, k=0)
             elif fluid['model'] == 'MRT':
                 if parallelization == 'cuda':
-                    self.collisionType = 2      # Stands for MRT
+                    self.collisionTypeFluid = 2      # Stands for MRT
                     self.collisionFunc = collisionModels.MRT
                 else:
                     self.collisionFunc = collisionModels.MRT
@@ -50,6 +50,7 @@ class collisionScheme:
                     from pylabolt.base.models.collisionParams import MRT_def
                     self.nu_bulk = fluid['nu_B']
                     self.tau_nu = self.cs_2 * transport.nu + 0.5
+                    # self.tau_bulk = self.cs_2 * transport.nu + 0.5  # Testing only
                     self.tau_bulk = self.cs_2 * (transport.nu/3 +
                                                  self.nu_bulk) + 0.5
                     self.S_nu = self.deltaT/self.tau_nu
@@ -64,6 +65,8 @@ class collisionScheme:
                               " missing in 'fluid' in 'collisionDict'")
                     os._exit(1)
                 self.preFactor = self.MRT.preFactorMat
+                # print(np.linalg.det(self.preFactor))
+                self.preFactorInv = self.MRT.preFactorMatInv
             else:
                 if rank == 0:
                     print("ERROR! Unsupported collision model : " +
@@ -72,7 +75,7 @@ class collisionScheme:
             self.collisionModelFluid = fluid['model']
             if fluid['equilibrium'] == 'linear':
                 try:
-                    self.rho_0 = precision(fluid['rho_ref'])
+                    self.rho_ref = precision(fluid['rho_ref'])
                 except KeyError:
                     if rank == 0:
                         print("ERROR! Missing keyword 'rho_ref' " +
@@ -80,26 +83,26 @@ class collisionScheme:
                     os._exit(1)
                 if parallelization == 'cuda':
                     self.equilibriumType = 1     # Stands for first order
-                    self.equilibriumFunc = equilibriumModels.linear
-                    self.equilibriumArgs = (self.rho_0, self.cs_2, self.c,
-                                            self.w)
+                    self.equilibriumFuncFluid = equilibriumModels.linear
+                    self.equilibriumArgsFluid = \
+                        (self.rho_ref, self.cs_2, self.c, self.w)
                 else:
-                    self.equilibriumFunc = equilibriumModels.linear
-                    self.equilibriumArgs = (self.rho_0, self.cs_2, self.c,
-                                            self.w)
+                    self.equilibriumFuncFluid = equilibriumModels.linear
+                    self.equilibriumArgsFluid = \
+                        (self.rho_ref, self.cs_2, self.c, self.w)
             elif fluid['equilibrium'] == 'secondOrder':
                 if parallelization == 'cuda':
                     self.equilibriumType = 2      # Stands for second order
-                    self.equilibriumFunc = equilibriumModels.secondOrder
-                    self.equilibriumArgs = (self.cs_2, self.cs_4,
-                                            self.c, self.w)
+                    self.equilibriumFuncFluid = equilibriumModels.secondOrder
+                    self.equilibriumArgsFluid = \
+                        (self.cs_2, self.cs_4, self.c, self.w)
                 else:
-                    self.equilibriumFunc = equilibriumModels.secondOrder
-                    self.equilibriumArgs = (self.cs_2, self.cs_4,
-                                            self.c, self.w)
+                    self.equilibriumFuncFluid = equilibriumModels.secondOrder
+                    self.equilibriumArgsFluid = \
+                        (self.cs_2, self.cs_4, self.c, self.w)
             elif fluid['equilibrium'] == 'incompressible':
                 try:
-                    self.rho_0 = precision(fluid['rho_ref'])
+                    self.rho_ref = precision(fluid['rho_ref'])
                 except KeyError:
                     if rank == 0:
                         print("ERROR! Missing keyword 'rho_ref' " +
@@ -108,16 +111,18 @@ class collisionScheme:
                     os._exit(1)
                 if parallelization == 'cuda':
                     self.equilibriumType = 3      # Stands for incompressible
-                    self.equilibriumFunc = equilibriumModels.incompressible
-                    self.equilibriumArgs = (self.rho_0, self.cs_2, self.cs_4,
-                                            self.c, self.w)
+                    self.equilibriumFuncFluid = \
+                        equilibriumModels.incompressible
+                    self.equilibriumArgsFluid = \
+                        (self.rho_ref, self.cs_2, self.cs_4, self.c, self.w)
                 else:
-                    self.equilibriumFunc = equilibriumModels.incompressible
-                    self.equilibriumArgs = (self.rho_0, self.cs_2, self.cs_4,
-                                            self.c, self.w)
+                    self.equilibriumFuncFluid = \
+                        equilibriumModels.incompressible
+                    self.equilibriumArgsFluid = \
+                        (self.rho_ref, self.cs_2, self.cs_4, self.c, self.w)
             elif fluid['equilibrium'] == 'oseen':
                 try:
-                    self.rho_0 = precision(fluid['rho_ref'])
+                    self.rho_ref = precision(fluid['rho_ref'])
                     self.U_0 = fluid['U_ref']
                     if isinstance(self.U_0, list):
                         self.U_0 = np.array(self.U_0, dtype=precision)
@@ -135,13 +140,15 @@ class collisionScheme:
                     os._exit(1)
                 if parallelization == 'cuda':
                     self.equilibriumType = 4    # Stands for oseen equilibrium
-                    self.equilibriumFunc = equilibriumModels.oseen
-                    self.equilibriumArgs = (self.rho_0, self.U_0, self.cs_2,
-                                            self.cs_4, self.c, self.w)
+                    self.equilibriumFuncFluid = equilibriumModels.oseen
+                    self.equilibriumArgsFluid = \
+                        (self.rho_ref, self.U_0, self.cs_2, self.cs_4, self.c,
+                         self.w)
                 else:
-                    self.equilibriumFunc = equilibriumModels.oseen
-                    self.equilibriumArgs = (self.rho_0, self.U_0, self.cs_2,
-                                            self.cs_4, self.c, self.w)
+                    self.equilibriumFuncFluid = equilibriumModels.oseen
+                    self.equilibriumArgsFluid = \
+                        (self.rho_ref, self.U_0, self.cs_2, self.cs_4, self.c,
+                         self.w)
             else:
                 if rank == 0:
                     print("ERROR! Unsupported equilibrium model : " +

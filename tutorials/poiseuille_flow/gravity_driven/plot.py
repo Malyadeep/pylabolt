@@ -40,8 +40,7 @@ def plot_U_poiseuille(Nx, Ny, y_sim, u_all, y_an, u_an):
     colors = ['green', 'blue', 'orange']
     plt.figure(1, figsize=(6, 6))
     for itr, case in enumerate(cases):
-        plt.scatter(u_all[itr][int(Nx - 1), :, 0] /
-                    np.max(u_all[itr][int(Nx - 1), :, 0]),
+        plt.scatter(u_all[itr][int(Nx - 1), :, 0] / 0.1,
                     y_sim, edgecolors=colors[itr], facecolors='none',
                     marker=markers[itr], label='PyLaBolt - ' + case)
     plt.plot(u_an, y_an, c='r', label='Analytical')

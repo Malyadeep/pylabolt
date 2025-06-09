@@ -2,8 +2,7 @@ import numpy as np
 import os
 
 
-def initializeFields(internalFields, fields, mesh, precision, comm,
-                     phaseField):
+def initializeFields(internalFields, fields, mesh, precision, comm):
     internalFieldsKeys = list(internalFields.keys())
     if len(internalFieldsKeys) == 1:
         return fields
@@ -19,8 +18,11 @@ def initializeFields(internalFields, fields, mesh, precision, comm,
                     if status == 0:
                         comm.Abort(1)
                 elif regionType == 'circle':
-                    status = circle(fields, mesh, precision, region,
-                                    phaseField)
+                    status = circle(fields, mesh, precision, region)
+                    if status == 0:
+                        comm.Abort(1)
+                elif regionType == 'ellipse':
+                    status = ellipse(fields, mesh, precision, region)
                     if status == 0:
                         comm.Abort(1)
                 elif regionType == 'rectangle':
@@ -54,7 +56,7 @@ def setFields(fields, ind, fieldsInitial, mesh, velType, x_ref=[1, 1],
             fields.rho[ind] = fieldsInitial[itr]
         if field == 'phi':
             fields.phi[ind] = fieldsInitial[itr]
-            # fields.phi[ind] = 0.5 * (1 + np.tanh(2 * eta))
+            # fields.phi[ind] = 0.5 * (1 - np.tanh(2 * eta))
 
 
 def line(fields, mesh, precision, region):
@@ -100,7 +102,7 @@ def line(fields, mesh, precision, region):
                         os._exit(1)
                     initial = precision(omega_initial)
                     x_ref = np.array(x_ref, dtype=precision)
-                    x_ref_idx = np.int64(np.divide(x_ref, mesh.delX)) +\
+                    x_ref_idx = np.divide(x_ref, mesh.delX) +\
                         np.ones(2, dtype=np.int64)
                 else:
                     print("ERROR!")
@@ -139,7 +141,7 @@ def line(fields, mesh, precision, region):
     return 1
 
 
-def circle(fields, mesh, precision, region, phaseField):
+def circle(fields, mesh, precision, region):
     try:
         center = region['center']
         radius = region['radius']
@@ -151,9 +153,10 @@ def circle(fields, mesh, precision, region, phaseField):
             print('ERROR! radius must be float for region type circle')
             print('Cannot set fields in region for region type circle\n')
             return 0
-        center_idx = np.int64(np.array(center)/mesh.delX) +\
+        center_idx = np.array(center)/mesh.delX +\
             np.ones(2, dtype=np.int64)
-        radius_idx = radius/mesh.delX
+        center_idx = np.array(center) / mesh.delX + np.ones(2)
+        radius_idx = radius / mesh.delX
         circleType = region['circleType']
         if circleType == 'half':
             point_0 = region['diameterPoint_0']
@@ -206,7 +209,7 @@ def circle(fields, mesh, precision, region, phaseField):
                         os._exit(1)
                     initial = precision(omega_initial)
                     x_ref = np.array(x_ref, dtype=precision)
-                    x_ref_idx = np.int64(np.divide(x_ref, mesh.delX)) +\
+                    x_ref_idx = np.divide(x_ref, mesh.delX) +\
                         np.ones(2, dtype=np.int64)
                 else:
                     print("ERROR!")
@@ -224,23 +227,25 @@ def circle(fields, mesh, precision, region, phaseField):
     if circleType == 'full':
         for i in range(mesh.Nx_global):
             for j in range(mesh.Ny_global):
+                # distFromCenter = np.sqrt((i - center_idx[0]) *
+                #                          (i - center_idx[0]) +
+                #                          (j - center_idx[1]) *
+                #                          (j - center_idx[1]))
+                # eta = (distFromCenter - radius_idx) / \
+                #     4.0
+                # if i == 10 and j == 10:
+                #     print(eta)
+                ind = i * mesh.Ny_global + j
                 if (np.sqrt((i - center_idx[0])*(i - center_idx[0]) +
                             (j - center_idx[1])*(j - center_idx[1])) <=
                         radius_idx):
-                    # distFromCenter = np.sqrt((i - center_idx[0]) *
-                    #                         (i - center_idx[0]) +
-                    #                         (j - center_idx[1]) *
-                    #                         (j - center_idx[1]))
-                    # eta = (distFromCenter - radius_idx) / \
-                    #     phaseField.interfaceWidth
-                    ind = i * mesh.Ny_global + j
                     setFields(fields, ind, fieldsInitial, mesh, velType,
-                            x_ref=x_ref_idx, eta=None)
+                              x_ref=x_ref_idx, eta=None)
     elif circleType == 'half':
         for i in range(mesh.Nx_global):
             for j in range(mesh.Ny_global):
                 if ((i - center_idx[0])*(i - center_idx[0]) +
-                        (j - center_idx[1])*(j - center_idx[1]) <
+                        (j - center_idx[1])*(j - center_idx[1]) <=
                         radius_idx*radius_idx):
                     if Nx_f - Nx_i == 0 and Ny_f - Ny_i != 0:
                         if activeDomain == '+' and i >= Nx_f:
@@ -273,6 +278,100 @@ def circle(fields, mesh, precision, region, phaseField):
     return 1
 
 
+def ellipse(fields, mesh, precision, region):
+    try:
+        center = region['center']
+        majorRadius = region['majorRadius']
+        minorRadius = region['minorRadius']
+        if not isinstance(center, list):
+            print('ERROR! coordinates in point_0 must be list [x, y]')
+            print('Cannot set fields in region for region type ellipse\n')
+            return 0
+        if (not isinstance(majorRadius, float) and not
+                isinstance(majorRadius, int) and not
+                isinstance(minorRadius, float) and not
+                isinstance(minorRadius, int)):
+            print("ERROR! majorRadius and minorRadius must be float or int" +
+                  " for region type ellipse")
+            print('Cannot set fields in region for region type ellipse\n')
+            return 0
+        center = np.array(center)/mesh.delX +\
+            np.ones(2, dtype=np.int64)
+        majorRadius = majorRadius/mesh.delX
+        minorRadius = minorRadius/mesh.delX
+        fieldsInitial = []
+        for field in fields.fieldList:
+            if field == 'u':
+                x_ref_idx = np.ones(2, dtype=np.int64)
+                velDict = region['fields']['U']
+                if velDict['type'] == 'translational':
+                    velType = 'translational'
+                    u_initial = velDict['value']
+                    if not isinstance(u_initial, list):
+                        print('ERROR! velocity must be a list of ' +
+                              'components [x, y]')
+                        os._exit(1)
+                    else:
+                        initial = np.array(u_initial, dtype=precision)
+                elif velDict['type'] == 'rotational':
+                    velType = 'rotational'
+                    omega_initial = velDict['omega']
+                    x_ref = velDict['x_ref']
+                    if not isinstance(omega_initial, float):
+                        print('ERROR! angular velocity must be float')
+                        os._exit(1)
+                    if not isinstance(x_ref, list):
+                        print('ERROR! reference point must be a list of ' +
+                              'coordinates [x, y]')
+                        os._exit(1)
+                    initial = precision(omega_initial)
+                    x_ref = np.array(x_ref, dtype=precision)
+                    x_ref_idx = np.divide(x_ref, mesh.delX) +\
+                        np.ones(2, dtype=np.int64)
+                else:
+                    print("ERROR!")
+                    print("Unsupported velocity initialization!", flush=True)
+                    os._exit(1)
+            if field == 'rho':
+                initial = precision(region['fields']['rho'])
+            if field == 'phi':
+                initial = precision(region['fields']['phi'])
+            fieldsInitial.append(initial)
+    except KeyError as e:
+        print('ERROR! Keyword ' + str(e) +
+              ' missing in internalFields')
+        return 0
+    for i in range(mesh.Nx_global):
+        for j in range(mesh.Ny_global):
+            if ((i - center[0])*(i - center[0]) /
+                    (majorRadius * majorRadius) +
+                    (j - center[1])*(j - center[1]) /
+                    (minorRadius * minorRadius) <= 1):
+                ind = i * mesh.Ny_global + j
+                setFields(fields, ind, fieldsInitial, mesh, velType,
+                          x_ref=x_ref_idx, eta=None)
+            # halfX = (mesh.Nx_global - 3) / 2 + 1
+            # halfY = (mesh.Ny_global - 3) / 2 + 1
+            # coorX, coorY = i - halfX, j - halfY
+            # gradX = 2 * coorX / (majorRadius * majorRadius)
+            # gradY = 2 * coorY / (minorRadius * minorRadius)
+            # magGrad = np.sqrt(gradX * gradX + gradY * gradY) + 1e-17
+            # normalX = gradX / magGrad
+            # normalY = gradY / magGrad
+            # theta = np.arctan2(coorY, coorX)
+            # R1, R2 = majorRadius * np.cos(theta), minorRadius * np.sin(theta)
+            # x = coorX - R1
+            # y = coorY - R2
+            # xDotNormal = x * normalX + y * normalY
+            # if i == halfX and j == halfY:
+            #     xDotNormal = -100
+            # eta = xDotNormal / phaseField.interfaceWidth
+            # ind = i * mesh.Ny_global + j
+            # setFields(fields, ind, fieldsInitial, mesh, velType,
+            #           x_ref=x_ref_idx, eta=eta)
+    return 1
+
+
 def rectangle(fields, mesh, precision, region):
     try:
         boundingBox = region['boundingBox']
@@ -282,7 +381,7 @@ def rectangle(fields, mesh, precision, region):
             print('Cannot set fields in region for region type rectangle\n')
             return 0
         boundingBox = np.array(boundingBox, dtype=np.float64)
-        boundingBox_idx = np.int64(np.divide(boundingBox, mesh.delX)) +\
+        boundingBox_idx = np.divide(boundingBox, mesh.delX) +\
             np.ones((2, 2), dtype=np.int64)
         fieldsInitial = []
         for field in fields.fieldList:
@@ -311,7 +410,7 @@ def rectangle(fields, mesh, precision, region):
                         os._exit(1)
                     initial = precision(omega_initial)
                     x_ref = np.array(x_ref, dtype=precision)
-                    x_ref_idx = np.int64(np.divide(x_ref, mesh.delX)) +\
+                    x_ref_idx = np.divide(x_ref, mesh.delX) +\
                         np.ones(2, dtype=np.int64)
                 else:
                     print("ERROR!")

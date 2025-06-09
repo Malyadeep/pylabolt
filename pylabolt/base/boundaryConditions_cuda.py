@@ -80,7 +80,7 @@ def zeroGradient(f, f_new, rho, u, faceList, outDirections, invDirections,
                 ind_nb = int(i_nb * Ny + j_nb)
                 break
         for k in range(f.shape[1]):
-            f[ind, k] = f[ind_nb, k]
+            f_new[ind, k] = f_new[ind_nb, k]
     else:
         return
 

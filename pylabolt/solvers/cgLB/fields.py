@@ -24,46 +24,26 @@ class fields:
         self.rho = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         self.p = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         self.phi = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
-        self.gradPhi = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
-        self.normalPhi = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
-        # temporary
-        self.nodesIdentified = np.zeros(mesh.Nx * mesh.Ny, dtype=np.int32)
         if phaseField.contactAngle is not None:
             self.phi_temp = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
-            self.phiAdvect = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
-            self.phiWetting = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
-            self.gradPhi_temp = np.zeros((mesh.Nx * mesh.Ny, 2),
-                                         dtype=precision)
-            self.normalPhi_temp = np.zeros((mesh.Nx * mesh.Ny, 2),
-                                           dtype=precision)
-            self.solidBoundary_old =\
-                np.zeros(mesh.Nx * mesh.Ny, dtype=np.int32)
-            self.fluidBoundary_old =\
-                np.zeros(mesh.Nx * mesh.Ny, dtype=np.int32)
-            self.normalPhiDotNormalSolid = np.zeros((mesh.Nx * mesh.Ny),
-                                                    dtype=precision)
-            self.phiFSolidBoundary = np.zeros((mesh.Nx * mesh.Ny),
-                                              dtype=precision)
+        self.gradPhi = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
+        self.normalPhi = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
         self.lapPhi = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         self.boundaryNode = np.full((mesh.Nx * mesh.Ny), fill_value=0,
                                     dtype=np.int32)
         self.forceField = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
+        self.surfaceTensionForce = np.zeros((mesh.Nx * mesh.Ny, 2),
+                                            dtype=precision)
+        self.viscousCorrection = np.zeros((mesh.Nx * mesh.Ny, 2),
+                                          dtype=precision)
+        self.pressureCorrection = np.zeros((mesh.Nx * mesh.Ny, 2),
+                                           dtype=precision)
         self.curvature = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         self.source = np.zeros((mesh.Nx * mesh.Ny, lattice.noOfDirections),
                                dtype=precision)
         self.massAdded = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         self.stressTensor = np.zeros((mesh.Nx * mesh.Ny, 2, 2),
                                      dtype=precision)
-        self.fluidBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
-        self.solidBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
-        self.contactAngleLocalFluid = np.zeros((mesh.Nx * mesh.Ny),
-                                               dtype=precision)
-        self.delPhiFluid = np.zeros((mesh.Nx * mesh.Ny), dtype=precision)
-        self.deltaFuncFluid = np.zeros((mesh.Nx * mesh.Ny), dtype=precision)
-        self.contactAngleLocalSolid = np.zeros((mesh.Nx * mesh.Ny),
-                                               dtype=precision)
-        self.delPhiSolid = np.zeros((mesh.Nx * mesh.Ny), dtype=precision)
-        self.deltaFuncSolid = np.zeros((mesh.Nx * mesh.Ny), dtype=precision)
         for ind in range(mesh.Nx * mesh.Ny):
             self.u[ind, 0] = initialFields.u[ind, 0]
             self.u[ind, 1] = initialFields.u[ind, 1]
@@ -71,11 +51,8 @@ class fields:
             self.p[ind] = initialFields.p[ind]
             self.phi[ind] = initialFields.phi[ind]
             self.boundaryNode[ind] = initialFields.boundaryNode[ind]
-            self.solidBoundary[ind] = initialFields.solidBoundary[ind]
-            self.fluidBoundary[ind] = initialFields.fluidBoundary[ind]
         self.solid = np.full((mesh.Nx * mesh.Ny, 2), fill_value=0,
                              dtype=np.int32)
-        self.solid_old = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=np.int32)
         self.solidNbNodesWhole = np.full(mesh.Nx * mesh.Ny, fill_value=0,
                                          dtype=np.int32)
         self.procBoundary = np.zeros((mesh.Nx * mesh.Ny), dtype=np.int32)
@@ -119,7 +96,7 @@ class fields:
                 np.zeros((mesh.Ny, 2), dtype=precision)
 
     def createObsModificationFields(self, mesh, precision):
-        # self.solid_old = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=np.int32)
+        self.solid_old = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=np.int32)
         self.phi_old = np.zeros(mesh.Nx * mesh.Ny, dtype=precision)
         self.forceCreation = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
         self.forceDes = np.zeros((mesh.Nx * mesh.Ny, 2), dtype=precision)
