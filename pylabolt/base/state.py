@@ -34,7 +34,8 @@ class State:
             self.mesh = mesh.Mesh(
                 simulation,
                 rank,
-                verbose=True)
+                verbose=True
+            )
 
             self.lattice = lattice.Lattice(
                 simulation,
@@ -47,7 +48,8 @@ class State:
             self.domain = domain.Domain(
                 simulation,
                 self.mesh,
-                comm
+                comm,
+                verbose=True
             )
 
             self.fields = fields.Fields(

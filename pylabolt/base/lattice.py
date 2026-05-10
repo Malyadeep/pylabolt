@@ -66,7 +66,7 @@ class Lattice:
             self.c_x = np.array([0, 1, -1], dtype=np.int32)
             self.c_y = np.array([0, 0, 0], dtype=np.int32)
             self.weights = np.array([2/3, 1/6, 1/6], dtype=control.precision)
-            self.invList = np.array([0, 2, 1], dtype=np.int32)
+            self.inv_list = np.array([0, 2, 1], dtype=np.int32)
             self.no_of_directions = np.int32(3)
         else:
             raise ValueError(

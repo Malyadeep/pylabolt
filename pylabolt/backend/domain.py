@@ -7,7 +7,8 @@ class Domain:
         self,
         simulation,
         mesh,
-        comm
+        comm,
+        verbose=True
     ):
         """
         Container for decomposed sub-domain description
@@ -35,7 +36,7 @@ class Domain:
             )
         decompose_dict = simulation.decompose_dict
 
-        if "nx" and "ny" not in decompose_dict: 
+        if "nx" and "ny" not in decompose_dict:
             raise ValueError("nx or ny missing decompose_dict")
         self.Nx_proc = decompose_dict["nx"]
         self.Ny_proc = decompose_dict["ny"]
