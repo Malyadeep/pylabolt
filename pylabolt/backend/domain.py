@@ -36,7 +36,8 @@ class Domain:
             )
         decompose_dict = simulation.decompose_dict
 
-        if "nx" and "ny" not in decompose_dict:
+        if ("nx" not in decompose_dict or
+                "ny" not in decompose_dict):
             raise ValueError("nx or ny missing decompose_dict")
         self.Nx_proc = decompose_dict["nx"]
         self.Ny_proc = decompose_dict["ny"]
