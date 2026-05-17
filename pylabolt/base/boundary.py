@@ -4,19 +4,64 @@ from pylabolt.utils.IO import print_log
 
 
 class BoundaryElement:
-    def __init__(self):
-        self.boundary_type = "periodic"
-        self.boundary_name = "temp"
+    def __init__(
+        self,
+        boundary_name,
+        segment,
+        segment_no,
+        orientation,
+        location,
+        precision,
+        fluid_config=None,
+        phase_config=None
+    ):
+        """
+        Container for each boundary element data
+        Attributes:
+
+        """
+        self.type = "periodic"
+        self.name = boundary_name + "_" + str(int(segment_no))
+        self.orientation = orientation
+        self.location = location
+        self.segment = np.array(segment)
+        if fluid_config is not None:
+            self.type_fluid = fluid_config["type"]
+            self.scalar_fluid = precision(0)
+            self.vector_fluid = np.zeros(2)
+            if fluid_config["scalar_value"] is not None:
+                self.scalar_fluid = precision(fluid_config["scalar_value"])
+            if fluid_config["vector_value"] is not None:
+                self.scalar_fluid = np.array(
+                    fluid_config["vector_value"], dtype=precision
+                )
+        if phase_config is not None:
+            self.type_phase = phase_config["type"]
+            self.scalar_phase = precision(0)
+            self.vector_phase = np.zeros(2)
+            if phase_config["scalar_value"] is not None:
+                self.scalar_fluid = precision(phase_config["scalar_value"])
+            if phase_config["vector_value"] is not None:
+                self.scalar_phase = np.array(
+                    phase_config["vector_value"], dtype=precision
+                )
+        if self.location == "bottom":
+            self.surface_normals = np.array([0, 1], dtype=precision)
+        elif self.location == "top":
+            self.surface_normals = np.array([0, -1], dtype=precision)
+        elif self.location == "left":
+            self.surface_normals = np.array([1, 0], dtype=precision)
+        elif self.location == "right":
+            self.surface_normals = np.array([-1, 0], dtype=precision)
+        # TODO: add inv_list, out_list, rank specific boundary node allocation
         self.boundary_nodes = []
-        self.boundary_scalar = 0.
-        self.boundary_vector = np.array([0., 0.])
-        self.surface_normals = []
 
 
 class Boundary:
     def __init__(
         self,
         simulation,
+        mesh,
         domain,
         control,
         fluid=False,
@@ -42,6 +87,7 @@ class Boundary:
 
         # ------- Read and initialize boundary elements ------- #
         self.read_boundary_dict(
+            mesh,
             domain,
             control,
             fluid=fluid,
@@ -52,6 +98,7 @@ class Boundary:
 
     def read_boundary_dict(
         self,
+        mesh,
         domain,
         control,
         fluid=False,
@@ -82,6 +129,7 @@ class Boundary:
             self.read_user_boundary_dict(
                 user_boundary_name,
                 user_boundary_dict,
+                mesh,
                 domain,
                 control,
                 fluid=fluid,
@@ -122,6 +170,7 @@ class Boundary:
         self,
         user_boundary_name,
         user_boundary_dict,
+        mesh,
         domain,
         control,
         fluid=False,
@@ -253,7 +302,7 @@ class Boundary:
                 self.validate_periodic_boundary(
                     user_boundary_name,
                     segments,
-                    domain
+                    mesh
                 )
 
         # ------- Validate phase dict ------- #
@@ -299,7 +348,7 @@ class Boundary:
                 self.validate_periodic_boundary(
                     user_boundary_name,
                     segments,
-                    domain
+                    mesh
                 )
         # ------- Validate scalar dict ------- #
         if scalar:
@@ -307,19 +356,41 @@ class Boundary:
                 # TODO: no scalar transport solver implemented
                 pass
 
+        # ------- Create boundary elements ------- #
         orientations = []
+        locations = []
         for segment_no, segment in enumerate(segments):
             # TODO: modifications needed for 1D case
             (x1, y1), (x2, y2) = segment
             if x2 - x1 == 0:
                 orientations.append("vertical")
+                if x2 == mesh.grid_global_shape[0] - 1:
+                    locations.append("right")
+                elif x2 == 0:
+                    locations.append("left")
             elif y2 - y1 == 0:
                 orientations.append("horizontal")
+                if y2 == mesh.grid_global_shape[1] - 1:
+                    locations.append("top")
+                elif y2 == 0:
+                    locations.append("bottom")
+            boundary_element = BoundaryElement(
+                user_boundary_name,
+                segment,
+                segment_no,
+                orientations[segment_no],
+                locations[segment_no],
+                control.precision,
+                fluid_config=fluid_config,
+                phase_config=phase_config
+            )
+            self.boundary_elements.append(boundary_element)
 
         self.log_boundary_data(
             user_boundary_name,
             segments,
             orientations,
+            locations,
             domain,
             fluid_config=fluid_config,
             phase_config=phase_config,
@@ -330,7 +401,7 @@ class Boundary:
         self,
         user_boundary_name,
         segments,
-        domain
+        mesh
     ):
         """
         Validates periodic boundary input from user
@@ -385,18 +456,18 @@ class Boundary:
                     "horizontal periodic boundaries must span" +
                     " same x-range : " + user_boundary_name
                 )
-            if sorted([y1_min, y2_min]) != [0, domain.Ny_global - 1]:
+            if sorted([y1_min, y2_min]) != [0, mesh.grid_global_shape[1] - 1]:
                 raise ValueError(
                     "horizontal periodic boundaries must connect" +
                     " top-bottom boundaries : " + user_boundary_name
                 )
-        elif is_horizontal:
+        elif is_vertical:
             if (y1_min, y1_max) != (y2_min, y2_max):
                 raise ValueError(
                     "vertical periodic boundaries must span" +
                     " same y-range : " + user_boundary_name
                 )
-            if sorted([x1_min, x2_min]) != [0, domain.Nx_global - 1]:
+            if sorted([x1_min, x2_min]) != [0, mesh.grid_global_shape[0] - 1]:
                 raise ValueError(
                     "vertical periodic boundaries must connect" +
                     " left-right boundaries : " + user_boundary_name
@@ -407,6 +478,7 @@ class Boundary:
         user_boundary_name,
         segments,
         orientations,
+        locations,
         domain,
         fluid_config=None,
         phase_config=None,
@@ -444,6 +516,9 @@ class Boundary:
             print_log(
                 "segement_" + str(segment_no + 1) + ":" +
                 str(segments[segment_no]).ljust(30) + "| orientation: " +
-                orientations[segment_no], domain.mpi_rank, verbose
+                orientations[segment_no].ljust(5) + " | location: " +
+                str(locations[segment_no]),
+                domain.mpi_rank,
+                verbose
             )
         print_log("\n", domain.mpi_rank, verbose)
