@@ -23,7 +23,6 @@ class BoundaryElement:
 
         """
         # TODO: make this class dimension aware: for the moment only 2D
-        self.type = "periodic"
         self.name = boundary_name + "_" + str(int(segment_no))
         self.orientation = orientation
         self.location = location
