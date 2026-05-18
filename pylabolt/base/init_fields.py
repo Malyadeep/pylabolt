@@ -15,11 +15,11 @@ def init_fields(
     verbose=True
 ):
     """
-    initializes fields based on user input
+    Initializes fields based on user input
     Args:
         simulation
     Returns:
-        bool
+
     """
     print_log("-" * 80, domain.mpi_rank, verbose)
     print_log("Initializing fields...\n", domain.mpi_rank, verbose)

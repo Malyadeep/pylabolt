@@ -1,6 +1,7 @@
 import numpy as np
 
 from pylabolt.utils.IO import print_log
+from pylabolt.backend.domain import global_to_local
 
 
 class BoundaryElement:
@@ -11,7 +12,8 @@ class BoundaryElement:
         segment_no,
         orientation,
         location,
-        precision,
+        domain,
+        control,
         fluid_config=None,
         phase_config=None
     ):
@@ -20,6 +22,7 @@ class BoundaryElement:
         Attributes:
 
         """
+        # TODO: make this class dimension aware: for the moment only 2D
         self.type = "periodic"
         self.name = boundary_name + "_" + str(int(segment_no))
         self.orientation = orientation
@@ -27,34 +30,92 @@ class BoundaryElement:
         self.segment = np.array(segment)
         if fluid_config is not None:
             self.type_fluid = fluid_config["type"]
-            self.scalar_fluid = precision(0)
+            self.scalar_fluid = control.precision(0)
             self.vector_fluid = np.zeros(2)
             if fluid_config["scalar_value"] is not None:
-                self.scalar_fluid = precision(fluid_config["scalar_value"])
+                self.scalar_fluid = control.precision(
+                    fluid_config["scalar_value"]
+                )
             if fluid_config["vector_value"] is not None:
                 self.scalar_fluid = np.array(
-                    fluid_config["vector_value"], dtype=precision
+                    fluid_config["vector_value"], dtype=control.precision
                 )
         if phase_config is not None:
             self.type_phase = phase_config["type"]
-            self.scalar_phase = precision(0)
+            self.scalar_phase = control.precision(0)
             self.vector_phase = np.zeros(2)
             if phase_config["scalar_value"] is not None:
-                self.scalar_fluid = precision(phase_config["scalar_value"])
+                self.scalar_phase = control.precision(
+                    phase_config["scalar_value"]
+                )
             if phase_config["vector_value"] is not None:
-                self.scalar_phase = np.array(
-                    phase_config["vector_value"], dtype=precision
+                self.vector_phase = np.array(
+                    phase_config["vector_value"], dtype=control.precision
                 )
         if self.location == "bottom":
-            self.surface_normals = np.array([0, 1], dtype=precision)
+            self.surface_normals = np.array([0, 1], dtype=control.precision)
+            self.out_list = np.array([4, 7, 8], dtype=np.int32)
+            self.inv_list = np.array([2, 5, 6], dtype=np.int32)
         elif self.location == "top":
-            self.surface_normals = np.array([0, -1], dtype=precision)
+            self.surface_normals = np.array([0, -1], dtype=control.precision)
+            self.out_list = np.array([2, 5, 6], dtype=np.int32)
+            self.inv_list = np.array([4, 7, 8], dtype=np.int32)
         elif self.location == "left":
-            self.surface_normals = np.array([1, 0], dtype=precision)
+            self.surface_normals = np.array([1, 0], dtype=control.precision)
+            self.out_list = np.array([3, 6, 7], dtype=np.int32)
+            self.inv_list = np.array([1, 8, 5], dtype=np.int32)
         elif self.location == "right":
-            self.surface_normals = np.array([-1, 0], dtype=precision)
-        # TODO: add inv_list, out_list, rank specific boundary node allocation
-        self.boundary_nodes = []
+            self.surface_normals = np.array([-1, 0], dtype=control.precision)
+            self.out_list = np.array([1, 8, 5], dtype=np.int32)
+            self.inv_list = np.array([3, 6, 7], dtype=np.int32)
+        # TODO: add rank specific boundary node allocation
+        self.boundary_nodes = self.allocate_boundary_nodes(
+            segment,
+            domain
+        )
+
+    def allocate_boundary_nodes(
+        self,
+        segment,
+        domain
+    ):
+        """
+        Allocates nodes at the boundary to the corresponding rank
+        Args:
+            segment: list
+            domain: domain object
+        Returns:
+            boundary_nodes: int array
+        """
+        boundary_nodes = []
+        x_min, y_min = segment[0]
+        x_max, y_max = segment[1]
+        if self.orientation == "horizontal":
+            j_global = y_min
+            for i_global in range(x_min, x_max + 1):  # includes [x_min,x_max]
+                i, j = global_to_local(i_global, j_global, domain.offset)
+                if (i < 0 or j < 0 or
+                        i >= (domain.shape[0] - 2) or
+                        j >= (domain.shape[1] - 2)):
+                    pass
+                else:
+                    ind = (i + 1) * domain.shape[1] + (j + 1)
+                    boundary_nodes.append(ind)
+            boundary_nodes = np.array(boundary_nodes, dtype=np.int64)
+            return boundary_nodes
+        if self.orientation == "vertical":
+            i_global = x_min
+            for j_global in range(y_min, y_max + 1):  # includes [y_min,y_max]
+                i, j = global_to_local(i_global, j_global, domain.offset)
+                if (i < 0 or j < 0 or
+                        i >= (domain.shape[0] - 2) or
+                        j >= (domain.shape[1] - 2)):
+                    pass
+                else:
+                    ind = (i + 1) * domain.shape[1] + (j + 1)
+                    boundary_nodes.append(ind)
+            boundary_nodes = np.array(boundary_nodes, dtype=np.int64)
+            return boundary_nodes
 
 
 class Boundary:
@@ -380,7 +441,8 @@ class Boundary:
                 segment_no,
                 orientations[segment_no],
                 locations[segment_no],
-                control.precision,
+                domain,
+                control,
                 fluid_config=fluid_config,
                 phase_config=phase_config
             )
