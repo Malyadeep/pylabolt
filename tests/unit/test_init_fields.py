@@ -2,39 +2,7 @@ import numpy as np
 import pytest
 
 import pylabolt.base.init_fields as init_fields
-
-
-""" Dummy classes """
-
-
-class DummyDomain:
-    def __init__(self, Nx, Ny, rank):
-        self.mpi_rank = rank
-        self.size = Nx * Ny
-        self.Nx = Nx
-        self.Ny = Ny
-        self.shape = np.array([Nx, Ny], dtype=np.int32)
-        self.offset = np.array([0, 0])
-
-
-class DummyControl:
-    def __init__(self):
-        self.precision = np.float64
-
-
-class DummyFields:
-    def __init__(self, domain, control):
-        self.velocity = np.zeros((domain.size, 2), dtype=control.precision)
-        self.pressure = np.zeros(domain.size, dtype=control.precision)
-        self.density = np.zeros(domain.size, dtype=control.precision)
-        self.phase_field = np.zeros(domain.size, dtype=control.precision)
-        self.ghost_node = np.zeros(domain.size, dtype=np.bool_)
-        for ind in range(domain.size):
-            i = ind // domain.shape[1]
-            j = ind - i * domain.shape[1]
-            if (i == 0 or j == 0 or i == domain.shape[0] - 1 or
-                    j == domain.shape[1] - 1):
-                self.ghost_node[ind] = True
+from factories import make_control, make_domain, make_fields, make_simulation
 
 
 """ Fixtures """
@@ -42,9 +10,9 @@ class DummyFields:
 
 @pytest.fixture
 def setup_env():
-    control = DummyControl()
-    domain = DummyDomain(5, 5, 0)
-    fields = DummyFields(domain, control)
+    control = make_control()
+    domain = make_domain(5, 5, 0)
+    fields = make_fields(domain, control)
     return control, domain, fields
 
 
@@ -220,13 +188,12 @@ init_fields tests
 def test_init_fields_missing_initial_fields(setup_env):
     control, domain, fields = setup_env
 
-    class Simulation:
-        pass
+    simulation = make_simulation()
 
     mssg = "initial_fields_dict not found in simulation.py file"
     with pytest.raises(ValueError, match=mssg):
         init_fields.init_fields(
-            Simulation(),
+            simulation,
             control,
             domain,
             fields,
@@ -240,33 +207,12 @@ def test_init_fields_missing_initial_fields(setup_env):
 def test_init_fields_missing_default(setup_env):
     control, domain, fields = setup_env
 
-    class Simulation:
-        initial_fields_dict = {}
+    simulation = make_simulation(initial_fields_dict={})
 
     mssg = "default missing in initial_fields_dict"
     with pytest.raises(ValueError, match=mssg):
         init_fields.init_fields(
-            Simulation(),
-            control,
-            domain,
-            fields,
-            fluid=True,
-            phase=True,
-            scalar=False,
-            verbose=False
-        )
-
-
-def test_init_fields_no_simulation(setup_env):
-    control, domain, fields = setup_env
-
-    class Simulation:
-        pass
-
-    mssg = "initial_fields_dict not found in simulation.py file"
-    with pytest.raises(ValueError, match=mssg):
-        init_fields.init_fields(
-            Simulation(),
+            simulation,
             control,
             domain,
             fields,
@@ -280,34 +226,35 @@ def test_init_fields_no_simulation(setup_env):
 def test_init_fields_default(setup_env):
     control, domain, fields = setup_env
 
-    class Simulation:
-        initial_fields_dict = {
-            "default": {
-                "fluid": {
-                    "velocity": {
-                        "type": "fixed",
-                        "value": [1, 2]
-                    },
-                    "density": {
-                        "type": "fixed",
-                        "value": 3
-                    },
-                    "pressure": {
-                        "type": "fixed",
-                        "value": 4
-                    }
+    initial_fields_dict = {
+        "default": {
+            "fluid": {
+                "velocity": {
+                    "type": "fixed",
+                    "value": [1, 2]
                 },
-                "phase": {
-                    "phase_field": {
-                        "type": "fixed",
-                        "value": 5
-                    }
+                "density": {
+                    "type": "fixed",
+                    "value": 3
+                },
+                "pressure": {
+                    "type": "fixed",
+                    "value": 4
+                }
+            },
+            "phase": {
+                "phase_field": {
+                    "type": "fixed",
+                    "value": 5
                 }
             }
         }
+    }
+
+    simulation = make_simulation(initial_fields_dict=initial_fields_dict)
 
     init_fields.init_fields(
-        Simulation(),
+        simulation,
         control,
         domain,
         fields,
@@ -330,56 +277,57 @@ def test_init_fields_default(setup_env):
 def test_init_fields_override(setup_env):
     control, domain, fields = setup_env
 
-    class Simulation:
-        initial_fields_dict = {
-            "default": {
-                "fluid": {
-                    "velocity": {
-                        "type": "fixed",
-                        "value": [1, 2]
-                    },
-                    "density": {
-                        "type": "fixed",
-                        "value": 3
-                    },
-                    "pressure": {
-                        "type": "fixed",
-                        "value": 4
-                    }
+    initial_fields_dict = {
+        "default": {
+            "fluid": {
+                "velocity": {
+                    "type": "fixed",
+                    "value": [1, 2]
                 },
-                "phase": {
-                    "phase_field": {
-                        "type": "fixed",
-                        "value": 5
-                    }
+                "density": {
+                    "type": "fixed",
+                    "value": 3
+                },
+                "pressure": {
+                    "type": "fixed",
+                    "value": 4
                 }
             },
-            "region1": {
-                "fluid": {
-                    "velocity": {
-                        "type": "fixed",
-                        "value": [2, 4]
-                    },
-                    "density": {
-                        "type": "fixed",
-                        "value": 9
-                    },
-                    "pressure": {
-                        "type": "fixed",
-                        "value": 16
-                    }
+            "phase": {
+                "phase_field": {
+                    "type": "fixed",
+                    "value": 5
+                }
+            }
+        },
+        "region1": {
+            "fluid": {
+                "velocity": {
+                    "type": "fixed",
+                    "value": [2, 4]
                 },
-                "phase": {
-                    "phase_field": {
-                        "type": "fixed",
-                        "value": 25
-                    }
+                "density": {
+                    "type": "fixed",
+                    "value": 9
+                },
+                "pressure": {
+                    "type": "fixed",
+                    "value": 16
+                }
+            },
+            "phase": {
+                "phase_field": {
+                    "type": "fixed",
+                    "value": 25
                 }
             }
         }
+    }
+
+    simulation = make_simulation(initial_fields_dict=initial_fields_dict)
 
     init_fields.init_fields(
-        Simulation(),
+        simulation,
         control,
         domain,
         fields,

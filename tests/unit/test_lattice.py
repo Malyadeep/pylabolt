@@ -2,21 +2,7 @@ import numpy as np
 import pytest
 
 from pylabolt.base.lattice import Lattice
-
-
-"""
-Dummy classes
-"""
-
-
-class DummyControl:
-    def __init__(self):
-        self.precision = np.float64
-
-
-class DummyMesh:
-    def __init__(self, dimensions=1):
-        self.dimensions = dimensions
+from factories import make_control, make_mesh, make_simulation
 
 
 """
@@ -25,16 +11,15 @@ Lattice test
 
 
 def test_missing_lattice_dict():
-    control = DummyControl()
-    mesh = DummyMesh(dimensions=1)
+    control = make_control()
+    mesh = make_mesh((10, 10))
 
-    class Simulation:
-        pass
+    simulation = make_simulation()
 
     mssg = "lattice_dict not found in simulation.py file"
     with pytest.raises(ValueError, match=mssg):
         Lattice(
-            Simulation(),
+            simulation,
             control,
             mesh,
             0,
@@ -43,16 +28,15 @@ def test_missing_lattice_dict():
 
 
 def test_missing_lattice_type():
-    control = DummyControl()
-    mesh = DummyMesh(dimensions=1)
+    control = make_control()
+    mesh = make_mesh((10, 10))
 
-    class Simulation:
-        lattice_dict = {}
+    simulation = make_simulation(lattice_dict={})
 
     mssg = "lattice_type missing in lattice_dict"
     with pytest.raises(ValueError, match=mssg):
         Lattice(
-            Simulation(),
+            simulation,
             control,
             mesh,
             0,
@@ -60,37 +44,25 @@ def test_missing_lattice_type():
         )
 
 
-def test_lattice_mesh_mismatch():
-    control = DummyControl()
-    mesh = DummyMesh(dimensions=1)
+@pytest.mark.parametrize(
+    "global_shape, lattice_type",
+    [[(10, 20), "D1Q3"],
+     [(10, 1), "D2Q9"]]
+)
+def test_lattice_mesh_mismatch(global_shape, lattice_type):
+    control = make_control()
+    mesh = make_mesh(global_shape)
 
-    class Simulation:
-        lattice_dict = {
-            "lattice_type": "D2Q9"
-        }
+    lattice_dict = {
+        "lattice_type": lattice_type
+    }
 
-    mssg = "grid dimensions and lattice type are incompatible"
-    with pytest.raises(ValueError, match=mssg):
-        Lattice(
-            Simulation(),
-            control,
-            mesh,
-            0,
-            verbose=False
-        )
-
-    control = DummyControl()
-    mesh = DummyMesh(dimensions=2)
-
-    class Simulation:
-        lattice_dict = {
-            "lattice_type": "D1Q3"
-        }
+    simulation = make_simulation(lattice_dict=lattice_dict)
 
     mssg = "grid dimensions and lattice type are incompatible"
     with pytest.raises(ValueError, match=mssg):
         Lattice(
-            Simulation(),
+            simulation,
             control,
             mesh,
             0,
@@ -99,18 +71,19 @@ def test_lattice_mesh_mismatch():
 
 
 def test_unsupported_lattice_type():
-    control = DummyControl()
-    mesh = DummyMesh(dimensions=2)
+    control = make_control()
+    mesh = make_mesh((10, 10))
 
-    class Simulation:
-        lattice_dict = {
-            "lattice_type": "D1Q9"
-        }
+    lattice_dict = {
+        "lattice_type": "D1Q9"
+    }
+
+    simulation = make_simulation(lattice_dict=lattice_dict)
 
     mssg = "Unsupported lattice type"
     with pytest.raises(ValueError, match=mssg):
         Lattice(
-            Simulation(),
+            simulation,
             control,
             mesh,
             0,
@@ -119,21 +92,22 @@ def test_unsupported_lattice_type():
 
 
 def test_d2q9_entries():
-    control = DummyControl()
-    mesh = DummyMesh(dimensions=2)
+    control = make_control()
+    mesh = make_mesh((10, 10))
 
-    class Simulation:
-        lattice_dict = {
-            "lattice_type": "D2Q9"
-        }
+    lattice_dict = {
+        "lattice_type": "D2Q9"
+    }
+
+    simulation = make_simulation(lattice_dict=lattice_dict)
 
     lattice = Lattice(
-            Simulation(),
-            control,
-            mesh,
-            0,
-            verbose=False
-        )
+        simulation,
+        control,
+        mesh,
+        0,
+        verbose=False
+    )
 
     cs = control.precision(1/np.sqrt(3))
     assert np.isclose(cs, lattice.cs)
@@ -162,21 +136,22 @@ def test_d2q9_entries():
 
 
 def test_d1q3_entries():
-    control = DummyControl()
-    mesh = DummyMesh(dimensions=1)
+    control = make_control()
+    mesh = make_mesh((10, 1))
 
-    class Simulation:
-        lattice_dict = {
-            "lattice_type": "D1Q3"
-        }
+    lattice_dict = {
+        "lattice_type": "D1Q3"
+    }
+
+    simulation = make_simulation(lattice_dict=lattice_dict)
 
     lattice = Lattice(
-            Simulation(),
-            control,
-            mesh,
-            0,
-            verbose=False
-        )
+        simulation,
+        control,
+        mesh,
+        0,
+        verbose=False
+    )
 
     cs = control.precision(1/np.sqrt(3))
     assert np.isclose(cs, lattice.cs)

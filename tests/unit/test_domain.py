@@ -3,26 +3,32 @@ import pytest
 import re
 
 from pylabolt.backend.domain import Domain, local_to_global, global_to_local
-
+from factories import make_decompose_dict, make_mesh, make_comm, make_simulation
 
 """
 Base fixtures
 """
 
 
-@pytest.fixture(
-    params=[(50, 40), (70, 65)]
-)
-def global_shape(request):
-    return np.array(request.param, dtype=np.int32)
+GLOBAL_SHAPES = [
+    (50, 40),
+    (70, 65)
+]
 
+DECOMPOSE_PARAMS = [
+    (1, 1),
+    (2, 1),
+    (1, 2),
+    (3, 2),
+    (2, 3),
+    (3, 3)
+]
 
-@pytest.fixture(
-    params=[(1, 1), (2, 1), (1, 2), (3, 2), (2, 3), (3, 3)]
-)
-def decompose(request):
-    nx, ny = request.param
-    return {"nx": nx, "ny": ny}
+COMBINED_PARAMS = [
+    (*d, s)
+    for d in DECOMPOSE_PARAMS
+    for s in GLOBAL_SHAPES
+]
 
 
 """
@@ -30,48 +36,19 @@ Derived fixtures
 """
 
 
-@pytest.fixture
-def dummy_simulation(decompose):
-    class Simulation:
-        decompose_dict = decompose
-    return Simulation()
-
-
-@pytest.fixture
-def dummy_mesh(global_shape):
-    class Mesh:
-        def __init__(self):
-            self.grid_global_shape = global_shape
-    return Mesh()
-
-
-@pytest.fixture
-def make_comm():
-    class DummyComm:
-        def __init__(self, mpi_rank, mpi_size):
-            self.mpi_size = mpi_size
-            self.mpi_rank = mpi_rank
-
-        def Get_rank(self):
-            return self.mpi_rank
-
-        def Get_size(self):
-            return self.mpi_size
-
-    return DummyComm
-
-
-@pytest.fixture
-def make_domain(dummy_simulation, dummy_mesh, make_comm):
-    def _make(mpi_rank, mpi_size):
-        comm = make_comm(mpi_rank, mpi_size)
-        return Domain(
-            dummy_simulation,
-            dummy_mesh,
-            comm,
-            verbose=False
-        )
-    return _make
+def make_domain(
+    mpi_rank,
+    mpi_size,
+    dummy_simulation,
+    dummy_mesh
+):
+    comm = make_comm(mpi_rank, mpi_size)
+    return Domain(
+        dummy_simulation,
+        dummy_mesh,
+        comm,
+        verbose=False
+    )
 
 
 """
@@ -79,57 +56,52 @@ Invalid decompsition tests
 """
 
 
-def test_missing_decompose_dict(dummy_mesh, make_comm):
-    mesh = dummy_mesh
+def test_missing_decompose_dict():
+    mesh = make_mesh((10, 10))
     comm = make_comm(1, 0)
-
-    class Simulation:
-        pass
+    simulation = make_simulation()
 
     mssg = "decompose_dict not found in simulation.py file"
     with pytest.raises(ValueError, match=mssg):
         Domain(
-            Simulation(),
+            simulation,
             mesh,
             comm,
             verbose=False
         )
 
 
-def test_missing_nx_ny(dummy_mesh, make_comm):
-    mesh = dummy_mesh
+def test_missing_nx_ny():
+    mesh = make_mesh((10, 10))
     comm = make_comm(1, 0)
 
-    class Simulation:
-        decompose_dict = {
-            "ny": 2
-        }
+    decompose_dict = {
+        "ny": 2
+    }
+    simulation = make_simulation(decompose_dict=decompose_dict)
 
     mssg = "nx or ny missing decompose_dict"
     with pytest.raises(ValueError, match=mssg):
         Domain(
-            Simulation(),
+            simulation,
             mesh,
             comm,
             verbose=False
         )
 
 
-def test_nx_ny_size_mismatch(dummy_mesh, make_comm):
-    mesh = dummy_mesh
+def test_nx_ny_size_mismatch():
+    mesh = make_mesh((10, 10))
     comm = make_comm(4, 0)
 
-    class Simulation:
-        decompose_dict = {
-            "nx": 3,
-            "ny": 2
-        }
+    decompose_dict = make_decompose_dict(3, 2)
+    simulation = make_simulation(decompose_dict=decompose_dict)
 
     mssg = "invalid domain decomposition. " +\
         "nx * ny not equal to total no.of MPI processes"
     with pytest.raises(ValueError, match=re.escape(mssg)):
         Domain(
-            Simulation(),
+            simulation,
             mesh,
             comm,
             verbose=False
@@ -141,13 +113,23 @@ Test decomposition consistency
 """
 
 
-def test_decompose_logic(make_domain, dummy_simulation, dummy_mesh):
-    nx = dummy_simulation.decompose_dict["nx"]
-    ny = dummy_simulation.decompose_dict["ny"]
+@pytest.mark.parametrize(
+    "nx, ny, global_shape",
+    COMBINED_PARAMS
+)
+def test_decompose_logic(nx, ny, global_shape):
     mpi_size = nx * ny
+    dummy_mesh = make_mesh(global_shape)
+    decompose_dict = make_decompose_dict(nx, ny)
+    simulation = make_simulation(decompose_dict=decompose_dict)
 
     for mpi_rank in range(mpi_size):
-        domain = make_domain(mpi_rank, mpi_size)
+        domain = make_domain(
+            mpi_rank,
+            mpi_size,
+            simulation,
+            dummy_mesh
+        )
 
         assert domain.mpi_rank == mpi_rank
         assert domain.mpi_size == mpi_size
@@ -199,16 +181,26 @@ def test_decompose_logic(make_domain, dummy_simulation, dummy_mesh):
         assert np.all(shape_exp == domain.shape)
 
 
-def test_domain_coverage(make_domain, dummy_simulation, dummy_mesh):
-    nx = dummy_simulation.decompose_dict["nx"]
-    ny = dummy_simulation.decompose_dict["ny"]
+@pytest.mark.parametrize(
+    "nx, ny, global_shape",
+    COMBINED_PARAMS
+)
+def test_domain_coverage(nx, ny, global_shape):
     mpi_size = nx * ny
+    dummy_mesh = make_mesh(global_shape)
+    decompose_dict = make_decompose_dict(nx, ny)
+    simulation = make_simulation(decompose_dict=decompose_dict)
 
     coverage = np.zeros(
         dummy_mesh.grid_global_shape, dtype=np.int32
     )
     for mpi_rank in range(mpi_size):
-        domain = make_domain(mpi_rank, mpi_size)
+        domain = make_domain(
+            mpi_rank,
+            mpi_size,
+            simulation,
+            dummy_mesh
+        )
 
         assert domain.Nx_rank > 0
         assert domain.Ny_rank > 0
@@ -219,13 +211,23 @@ def test_domain_coverage(make_domain, dummy_simulation, dummy_mesh):
     assert np.all(coverage == 1)
 
 
-def test_local_global_mapping(make_domain, dummy_simulation):
-    nx = dummy_simulation.decompose_dict["nx"]
-    ny = dummy_simulation.decompose_dict["ny"]
+@pytest.mark.parametrize(
+    "nx, ny, global_shape",
+    COMBINED_PARAMS
+)
+def test_local_global_mapping(nx, ny, global_shape):
     mpi_size = nx * ny
+    dummy_mesh = make_mesh(global_shape)
+    decompose_dict = make_decompose_dict(nx, ny)
+    simulation = make_simulation(decompose_dict=decompose_dict)
 
     for mpi_rank in range(mpi_size):
-        domain = make_domain(mpi_rank, mpi_size)
+        domain = make_domain(
+            mpi_rank,
+            mpi_size,
+            simulation,
+            dummy_mesh
+        )
         offset = domain.offset
         for i in range(domain.Nx_rank):
             for j in range(domain.Ny_rank):

@@ -2,29 +2,7 @@ import numpy as np
 import pytest
 
 from pylabolt.base.fields import Fields
-
-
-""" Dummy classes """
-
-
-class DummyDomain:
-    def __init__(self, Nx, Ny, rank):
-        self.mpi_rank = rank
-        self.size = Nx * Ny
-        self.Nx = Nx
-        self.Ny = Ny
-        self.shape = np.array([Nx, Ny], dtype=np.int32)
-        self.offset = np.array([0, 0])
-
-
-class DummyLattice:
-    def __init__(self):
-        self.no_of_directions = 9
-
-
-class DummyControl:
-    def __init__(self):
-        self.precision = np.float64
+from factories import make_control, make_lattice, make_domain
 
 
 """ Fixtures """
@@ -32,9 +10,9 @@ class DummyControl:
 
 @pytest.fixture
 def setup_env():
-    control = DummyControl()
-    lattice = DummyLattice()
-    domain = DummyDomain(5, 5, 0)
+    control = make_control()
+    lattice = make_lattice(9)
+    domain = make_domain(5, 5, 0)
     return control, lattice, domain
 
 
