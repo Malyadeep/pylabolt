@@ -274,7 +274,7 @@ class Boundary:
             )
         if len(segments) == 0:
             raise ValueError(
-                "segments cannot be an empty lst: " + user_boundary_name
+                "segments cannot be an empty list: " + user_boundary_name
             )
         for segment in segments:
             if not (
@@ -283,7 +283,7 @@ class Boundary:
                 all(isinstance(pt, list) and len(pt) == 2 for pt in segment)
             ):
                 raise ValueError(
-                    "segment must have structure [[x1, y1], [x2, y2]]:" +
+                    "segment must have structure [[x1, y1], [x2, y2]]: " +
                     user_boundary_name
                 )
 
@@ -292,14 +292,14 @@ class Boundary:
             # enforce ordering
             if not (x2 >= x1 and y2 >= y1):
                 raise ValueError(
-                    "segment must satisfy x2 >= x1 and y2 >= y1:" +
+                    "segment must satisfy x2 >= x1 and y2 >= y1: " +
                     user_boundary_name
                 )
 
             # enforce axis-aligned constraint
             if not (x1 == x2 or y1 == y2):
                 raise ValueError(
-                    "segment must be axis-aligned (horizontal or vertical):" +
+                    "segment must be axis-aligned (horizontal or vertical): " +
                     user_boundary_name
                 )
 
