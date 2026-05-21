@@ -338,7 +338,7 @@ class Boundary:
                 if (not isinstance(boundary_value, list) or
                         len(boundary_value) != 2):
                     raise ValueError(
-                        "value for fixed_velocity must be a list (ux, uy)"
+                        "value for fixed_velocity must be a list (ux, uy): "
                         + user_boundary_name
                     )
                 fluid_config["vector_value"] =\
@@ -353,7 +353,7 @@ class Boundary:
                 if (not isinstance(boundary_value, int) and
                         not isinstance(boundary_value, float)):
                     raise ValueError(
-                        "value for fixed_pressure must be a float or int"
+                        "value for fixed_pressure must be a float or int: "
                         + user_boundary_name
                     )
                 fluid_config["scalar_value"] =\

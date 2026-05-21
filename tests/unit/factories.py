@@ -100,3 +100,42 @@ def make_simulation(
     if initial_fields_dict is not None:
         data["initial_fields_dict"] = initial_fields_dict
     return SimpleNamespace(**data)
+
+
+class BoundaryDictsFluid:
+    def __init__(self):
+        self.sample_dict = {
+            "options": {},
+            "check": {
+                "fluid": {
+                    "type": "bounce_back"
+                },
+                "segments": [
+                    [[0, 20], [20, 20]],
+                    [[0, 0], [20, 0]]
+                ]
+            }
+        }
+
+    def get_bounce_back_dict(self):
+        sample_dict = self.sample_dict
+        sample_dict["check"]["fluid"]["type"] = "bounce_back"
+        return sample_dict
+
+    def get_fixed_velocity_dict(self):
+        sample_dict = self.sample_dict
+        sample_dict["check"]["fluid"]["type"] = "fixed_velocity"
+        sample_dict["check"]["fluid"]["value"] = [1e-3, 1e-5]
+        return sample_dict
+
+    def get_fixed_pressure_dict(self):
+        sample_dict = self.sample_dict
+        sample_dict["check"]["fluid"]["type"] = "fixed_pressure"
+        sample_dict["check"]["fluid"]["value"] = 0.35
+        return sample_dict
+
+    def get_periodic_dict(self):
+        sample_dict = self.sample_dict
+        sample_dict["check"]["fluid"]["type"] = "periodic"
+        sample_dict["check"]["fluid"]["value"] = 0.35
+        return sample_dict

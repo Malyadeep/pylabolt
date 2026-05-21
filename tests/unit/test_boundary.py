@@ -8,7 +8,8 @@ from factories import (
     make_mesh,
     make_domain,
     make_control,
-    make_simulation
+    make_simulation,
+    BoundaryDictsFluid
 )
 
 
@@ -18,6 +19,11 @@ def setup_env():
     domain = make_domain(17, 13, 0)
     control = make_control()
     return mesh, domain, control
+
+
+@pytest.fixture
+def boundary_dicts_fluid():
+    return BoundaryDictsFluid()
 
 
 def build_boundary(
@@ -168,3 +174,63 @@ class TestSegmentValidation:
         mssg = "segment must be axis-aligned (horizontal or vertical): check"
         with pytest.raises(ValueError, match=re.escape(mssg)):
             build_boundary(simulation, setup_env)
+
+
+class TestFluidBoundaryDicts:
+    def test_missing_fluid(self, setup_env, boundary_dicts_fluid):
+        boundary_dict = boundary_dicts_fluid.sample_dict
+        boundary_dict["check"].pop("fluid")
+        simulation = make_simulation(boundary_dict=boundary_dict)
+        mssg = "fluid missing in boundary: check"
+        with pytest.raises(ValueError, match=mssg):
+            build_boundary(simulation, setup_env, fluid=True)
+
+    def test_missing_fluid_type(self, setup_env, boundary_dicts_fluid):
+        boundary_dict = boundary_dicts_fluid.sample_dict
+        boundary_dict["check"]["fluid"].pop("type")
+        simulation = make_simulation(boundary_dict=boundary_dict)
+        mssg = "type missing in fluid section of boundary: check"
+        with pytest.raises(ValueError, match=mssg):
+            build_boundary(simulation, setup_env, fluid=True)
+
+    def test_unsupported_fluid_bc(self, setup_env, boundary_dicts_fluid):
+        boundary_dict = boundary_dicts_fluid.sample_dict
+        boundary_dict["check"]["fluid"]["type"] = "other"
+        simulation = make_simulation(boundary_dict=boundary_dict)
+        mssg = "Unsupported boundary condition for fluid: other"
+        with pytest.raises(ValueError, match=mssg):
+            build_boundary(simulation, setup_env, fluid=True)
+
+    def test_fixed_velocity_fluid(self, setup_env, boundary_dicts_fluid):
+        boundary_dict = boundary_dicts_fluid.get_fixed_velocity_dict()
+        boundary_dict["check"]["fluid"].pop("value")
+        simulation = make_simulation(boundary_dict=boundary_dict)
+        mssg = "value missing in fluid section of boundary: check"
+        with pytest.raises(ValueError, match=mssg):
+            build_boundary(simulation, setup_env, fluid=True)
+
+        boundary_dict = boundary_dicts_fluid.get_fixed_velocity_dict()
+        values = [[1, 2, 3], 0.5, [1], "foo"]
+        mssg = "value for fixed_velocity must be a list (ux, uy): check"
+        for value in values:
+            boundary_dict["check"]["fluid"]["value"] = value
+            simulation = make_simulation(boundary_dict=boundary_dict)
+            with pytest.raises(ValueError, match=re.escape(mssg)):
+                build_boundary(simulation, setup_env, fluid=True)
+
+    def test_fixed_pressure_fluid(self, setup_env, boundary_dicts_fluid):
+        boundary_dict = boundary_dicts_fluid.get_fixed_pressure_dict()
+        boundary_dict["check"]["fluid"].pop("value")
+        simulation = make_simulation(boundary_dict=boundary_dict)
+        mssg = "value missing in fluid section of boundary: check"
+        with pytest.raises(ValueError, match=mssg):
+            build_boundary(simulation, setup_env, fluid=True)
+
+        boundary_dict = boundary_dicts_fluid.get_fixed_pressure_dict()
+        values = [[1, 2, 3], [1], "foo"]
+        mssg = "value for fixed_pressure must be a float or int: check"
+        for value in values:
+            boundary_dict["check"]["fluid"]["value"] = value
+            simulation = make_simulation(boundary_dict=boundary_dict)
+            with pytest.raises(ValueError, match=mssg):
+                build_boundary(simulation, setup_env, fluid=True)
