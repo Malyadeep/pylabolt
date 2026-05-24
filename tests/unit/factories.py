@@ -112,7 +112,9 @@ class BoundaryDictsFluid:
                 },
                 "segments": [
                     [[0, 20], [20, 20]],
-                    [[0, 0], [20, 0]]
+                    [[0, 0], [20, 0]],
+                    [[0, 0], [0, 20]],
+                    [[20, 0], [20, 20]]
                 ]
             }
         }
@@ -134,8 +136,61 @@ class BoundaryDictsFluid:
         sample_dict["check"]["fluid"]["value"] = 0.35
         return sample_dict
 
-    def get_periodic_dict(self):
+    def get_periodic_dict(self, Nx, Ny, orientation="vertical"):
         sample_dict = self.sample_dict
         sample_dict["check"]["fluid"]["type"] = "periodic"
-        sample_dict["check"]["fluid"]["value"] = 0.35
+        if orientation == "vertical":
+            sample_dict["check"]["segments"] = [
+                [[0, 0], [0, Ny - 1]],
+                [[Nx - 1, 0], [Nx - 1, Ny - 1]]
+            ]
+        elif orientation == "horizontal":
+            sample_dict["check"]["segments"] = [
+                [[0, 0], [Nx - 1, 0]],
+                [[0, Ny - 1], [Nx - 1, Ny - 1]]
+            ]
+        return sample_dict
+
+
+class BoundaryDictsPhase:
+    def __init__(self):
+        self.sample_dict = {
+            "options": {},
+            "check": {
+                "phase": {
+                    "type": "bounce_back"
+                },
+                "segments": [
+                    [[0, 20], [20, 20]],
+                    [[0, 0], [20, 0]],
+                    [[0, 0], [0, 20]],
+                    [[20, 0], [20, 20]]
+                ]
+            }
+        }
+
+    def get_bounce_back_dict(self):
+        sample_dict = self.sample_dict
+        sample_dict["check"]["phase"]["type"] = "bounce_back"
+        return sample_dict
+
+    def get_fixed_value_dict(self):
+        sample_dict = self.sample_dict
+        sample_dict["check"]["phase"]["type"] = "fixed_value"
+        sample_dict["check"]["phase"]["value"] = 0.35
+        return sample_dict
+
+    def get_periodic_dict(self, Nx, Ny, orientation="vertical"):
+        sample_dict = self.sample_dict
+        sample_dict["check"]["phase"]["type"] = "periodic"
+        if orientation == "vertical":
+            sample_dict["check"]["segments"] = [
+                [[0, 0], [0, Ny - 1]],
+                [[Nx - 1, 0], [Nx - 1, Ny - 1]]
+            ]
+        elif orientation == "horizontal":
+            sample_dict["check"]["segments"] = [
+                [[0, 0], [Nx - 1, 0]],
+                [[0, Ny - 1], [Nx - 1, Ny - 1]]
+            ]
         return sample_dict

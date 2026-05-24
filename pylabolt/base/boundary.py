@@ -30,19 +30,19 @@ class BoundaryElement:
         if fluid_config is not None:
             self.type_fluid = fluid_config["type"]
             self.scalar_fluid = control.precision(0)
-            self.vector_fluid = np.zeros(2)
+            self.vector_fluid = np.zeros(2, dtype=control.precision)
             if fluid_config["scalar_value"] is not None:
                 self.scalar_fluid = control.precision(
                     fluid_config["scalar_value"]
                 )
             if fluid_config["vector_value"] is not None:
-                self.scalar_fluid = np.array(
+                self.vector_fluid = np.array(
                     fluid_config["vector_value"], dtype=control.precision
                 )
         if phase_config is not None:
             self.type_phase = phase_config["type"]
             self.scalar_phase = control.precision(0)
-            self.vector_phase = np.zeros(2)
+            self.vector_phase = np.zeros(2, dtype=control.precision)
             if phase_config["scalar_value"] is not None:
                 self.scalar_phase = control.precision(
                     phase_config["scalar_value"]
@@ -67,7 +67,6 @@ class BoundaryElement:
             self.surface_normals = np.array([-1, 0], dtype=control.precision)
             self.out_list = np.array([1, 8, 5], dtype=np.int32)
             self.inv_list = np.array([3, 6, 7], dtype=np.int32)
-        # TODO: add rank specific boundary node allocation
         self.boundary_nodes = self.allocate_boundary_nodes(
             segment,
             domain
@@ -358,12 +357,6 @@ class Boundary:
                     )
                 fluid_config["scalar_value"] =\
                     control.precision(boundary_value)
-            elif boundary_type == "periodic":
-                self.validate_periodic_boundary(
-                    user_boundary_name,
-                    segments,
-                    mesh
-                )
 
         # ------- Validate phase dict ------- #
         if phase:
@@ -377,7 +370,7 @@ class Boundary:
                     "type missing in phase section of boundary: "
                     + user_boundary_name
                 )
-            boundary_type = fluid_dict["type"]
+            boundary_type = phase_dict["type"]
             supported_phase_bcs = [
                 "bounce_back",
                 "fixed_value",
@@ -399,28 +392,34 @@ class Boundary:
                 if (not isinstance(boundary_value, int) and
                         not isinstance(boundary_value, float)):
                     raise ValueError(
-                        "value for fixed_value must be a float or int"
+                        "value for fixed_value must be a float or int: "
                         + user_boundary_name
                     )
                 phase_config["scalar_value"] =\
                     control.precision(boundary_value)
-            elif boundary_type == "periodic":
-                self.validate_periodic_boundary(
-                    user_boundary_name,
-                    segments,
-                    mesh
-                )
+
         # ------- Validate scalar dict ------- #
         if scalar:
             if "scalar_value" not in user_boundary_dict:
                 # TODO: no scalar transport solver implemented
                 pass
 
+        if (fluid_config["type"] == "periodic" or
+                phase_config["type"] == "periodic"):
+            self.validate_periodic_boundary(
+                user_boundary_name,
+                segments,
+                mesh
+            )
+
         # ------- Create boundary elements ------- #
         orientations = []
         locations = []
         for segment_no, segment in enumerate(segments):
             # TODO: modifications needed for 1D case
+            # TODO: insert a condition here that catches if the
+            # user specifies a boundary segment that doesn't
+            # satisfies location conditions
             (x1, y1), (x2, y2) = segment
             if x2 - x1 == 0:
                 orientations.append("vertical")
@@ -515,23 +514,23 @@ class Boundary:
             if (x1_min, x1_max) != (x2_min, x2_max):
                 raise ValueError(
                     "horizontal periodic boundaries must span" +
-                    " same x-range : " + user_boundary_name
+                    " same x-range: " + user_boundary_name
                 )
             if sorted([y1_min, y2_min]) != [0, mesh.grid_global_shape[1] - 1]:
                 raise ValueError(
                     "horizontal periodic boundaries must connect" +
-                    " top-bottom boundaries : " + user_boundary_name
+                    " top-bottom boundaries: " + user_boundary_name
                 )
         elif is_vertical:
             if (y1_min, y1_max) != (y2_min, y2_max):
                 raise ValueError(
                     "vertical periodic boundaries must span" +
-                    " same y-range : " + user_boundary_name
+                    " same y-range: " + user_boundary_name
                 )
             if sorted([x1_min, x2_min]) != [0, mesh.grid_global_shape[0] - 1]:
                 raise ValueError(
                     "vertical periodic boundaries must connect" +
-                    " left-right boundaries : " + user_boundary_name
+                    " left-right boundaries: " + user_boundary_name
                 )
 
     def log_boundary_data(
@@ -554,7 +553,7 @@ class Boundary:
         """
         print_log("boundary name: " + user_boundary_name,
                   domain.mpi_rank, verbose)
-        if fluid_config is not None:
+        if fluid_config["type"] is not None:
             print_log("fluid boundary condition:" + fluid_config["type"],
                       domain.mpi_rank, verbose)
             if fluid_config["scalar_value"] is not None:
@@ -563,7 +562,7 @@ class Boundary:
             if fluid_config["vector_value"] is not None:
                 print_log("fluid value:" + str(fluid_config["vector_value"]),
                           domain.mpi_rank, verbose)
-        if phase_config is not None:
+        if phase_config["type"] is not None:
             print_log("phase boundary condition:" + phase_config["type"],
                       domain.mpi_rank, verbose)
             if phase_config["scalar_value"] is not None:
