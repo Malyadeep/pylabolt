@@ -3,11 +3,14 @@ import numpy as np
 import re
 
 
-from pylabolt.base.boundary import Boundary, BoundaryElement
+from pylabolt.base.boundary import Boundary
+from pylabolt.backend.domain import Domain
 from factories import (
     make_mesh,
     make_domain,
     make_control,
+    make_comm,
+    make_decompose_dict,
     make_simulation,
     BoundaryDictsFluid,
     BoundaryDictsPhase
@@ -559,3 +562,138 @@ class TestPeriodicValidation:
             " left-right boundaries: check"
         with pytest.raises(ValueError, match=mssg):
             build_boundary(simulation, setup_env, fluid=True)
+
+
+class TestBoundaryNodeAllocation:
+    def test_single_rank(self, setup_env, boundary_dicts_fluid):
+        mesh, domain, control = setup_env
+        boundary_dict = boundary_dicts_fluid.get_bounce_back_dict()
+        simulation = make_simulation(boundary_dict=boundary_dict)
+        Nx, Ny = mesh.grid_global_shape
+        simulation.boundary_dict["check"]["segments"] = [
+            [[0, Ny - 1], [Nx - 1, Ny - 1]],
+            [[0, 0], [Nx - 1, 0]],
+            [[0, 0], [0, Ny - 1]],
+            [[Nx - 1, 0], [Nx - 1, Ny - 1]]
+        ]
+        boundary = build_boundary(simulation, setup_env, fluid=True)
+        no_of_elements = len(boundary.boundary_elements)
+        for element_no in range(no_of_elements):
+            node_list = []
+            segment = simulation.boundary_dict["check"]["segments"][element_no]
+            for i in range(segment[0][0], segment[1][0] + 1):
+                for j in range(segment[0][1], segment[1][1] + 1):
+                    ind = (i + 1) * (Ny + 2) + (j + 1)
+                    node_list.append(ind)
+            node_list = np.array(node_list)
+            assert np.all(
+                node_list ==
+                boundary.boundary_elements[element_no].boundary_nodes
+            )
+
+    def check_node_allocation(self, domain, location):
+        node_list = []
+        if location == "left":
+            if domain.i_proc != 0:
+                return node_list
+            else:
+                i = 1
+                node_list = []
+                for j in range(1, domain.shape[1] - 1):
+                    ind = i * domain.shape[1] + j
+                    node_list.append(ind)
+                return np.array(node_list, dtype=np.int32)
+        elif location == "right":
+            if domain.i_proc != domain.Nx_proc - 1:
+                return node_list
+            else:
+                i = domain.shape[0] - 2
+                node_list = []
+                for j in range(1, domain.shape[1] - 1):
+                    ind = i * domain.shape[1] + j
+                    node_list.append(ind)
+                return np.array(node_list, dtype=np.int32)
+        elif location == "bottom":
+            if domain.j_proc != 0:
+                return node_list
+            else:
+                j = 1
+                node_list = []
+                for i in range(1, domain.shape[0] - 1):
+                    ind = i * domain.shape[1] + j
+                    node_list.append(ind)
+                return np.array(node_list, dtype=np.int32)
+        elif location == "top":
+            if domain.j_proc != domain.Ny_proc - 1:
+                return node_list
+            else:
+                j = domain.shape[1] - 2
+                node_list = []
+                for i in range(1, domain.shape[0] - 1):
+                    ind = i * domain.shape[1] + j
+                    node_list.append(ind)
+                return np.array(node_list, dtype=np.int32)
+
+    def test_multi_rank(self, setup_env, boundary_dicts_fluid):
+        mpi_size = 9
+        boundary_dict = boundary_dicts_fluid.get_bounce_back_dict()
+        decompose_dict = make_decompose_dict(3, 3)
+        simulation = make_simulation(
+            boundary_dict=boundary_dict,
+            decompose_dict=decompose_dict
+        )
+        Nx, Ny = 20, 19
+        simulation.boundary_dict["check"]["segments"] = [
+            [[0, Ny - 1], [Nx - 1, Ny - 1]],
+            [[0, 0], [Nx - 1, 0]],
+            [[0, 0], [0, Ny - 1]],
+            [[Nx - 1, 0], [Nx - 1, Ny - 1]]
+        ]
+        control_all = []
+        mesh_all = []
+        comm_all = []
+        domain_all = []
+        boundary_all = []
+        for mpi_rank in range(mpi_size):
+            control_temp = make_control()
+            mesh_temp = make_mesh((Nx, Ny))
+            comm_temp = make_comm(mpi_rank, mpi_size)
+            domain_temp = Domain(
+                simulation,
+                mesh_temp,
+                comm_temp,
+                verbose=False
+            )
+            boundary_temp = Boundary(
+                simulation,
+                mesh_temp,
+                domain_temp,
+                control_temp,
+                fluid=True,
+                verbose=False
+            )
+            control_all.append(control_temp)
+            mesh_all.append(mesh_temp)
+            comm_all.append(comm_temp)
+            domain_all.append(domain_temp)
+            boundary_all.append(boundary_temp)
+
+        for current_rank in range(mpi_size):
+            no_of_elements = len(boundary_all[current_rank].boundary_elements)
+            for element_no in range(no_of_elements):
+                node_list = self.check_node_allocation(
+                    domain_all[current_rank],
+                    boundary_all[current_rank].
+                    boundary_elements[element_no].location
+                )
+                if len(node_list) > 0:
+                    assert np.all(
+                        node_list ==
+                        boundary_all[current_rank].
+                        boundary_elements[element_no].boundary_nodes
+                    )
+                else:
+                    assert len(
+                        boundary_all[current_rank].
+                        boundary_elements[element_no].boundary_nodes
+                    ) == 0

@@ -74,8 +74,8 @@ class DummyComm:
         return self.mpi_size
 
 
-def make_comm(mpi_size, mpi_rank):
-    return DummyComm(mpi_size, mpi_rank)
+def make_comm(mpi_rank, mpi_size):
+    return DummyComm(mpi_rank, mpi_size)
 
 
 def make_simulation(
