@@ -50,6 +50,7 @@ class DummyFields:
         self.density = np.zeros(domain.size, dtype=control.precision)
         self.phase_field = np.zeros(domain.size, dtype=control.precision)
         self.ghost_node = np.zeros(domain.size, dtype=np.bool_)
+        self.periodic_boundary = np.zeros(domain.size, dtype=np.bool_)
         for ind in range(domain.size):
             i = ind // domain.shape[1]
             j = ind - i * domain.shape[1]

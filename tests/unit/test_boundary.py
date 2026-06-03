@@ -9,6 +9,7 @@ from factories import (
     make_mesh,
     make_domain,
     make_control,
+    make_fields,
     make_comm,
     make_decompose_dict,
     make_simulation,
@@ -22,7 +23,8 @@ def setup_env():
     mesh = make_mesh((15, 11))
     domain = make_domain(17, 13, 0)
     control = make_control()
-    return mesh, domain, control
+    fields = make_fields(domain, control)
+    return mesh, domain, control, fields
 
 
 @pytest.fixture
@@ -42,12 +44,13 @@ def build_boundary(
     phase=False,
     scalar=False
 ):
-    mesh, domain, control = setup_env
+    mesh, domain, control, fields = setup_env
     return Boundary(
         simulation,
         mesh,
         domain,
         control,
+        fields,
         fluid=fluid,
         phase=phase,
         scalar=scalar,
@@ -245,7 +248,7 @@ class TestFluidBoundaryDicts:
                 build_boundary(simulation, setup_env, fluid=True)
 
     def test_valid_fluid_bc(self, setup_env, boundary_dicts_fluid):
-        mesh, domain, control = setup_env
+        mesh, domain, control, fields = setup_env
         boundary_dict = boundary_dicts_fluid.sample_dict
         simulation = make_simulation(boundary_dict=boundary_dict)
         boundary_types = [
@@ -362,7 +365,7 @@ class TestPhaseBoundaryDicts:
                 build_boundary(simulation, setup_env, phase=True)
 
     def test_valid_phase_bc(self, setup_env, boundary_dicts_phase):
-        mesh, domain, control = setup_env
+        mesh, domain, control, fields = setup_env
         boundary_dict = boundary_dicts_phase.sample_dict
         simulation = make_simulation(boundary_dict=boundary_dict)
         boundary_types = [
@@ -432,7 +435,7 @@ class TestPhaseBoundaryDicts:
 
 class TestPeriodicValidation:
     def test_invalid_no_of_segments(self, setup_env, boundary_dicts_fluid):
-        mesh, domain, control = setup_env
+        mesh, domain, control, fields = setup_env
         Nx, Ny = mesh.grid_global_shape
         boundary_dict = boundary_dicts_fluid.get_periodic_dict(Nx, Ny)
         simulation = make_simulation(boundary_dict=boundary_dict)
@@ -454,7 +457,7 @@ class TestPeriodicValidation:
                     build_boundary(simulation, setup_env, fluid=True)
 
     def test_segment_orientation(self, setup_env, boundary_dicts_fluid):
-        mesh, domain, control = setup_env
+        mesh, domain, control, fields = setup_env
         Nx, Ny = mesh.grid_global_shape
         boundary_dict = boundary_dicts_fluid.get_periodic_dict(
             Nx,
@@ -480,7 +483,7 @@ class TestPeriodicValidation:
             build_boundary(simulation, setup_env, fluid=True)
 
     def test_segment_length(self, setup_env, boundary_dicts_fluid):
-        mesh, domain, control = setup_env
+        mesh, domain, control, fields = setup_env
         Nx, Ny = mesh.grid_global_shape
         boundary_dict = boundary_dicts_fluid.get_periodic_dict(
             Nx,
@@ -510,7 +513,7 @@ class TestPeriodicValidation:
             build_boundary(simulation, setup_env, fluid=True)
 
     def test_connection_horizontal(self, setup_env, boundary_dicts_fluid):
-        mesh, domain, control = setup_env
+        mesh, domain, control, fields = setup_env
         Nx, Ny = mesh.grid_global_shape
         boundary_dict = boundary_dicts_fluid.get_periodic_dict(
             Nx,
@@ -537,7 +540,7 @@ class TestPeriodicValidation:
             build_boundary(simulation, setup_env, fluid=True)
 
     def test_connection_vertical(self, setup_env, boundary_dicts_fluid):
-        mesh, domain, control = setup_env
+        mesh, domain, control, fields = setup_env
         Nx, Ny = mesh.grid_global_shape
         boundary_dict = boundary_dicts_fluid.get_periodic_dict(
             Nx,
@@ -566,7 +569,7 @@ class TestPeriodicValidation:
 
 class TestBoundaryNodeAllocation:
     def test_single_rank(self, setup_env, boundary_dicts_fluid):
-        mesh, domain, control = setup_env
+        mesh, domain, control, fields = setup_env
         boundary_dict = boundary_dicts_fluid.get_bounce_back_dict()
         simulation = make_simulation(boundary_dict=boundary_dict)
         Nx, Ny = mesh.grid_global_shape
@@ -654,6 +657,7 @@ class TestBoundaryNodeAllocation:
         comm_all = []
         domain_all = []
         boundary_all = []
+        fields_all = []
         for mpi_rank in range(mpi_size):
             control_temp = make_control()
             mesh_temp = make_mesh((Nx, Ny))
@@ -664,11 +668,13 @@ class TestBoundaryNodeAllocation:
                 comm_temp,
                 verbose=False
             )
+            fields_temp = make_fields(domain_temp, control_temp)
             boundary_temp = Boundary(
                 simulation,
                 mesh_temp,
                 domain_temp,
                 control_temp,
+                fields_temp,
                 fluid=True,
                 verbose=False
             )
@@ -676,6 +682,7 @@ class TestBoundaryNodeAllocation:
             mesh_all.append(mesh_temp)
             comm_all.append(comm_temp)
             domain_all.append(domain_temp)
+            fields_all.append(fields_temp)
             boundary_all.append(boundary_temp)
 
         for current_rank in range(mpi_size):
@@ -697,3 +704,56 @@ class TestBoundaryNodeAllocation:
                         boundary_all[current_rank].
                         boundary_elements[element_no].boundary_nodes
                     ) == 0
+
+    def test_periodic_nodes(self, setup_env, boundary_dicts_fluid):
+        mpi_size = 9
+        Nx, Ny = 20, 19
+        boundary_dict = boundary_dicts_fluid.get_periodic_dict(Nx, Ny)
+        decompose_dict = make_decompose_dict(3, 3)
+        simulation = make_simulation(
+            boundary_dict=boundary_dict,
+            decompose_dict=decompose_dict
+        )
+        control_all = []
+        mesh_all = []
+        comm_all = []
+        domain_all = []
+        boundary_all = []
+        fields_all = []
+        for mpi_rank in range(mpi_size):
+            control_temp = make_control()
+            mesh_temp = make_mesh((Nx, Ny))
+            comm_temp = make_comm(mpi_rank, mpi_size)
+            domain_temp = Domain(
+                simulation,
+                mesh_temp,
+                comm_temp,
+                verbose=False
+            )
+            fields_temp = make_fields(domain_temp, control_temp)
+            boundary_temp = Boundary(
+                simulation,
+                mesh_temp,
+                domain_temp,
+                control_temp,
+                fields_temp,
+                fluid=True,
+                verbose=False
+            )
+            boundary_all.append(boundary_temp)
+            fields_all.append(fields_temp)
+
+        for current_rank in range(mpi_size):
+            periodic_nodes_temp = []
+            no_of_elements = len(boundary_all[current_rank].boundary_elements)
+            for element_no in range(no_of_elements):
+                node_list = boundary_all[current_rank].\
+                    boundary_elements[element_no].boundary_nodes
+                if len(node_list) > 0:
+                    periodic_nodes_temp.extend(node_list)
+            periodic_nodes = np.unique(periodic_nodes_temp).astype(np.int32)
+            mask = fields_all[current_rank].periodic_boundary
+            all_nodes = np.arange(mask.size)
+            non_periodic_nodes = np.setdiff1d(all_nodes, periodic_nodes)
+            assert np.all(mask[periodic_nodes])
+            assert np.all(~mask[non_periodic_nodes])

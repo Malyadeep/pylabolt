@@ -14,6 +14,7 @@ class BoundaryElement:
         location,
         domain,
         control,
+        fields,
         fluid_config=None,
         phase_config=None
     ):
@@ -27,8 +28,11 @@ class BoundaryElement:
         self.orientation = orientation
         self.location = location
         self.segment = np.array(segment)
+        self.periodic = False
         if fluid_config is not None:
             self.type_fluid = fluid_config["type"]
+            if self.type_fluid == "periodic":
+                self.periodic = True
             self.scalar_fluid = control.precision(0)
             self.vector_fluid = np.zeros(2, dtype=control.precision)
             if fluid_config["scalar_value"] is not None:
@@ -41,6 +45,8 @@ class BoundaryElement:
                 )
         if phase_config is not None:
             self.type_phase = phase_config["type"]
+            if self.type_phase == "periodic":
+                self.periodic = True
             self.scalar_phase = control.precision(0)
             self.vector_phase = np.zeros(2, dtype=control.precision)
             if phase_config["scalar_value"] is not None:
@@ -71,6 +77,8 @@ class BoundaryElement:
             segment,
             domain
         )
+        if self.periodic is True:
+            fields.periodic_boundary[self.boundary_nodes] = True
 
     def allocate_boundary_nodes(
         self,
@@ -123,6 +131,7 @@ class Boundary:
         mesh,
         domain,
         control,
+        fields,
         fluid=False,
         phase=False,
         scalar=False,
@@ -149,6 +158,7 @@ class Boundary:
             mesh,
             domain,
             control,
+            fields,
             fluid=fluid,
             phase=phase,
             scalar=scalar,
@@ -160,6 +170,7 @@ class Boundary:
         mesh,
         domain,
         control,
+        fields,
         fluid=False,
         phase=False,
         scalar=False,
@@ -191,6 +202,7 @@ class Boundary:
                 mesh,
                 domain,
                 control,
+                fields,
                 fluid=fluid,
                 phase=phase,
                 scalar=scalar,
@@ -232,6 +244,7 @@ class Boundary:
         mesh,
         domain,
         control,
+        fields,
         fluid=False,
         phase=False,
         scalar=False,
@@ -441,6 +454,7 @@ class Boundary:
                 locations[segment_no],
                 domain,
                 control,
+                fields,
                 fluid_config=fluid_config,
                 phase_config=phase_config
             )
@@ -574,7 +588,7 @@ class Boundary:
         print_log("segments:", domain.mpi_rank, verbose)
         for segment_no in range(len(segments)):
             print_log(
-                "segement_" + str(segment_no + 1) + ":" +
+                "segment_" + str(segment_no + 1) + ":" +
                 str(segments[segment_no]).ljust(30) + "| orientation: " +
                 orientations[segment_no].ljust(5) + " | location: " +
                 str(locations[segment_no]),

@@ -6,6 +6,7 @@ import pylabolt.base.control as control
 import pylabolt.base.mesh as mesh
 import pylabolt.base.lattice as lattice
 import pylabolt.base.fields as fields
+import pylabolt.base.boundary as boundary
 import pylabolt.backend.domain as domain
 
 from pylabolt.base.init_fields import init_fields
@@ -71,6 +72,18 @@ class State:
                 scalar=scalar,
                 verbose=True
             )
+
+            self.boundary = boundary.Boundary(
+                simulation,
+                self.mesh,
+                self.domain,
+                self.control,
+                self.fields,
+                fluid=fluid,
+                phase=phase,
+                scalar=scalar,
+                verbose=True
+            )
         except Exception as e:
             print_log("-" * 80, rank, verbose=True)
             print_log("FATAL ERROR!", rank, verbose=True)
@@ -94,4 +107,3 @@ class State:
         )
         """ """
         self.obstacle = None
-        self.boundary = None
