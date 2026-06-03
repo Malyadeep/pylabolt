@@ -7,6 +7,7 @@ import pylabolt.base.mesh as mesh
 import pylabolt.base.lattice as lattice
 import pylabolt.base.fields as fields
 import pylabolt.base.boundary as boundary
+import pylabolt.base.obstacle as obstacle
 import pylabolt.backend.domain as domain
 
 from pylabolt.base.init_fields import init_fields
@@ -16,6 +17,9 @@ from pylabolt.utils.IO import print_log
 class State:
     def __init__(self, comm, rank, fluid=False,
                  phase=False, scalar=False):
+        self.fluid = fluid
+        self.phase = phase
+        self.scalar = scalar
         try:
             try:
                 working_dir = os.getcwd()
@@ -57,9 +61,9 @@ class State:
                 self.control,
                 self.lattice,
                 self.domain,
-                fluid=fluid,
-                phase=phase,
-                scalar=scalar
+                fluid=self.fluid,
+                phase=self.phase,
+                scalar=self.scalar
             )
 
             init_fields(
@@ -67,9 +71,9 @@ class State:
                 self.control,
                 self.domain,
                 self.fields,
-                fluid=fluid,
-                phase=phase,
-                scalar=scalar,
+                fluid=self.fluid,
+                phase=self.phase,
+                scalar=self.scalar,
                 verbose=True
             )
 
@@ -79,11 +83,24 @@ class State:
                 self.domain,
                 self.control,
                 self.fields,
-                fluid=fluid,
-                phase=phase,
-                scalar=scalar,
+                fluid=self.fluid,
+                phase=self.phase,
+                scalar=self.scalar,
                 verbose=True
             )
+
+            self.obstacle = obstacle.Obstacle(
+                simulation,
+                self.mesh,
+                self.domain,
+                self.control,
+                self.fields,
+                fluid=self.fluid,
+                phase=self.phase,
+                scalar=self.scalar,
+                verbose=True
+            )
+
         except Exception as e:
             print_log("-" * 80, rank, verbose=True)
             print_log("FATAL ERROR!", rank, verbose=True)
