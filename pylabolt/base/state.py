@@ -112,10 +112,9 @@ class State:
             os.makedirs("procs")
         np.savez(
             "procs/proc_" + str(self.domain.mpi_rank) + ".npz",
+            solid=self.fields.solid,
+            solid_id=self.fields.solid_id,
             velocity=self.fields.velocity,
-            density=self.fields.density,
-            pressure=self.fields.pressure,
-            phase_field=self.fields.phase_field,
             Nx=self.mesh.grid_global_shape[0],
             Ny=self.mesh.grid_global_shape[1],
             offset=self.domain.offset,

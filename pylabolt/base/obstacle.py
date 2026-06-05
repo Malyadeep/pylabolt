@@ -1,7 +1,7 @@
 import numpy as np
 
 from pylabolt.utils.IO import print_log
-from pylabolt.backend.domain import global_to_local
+from pylabolt.backend.domain import local_to_global
 
 
 class Obstacle:
@@ -33,6 +33,8 @@ class Obstacle:
         self.compute_forces = False
         self.compute_forces = False
         self.ref_point_torque = np.zeros(2, dtype=control.precision)
+        self.write_obstacle_data = False
+        self.write_interval = 1
         self.obstacles = []
 
         # ------- Read and initialize obstacles elements ------- #
@@ -74,23 +76,23 @@ class Obstacle:
             control,
             verbose
         )
-        for key_no, key in enumerate(self.obstacle_dict.keys()):
-            if key == "options":
-                continue
+        key_list = list(self.obstacle_dict.keys())
+        key_list.remove("options")
+        for obstacle_id, key in enumerate(key_list):
             user_obstacle_name = key
             user_obstacle_dict = self.obstacle_dict[key]
-            # self.read_user_obstacle_dict(
-            #     user_obstacle_name,
-            #     user_obstacle_dict,
-            #     mesh,
-            #     domain,
-            #     control,
-            #     fields,
-            #     fluid=fluid,
-            #     phase=phase,
-            #     scalar=scalar,
-            #     verbose=verbose
-            # )
+            self.read_user_obstacle_dict(
+                obstacle_id,
+                user_obstacle_name,
+                user_obstacle_dict,
+                domain,
+                control,
+                fields,
+                fluid=fluid,
+                phase=phase,
+                scalar=scalar,
+                verbose=verbose
+            )
 
     def read_options_dict(
         self,
@@ -153,13 +155,35 @@ class Obstacle:
             domain.mpi_rank,
             verbose=verbose
         )
+        if "write_obstacle_data" in options_dict:
+            self.write_obstacle_data = True
+            temp_dict = options_dict["write_obstacle_data"]
+            if "interval" not in temp_dict:
+                raise ValueError("interval missing obstacle_dict options!")
+            self.write_interval = temp_dict["interval"]
+            if not (isinstance(self.write_interval, int) and
+                    self.write_interval > 0):
+                raise ValueError(
+                    "interval must be int and > 0 in obstacle_dict options"
+                )
+        print_log(
+            "write_obstacle_data: " + str(self.write_obstacle_data),
+            domain.mpi_rank,
+            verbose=verbose
+        )
+        if self.write_obstacle_data:
+            print_log(
+                "write_interval: " + str(self.write_interval),
+                domain.mpi_rank,
+                verbose=verbose
+            )
         print_log("Obstacle options set\n", domain.mpi_rank, verbose)
 
     def read_user_obstacle_dict(
         self,
+        obstacle_id,
         user_obstacle_name,
         user_obstacle_dict,
-        mesh,
         domain,
         control,
         fields,
@@ -184,15 +208,21 @@ class Obstacle:
 
         if obstacle_type == "circle":
             obstacle = Circle(
+                obstacle_id,
                 user_obstacle_name,
                 user_obstacle_dict,
-                control
+                control,
+                domain,
+                fields
             )
         elif obstacle_type == "ellipse":
             obstacle = Ellipse(
+                obstacle_id,
                 user_obstacle_name,
                 user_obstacle_dict,
-                control
+                control,
+                domain,
+                fields
             )
         elif obstacle_type == "custom":
             obstacle = create_custom_obstacle()
@@ -266,15 +296,19 @@ class Obstacle:
 class Circle:
     def __init__(
         self,
+        obstacle_id,
         user_obstacle_name,
         user_obstacle_dict,
-        control
+        control,
+        domain,
+        fields
     ):
         """
         Container object for obstacle type: circle
         Attributes:
 
         """
+        self.id = obstacle_id
         self.name = user_obstacle_name
         self.type = "circle"
 
@@ -358,7 +392,11 @@ class Circle:
                     " in obstacle: " + user_obstacle_name
                 )
             self.degree_of_freedom = solid_motion_dict["degree_of_freedom"]
-            if self.motion_type not in ["rotation", "translation", "both"]:
+            if self.degree_of_freedom not in [
+                "rotation",
+                "translation",
+                "both"
+            ]:
                 raise ValueError(
                     "Unsupported degree of freedom: " + self.motion_type +
                     " in obstacle: " + user_obstacle_name
@@ -382,19 +420,54 @@ class Circle:
                 self.angular_velocity, dtype=control.precision
             )
 
+        self.set_solid_nodes(
+            fields,
+            domain
+        )
+
+    def set_solid_nodes(
+        self,
+        fields,
+        domain,
+    ):
+        """
+        Sets solid node values for obstacle type circle
+        Args:
+
+        Returns:
+
+        """
+        offset = domain.offset
+        for ind in range(domain.size):
+            i = ind // domain.shape[1]
+            j = ind - i * domain.shape[1]
+            i_global, j_global = local_to_global(
+                i - 1, j - 1, offset
+            )
+            dist_from_center = \
+                (i_global - self.center[0]) * (i_global - self.center[0]) +\
+                (j_global - self.center[1]) * (j_global - self.center[1])
+            if dist_from_center <= self.radius * self.radius:
+                fields.solid[ind] = True
+                fields.solid_id[ind] = self.id
+
 
 class Ellipse:
     def __init__(
         self,
+        obstacle_id,
         user_obstacle_name,
         user_obstacle_dict,
-        control
+        control,
+        domain,
+        fields
     ):
         """
         Container object for obstacle type: circle
         Attributes:
 
         """
+        self.id = obstacle_id
         self.name = user_obstacle_name
         self.type = "ellipse"
 
@@ -433,7 +506,8 @@ class Ellipse:
                 " type ellipse representing angle in degrees: " +
                 user_obstacle_name
             )
-        self.inclination_angle = control.precision(inclination_angle)
+        self.inclination_angle = control.precision(inclination_angle) *\
+            np.pi / 180
 
         if "center" not in user_obstacle_dict:
             raise ValueError(
@@ -501,7 +575,11 @@ class Ellipse:
                     " in obstacle: " + user_obstacle_name
                 )
             self.degree_of_freedom = solid_motion_dict["degree_of_freedom"]
-            if self.motion_type not in ["rotation", "translation", "both"]:
+            if self.degree_of_freedom not in [
+                "rotation",
+                "translation",
+                "both"
+            ]:
                 raise ValueError(
                     "Unsupported degree of freedom: " + self.motion_type +
                     " in obstacle: " + user_obstacle_name
@@ -524,6 +602,43 @@ class Ellipse:
             self.angular_velocity = np.array(
                 self.angular_velocity, dtype=control.precision
             )
+
+        self.set_solid_nodes(
+            fields,
+            domain
+        )
+
+    def set_solid_nodes(
+        self,
+        fields,
+        domain,
+    ):
+        """
+        Sets solid node values for obstacle type circle
+        Args:
+
+        Returns:
+
+        """
+        offset = domain.offset
+        cos_alpha = np.cos(self.inclination_angle)
+        sin_alpha = np.sin(self.inclination_angle)
+        for ind in range(domain.size):
+            i = ind // domain.shape[1]
+            j = ind - i * domain.shape[1]
+            i_global, j_global = local_to_global(
+                i - 1, j - 1, offset
+            )
+            rx = i_global - self.center[0]
+            ry = j_global - self.center[1]
+            x = rx * cos_alpha + ry * sin_alpha
+            y = - rx * sin_alpha + ry * cos_alpha
+            scaled_dist =\
+                (x * x) / (self.semi_major_axis * self.semi_major_axis) +\
+                (y * y) / (self.semi_minor_axis * self.semi_minor_axis)
+            if scaled_dist <= 1:
+                fields.solid[ind] = True
+                fields.solid_id[ind] = self.id
 
 
 def create_custom_obstacle():

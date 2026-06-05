@@ -34,7 +34,8 @@ def test_geometry_fields(setup_env):
     )
 
     fields_check = {
-        "solid": [(domain.size, 2), np.int32, False],
+        "solid": [(domain.size,), np.bool_, False],
+        "solid_id": [(domain.size,), np.int32, -1],
         "fluid_boundary": [(domain.size,), np.bool_, False],
         "solid_boundary": [(domain.size,), np.bool_, False],
         "ghost_node": [(domain.size,), np.bool_, False],
