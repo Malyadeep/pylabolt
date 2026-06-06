@@ -165,6 +165,10 @@ class Boundary:
             verbose=verbose
         )
 
+        print_log("Setting up domain boundaries done!",
+                  domain.mpi_rank, verbose)
+        print_log("-" * 80, domain.mpi_rank, verbose)
+
     def read_boundary_dict(
         self,
         mesh,

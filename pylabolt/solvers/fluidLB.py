@@ -1,13 +1,20 @@
 import time
 from mpi4py import MPI
 
+from pylabolt.utils.IO import load_simulation
 from pylabolt.base.state import State
 
 
 class Solver:
     def __init__(self, comm):
-        rank = comm.Get_rank()
-        self.state = State(comm, rank, fluid=True)
+        mpi_rank = comm.Get_rank()
+        simulation = load_simulation(comm, mpi_rank)
+        self.state = State(
+            simulation,
+            comm,
+            mpi_rank,
+            fluid=True
+        )
 
 
 def main():

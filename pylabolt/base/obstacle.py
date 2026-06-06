@@ -49,6 +49,10 @@ class Obstacle:
             verbose=verbose
         )
 
+        print_log("Setting up obstacles done!",
+                  domain.mpi_rank, verbose)
+        print_log("-" * 80, domain.mpi_rank, verbose)
+
     def read_obstacle_dict(
         self,
         mesh,
@@ -225,32 +229,25 @@ class Obstacle:
                 fields
             )
         elif obstacle_type == "custom":
-            obstacle = create_custom_obstacle()
+            pass
+            # TODO: creation of custom obstacle from user-defined
+            # function or txt file
+            # obstacle = create_custom_obstacle()
         else:
             raise ValueError("Unsupported obstacle type: " + obstacle_type)
 
         self.obstacles.append(obstacle)
 
-        # self.log_obstacle_data(
-        #     user_obstacle_name,
-        #     segments,
-        #     orientations,
-        #     locations,
-        #     domain,
-        #     fluid_config=fluid_config,
-        #     phase_config=phase_config,
-        #     verbose=verbose
-        # )
+        self.log_obstacle_data(
+            obstacle,
+            domain,
+            verbose=verbose
+        )
 
     def log_obstacle_data(
         self,
-        user_obstacle_name,
-        segments,
-        orientations,
-        locations,
+        obstacle,
         domain,
-        fluid_config=None,
-        phase_config=None,
         verbose=True
     ):
         """
@@ -260,36 +257,12 @@ class Obstacle:
         Returns:
 
         """
-        print_log("obstacle name: " + user_obstacle_name,
-                  domain.mpi_rank, verbose)
-        if fluid_config["type"] is not None:
-            print_log("fluid obstacle condition:" + fluid_config["type"],
-                      domain.mpi_rank, verbose)
-            if fluid_config["scalar_value"] is not None:
-                print_log("fluid value:" + str(fluid_config["scalar_value"]),
-                          domain.mpi_rank, verbose)
-            if fluid_config["vector_value"] is not None:
-                print_log("fluid value:" + str(fluid_config["vector_value"]),
-                          domain.mpi_rank, verbose)
-        if phase_config["type"] is not None:
-            print_log("phase obstacle condition:" + phase_config["type"],
-                      domain.mpi_rank, verbose)
-            if phase_config["scalar_value"] is not None:
-                print_log("phase value:" + str(phase_config["scalar_value"]),
-                          domain.mpi_rank, verbose)
-            if phase_config["vector_value"] is not None:
-                print_log("phase value:" + str(phase_config["vector_value"]),
-                          domain.mpi_rank, verbose)
-        print_log("segments:", domain.mpi_rank, verbose)
-        for segment_no in range(len(segments)):
-            print_log(
-                "segment_" + str(segment_no + 1) + ":" +
-                str(segments[segment_no]).ljust(30) + "| orientation: " +
-                orientations[segment_no].ljust(5) + " | location: " +
-                str(locations[segment_no]),
-                domain.mpi_rank,
-                verbose
-            )
+        for key, value in obstacle.properties.items():
+            print_log(f"{key:20s}: {value}", domain.mpi_rank, verbose)
+        if obstacle.static is False:
+            for key, value in obstacle.motion_properties.items():
+                print_log(f"{key:20s}: {value}", domain.mpi_rank, verbose)
+
         print_log("\n", domain.mpi_rank, verbose)
 
 
@@ -444,12 +417,37 @@ class Circle:
             i_global, j_global = local_to_global(
                 i - 1, j - 1, offset
             )
-            dist_from_center = \
-                (i_global - self.center[0]) * (i_global - self.center[0]) +\
-                (j_global - self.center[1]) * (j_global - self.center[1])
-            if dist_from_center <= self.radius * self.radius:
+            rx = i_global - self.center[0]
+            ry = j_global - self.center[1]
+            dist_sq_from_center = rx * rx + ry * ry
+            if dist_sq_from_center <= self.radius * self.radius:
                 fields.solid[ind] = True
                 fields.solid_id[ind] = self.id
+                fields.velocity[ind, 0] = self.linear_velocity[0] -\
+                    self.angular_velocity * ry
+                fields.velocity[ind, 1] = self.linear_velocity[1] +\
+                    self.angular_velocity * rx
+
+    @property
+    def properties(self):
+        return {
+            "obstacle id": self.id,
+            "obstacle name": self.name,
+            "obstacle type": self.type,
+            "density": self.density,
+            "center": [float(item) for item in self.center],
+            "radius": self.radius,
+            "static obstacle": self.static
+        }
+
+    @property
+    def motion_properties(self):
+        return {
+            "motion_type": self.motion_type,
+            "degree_of_freedom": self.degree_of_freedom,
+            "linear_velocity": [float(item) for item in self.linear_velocity],
+            "angular_velocity": self.angular_velocity
+        }
 
 
 class Ellipse:
@@ -639,6 +637,33 @@ class Ellipse:
             if scaled_dist <= 1:
                 fields.solid[ind] = True
                 fields.solid_id[ind] = self.id
+                fields.velocity[ind, 0] = self.linear_velocity[0] -\
+                    self.angular_velocity * ry
+                fields.velocity[ind, 1] = self.linear_velocity[1] +\
+                    self.angular_velocity * rx
+
+    @property
+    def properties(self):
+        return {
+            "obstacle id": self.id,
+            "obstacle name": self.name,
+            "obstacle type": self.type,
+            "density": self.density,
+            "center": [float(item) for item in self.center],
+            "semi-major axis": self.semi_major_axis,
+            "semi-minor axis": self.semi_minor_axis,
+            "inclination angle": np.rad2deg(self.inclination_angle),
+            "static obstacle": self.static
+        }
+
+    @property
+    def motion_properties(self):
+        return {
+            "motion_type": self.motion_type,
+            "degree_of_freedom": self.degree_of_freedom,
+            "linear_velocity": [float(item) for item in self.linear_velocity],
+            "angular_velocity": self.angular_velocity
+        }
 
 
 def create_custom_obstacle():

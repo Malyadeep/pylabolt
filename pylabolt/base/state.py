@@ -1,5 +1,4 @@
 import os
-import sys
 import numpy as np
 
 import pylabolt.base.control as control
@@ -15,30 +14,33 @@ from pylabolt.utils.IO import print_log
 
 
 class State:
-    def __init__(self, comm, rank, fluid=False,
-                 phase=False, scalar=False):
+    def __init__(
+        self,
+        simulation,
+        comm,
+        mpi_rank,
+        fluid=False,
+        phase=False,
+        scalar=False
+    ):
+        """
+        Container for constants and evolving fields
+        Attributes:
+
+        """
         self.fluid = fluid
         self.phase = phase
         self.scalar = scalar
         try:
-            try:
-                working_dir = os.getcwd()
-                sys.path.append(working_dir)
-                import simulation
-            except ImportError:
-                raise ImportError(
-                    "Missing simulation.py file in current working directory"
-                )
-
             self.control = control.Control(
                 simulation,
-                rank,
+                mpi_rank,
                 verbose=True
             )
 
             self.mesh = mesh.Mesh(
                 simulation,
-                rank,
+                mpi_rank,
                 verbose=True
             )
 
@@ -46,7 +48,7 @@ class State:
                 simulation,
                 self.control,
                 self.mesh,
-                rank,
+                mpi_rank,
                 verbose=True
             )
 
@@ -102,9 +104,9 @@ class State:
             )
 
         except Exception as e:
-            print_log("-" * 80, rank, verbose=True)
-            print_log("FATAL ERROR!", rank, verbose=True)
-            print_log(str(e), rank, verbose=True)
+            print_log("-" * 80, mpi_rank, verbose=True)
+            print_log("FATAL ERROR!", mpi_rank, verbose=True)
+            print_log(str(e), mpi_rank, verbose=True)
             comm.Abort()
 
         """ Output initial fields for testing """
@@ -121,5 +123,3 @@ class State:
             Nx_rank=self.domain.Nx_rank,
             Ny_rank=self.domain.Ny_rank
         )
-        """ """
-        self.obstacle = None
