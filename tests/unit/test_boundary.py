@@ -4,7 +4,7 @@ import re
 
 
 from pylabolt.base.boundary import Boundary
-from pylabolt.backend.domain import Domain
+from pylabolt.parallel.domain import Domain
 from factories import (
     make_mesh,
     make_domain,

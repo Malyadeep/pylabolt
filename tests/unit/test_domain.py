@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import re
 
-from pylabolt.backend.domain import Domain, local_to_global, global_to_local
+from pylabolt.parallel.domain import Domain, local_to_global, global_to_local
 from factories import make_decompose_dict, make_mesh, make_comm, make_simulation
 
 """

@@ -1,7 +1,7 @@
 import numpy as np
 
 from pylabolt.utils.helpers import print_log
-from pylabolt.backend.domain import local_to_global
+from pylabolt.parallel.domain import local_to_global
 
 
 class Obstacle:

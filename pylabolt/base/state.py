@@ -8,7 +8,7 @@ import pylabolt.base.transport as transport
 import pylabolt.base.fields as fields
 import pylabolt.base.boundary as boundary
 import pylabolt.base.obstacle as obstacle
-import pylabolt.backend.domain as domain
+import pylabolt.parallel.domain as domain
 
 from pylabolt.base.init_fields import init_fields
 from pylabolt.utils.helpers import print_log

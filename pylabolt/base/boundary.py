@@ -1,7 +1,7 @@
 import numpy as np
 
 from pylabolt.utils.helpers import print_log
-from pylabolt.backend.domain import global_to_local
+from pylabolt.parallel.domain import global_to_local
 
 
 class BoundaryElement:
