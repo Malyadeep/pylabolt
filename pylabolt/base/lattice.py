@@ -1,6 +1,6 @@
 import numpy as np
 
-from pylabolt.utils.IO import print_log
+from pylabolt.utils.helpers import print_log
 
 
 class Lattice:

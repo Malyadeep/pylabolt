@@ -4,13 +4,14 @@ import numpy as np
 import pylabolt.base.control as control
 import pylabolt.base.mesh as mesh
 import pylabolt.base.lattice as lattice
+import pylabolt.base.transport as transport
 import pylabolt.base.fields as fields
 import pylabolt.base.boundary as boundary
 import pylabolt.base.obstacle as obstacle
 import pylabolt.backend.domain as domain
 
 from pylabolt.base.init_fields import init_fields
-from pylabolt.utils.IO import print_log
+from pylabolt.utils.helpers import print_log
 
 
 class State:
@@ -56,6 +57,16 @@ class State:
                 simulation,
                 self.mesh,
                 comm,
+                verbose=True
+            )
+
+            self.transport = transport.Transport(
+                simulation,
+                self.control,
+                self.domain,
+                fluid=self.fluid,
+                phase=self.phase,
+                scalar=self.scalar,
                 verbose=True
             )
 

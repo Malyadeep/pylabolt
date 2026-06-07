@@ -1,7 +1,7 @@
 import time
 from mpi4py import MPI
 
-from pylabolt.utils.IO import load_simulation
+from pylabolt.utils.helpers import load_simulation
 from pylabolt.base.state import State
 
 

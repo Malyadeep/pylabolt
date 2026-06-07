@@ -1,7 +1,7 @@
 import numpy as np
 
 from pylabolt.backend.domain import local_to_global
-from pylabolt.utils.IO import print_log
+from pylabolt.utils.helpers import print_log
 
 
 def init_fields(
