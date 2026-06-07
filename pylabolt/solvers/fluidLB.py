@@ -3,6 +3,7 @@ from mpi4py import MPI
 
 from pylabolt.utils.helpers import load_simulation
 from pylabolt.base.state import State
+from pylabolt.base.obstacle_operator import ObstacleOperator
 
 
 class Solver:
@@ -15,6 +16,7 @@ class Solver:
             mpi_rank,
             fluid=True
         )
+        self.obstacle_operator = ObstacleOperator(self.state)
 
 
 def main():

@@ -284,6 +284,12 @@ class Circle:
         self.id = obstacle_id
         self.name = user_obstacle_name
         self.type = "circle"
+        self.solid_boundary_nodes = []
+        self.fluid_boundary_nodes = []
+        self.surface_normals_solid = []
+        self.surface_normals_fluid = []
+        self.forces = []
+        self.torque = []
 
         if "radius" not in user_obstacle_dict:
             raise ValueError(
@@ -468,6 +474,12 @@ class Ellipse:
         self.id = obstacle_id
         self.name = user_obstacle_name
         self.type = "ellipse"
+        self.solid_boundary_nodes = []
+        self.fluid_boundary_nodes = []
+        self.surface_normals_solid = []
+        self.surface_normals_fluid = []
+        self.forces = []
+        self.torque = []
 
         if "semi_major_axis" not in user_obstacle_dict:
             raise ValueError(
