@@ -1,7 +1,5 @@
 import numpy as np
 
-from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.domain import local_to_global
 from pylabolt.parallel.cpu.obstacle_kernels import (
     compute_obstacle_boundary,
     compute_normals_circle,
@@ -27,6 +25,7 @@ class ObstacleOperator:
         self.no_of_obstacles = len(state.obstacle.obstacles)
         # ------- Find solid-fluid boundary nodes ------- #
         self.find_obstacle_boundary_nodes_cpu(state)
+        self.find_obstacle_normals_cpu(state)
 
     def find_obstacle_boundary_nodes_cpu(
         self,
@@ -39,7 +38,7 @@ class ObstacleOperator:
         Returns:
 
         """
-        for obstacle_no, obstacle in enumerate(state.obstacle.obstacles):
+        for obstacle in state.obstacle.obstacles:
             obstacle.solid_boundary_nodes, obstacle.fluid_boundary_nodes =\
                 compute_obstacle_boundary(
                     state.domain.size,
@@ -64,7 +63,7 @@ class ObstacleOperator:
         Returns:
 
         """
-        for obstacle_no, obstacle in enumerate(state.obstacle.obstacles):
+        for obstacle in state.obstacle.obstacles:
             surface_normals_solid = np.zeros(
                 (obstacle.solid_boundary_nodes.shape[0], 2),
                 dtype=state.control.precision
@@ -88,6 +87,9 @@ class ObstacleOperator:
                     state.domain.shape,
                     state.domain.offset,
                     obstacle.center,
+                    obstacle.semi_major_axis,
+                    obstacle.semi_minor_axis,
+                    obstacle.inclination_angle,
                     obstacle.solid_boundary_nodes,
                     obstacle.fluid_boundary_nodes,
                     surface_normals_solid,
@@ -95,3 +97,51 @@ class ObstacleOperator:
                 )
             obstacle.surface_normals_solid = surface_normals_solid
             obstacle.surface_normals_fluid = surface_normals_fluid
+
+    def find_obstacle_boundary_nodes_gpu(
+        self,
+        state
+    ):
+        """
+        Creates obstacle boundary nodes. Sets solid and fluid boundary
+        Args:
+
+        Returns:
+
+        """
+        pass
+
+    def find_obstacle_normals_gpu(
+        self,
+        state
+    ):
+        """
+        Compute obstacle normals on both fluid and solid boundary
+        Args:
+
+        Returns:
+
+        """
+        pass
+
+    def set_backend(
+        self,
+        backend
+    ):
+        """
+        Compute obstacle normals on both fluid and solid boundary
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "cpu":
+            self.find_obstacle_boundary_nodes =\
+                self.find_obstacle_boundary_nodes_cpu
+            self.find_obstacle_normals =\
+                self.find_obstacle_normals_cpu
+        elif backend.backend_type == "gpu":
+            self.find_obstacle_boundary_nodes =\
+                self.find_obstacle_boundary_nodes_gpu
+            self.find_obstacle_normals =\
+                self.find_obstacle_normals_gpu

@@ -14,7 +14,7 @@ class Backend:
         Attributes:
 
         """
-        self.backend = backend
+        self.backend_type = backend
         self.no_of_threads = n_threads
-        if backend == "cpu":
+        if self.backend_type == "cpu":
             numba.set_num_threads(self.no_of_threads)

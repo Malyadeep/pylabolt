@@ -138,8 +138,8 @@ def compute_normals_ellipse(
         x_g = gx * cos_alpha - gy * sin_alpha
         y_g = gx * sin_alpha + gy * cos_alpha
         mag = np.sqrt(x_g * x_g + y_g * y_g)
-        surface_normals_solid[itr, 0] = rx / mag
-        surface_normals_solid[itr, 1] = ry / mag
+        surface_normals_solid[itr, 0] = x_g / mag
+        surface_normals_solid[itr, 1] = y_g / mag
     for itr in prange(fluid_boundary_nodes.shape[0]):
         ind = fluid_boundary_nodes[itr]
         i = ind // shape[1]
@@ -156,5 +156,5 @@ def compute_normals_ellipse(
         x_g = gx * cos_alpha - gy * sin_alpha
         y_g = gx * sin_alpha + gy * cos_alpha
         mag = np.sqrt(x_g * x_g + y_g * y_g)
-        surface_normals_fluid[itr, 0] = rx / mag
-        surface_normals_fluid[itr, 1] = ry / mag
+        surface_normals_fluid[itr, 0] = x_g / mag
+        surface_normals_fluid[itr, 1] = y_g / mag
