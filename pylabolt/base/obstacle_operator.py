@@ -25,7 +25,10 @@ class ObstacleOperator:
         self.no_of_obstacles = len(state.obstacle.obstacles)
         # ------- Find solid-fluid boundary nodes ------- #
         self.find_obstacle_boundary_nodes_cpu(state)
+        # ------- Find solid-fluid normals ------- #
         self.find_obstacle_normals_cpu(state)
+
+        self.set_backend(backend)
 
     def find_obstacle_boundary_nodes_cpu(
         self,

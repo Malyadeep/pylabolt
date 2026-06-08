@@ -1,18 +1,89 @@
 import numpy as np
+import numba
 from numba import prange
 
 from pylabolt.parallel.domain import local_to_global
 
 
+@numba.njit(nogil=True)
+def construct_circle(
+    i_global,
+    j_global,
+    grid_global_shape,
+    x_periodic,
+    y_periodic,
+    center,
+    radius
+):
+    Nx, Ny = grid_global_shape
+    rx = i_global - center[0]
+    ry = j_global - center[1]
+    rx_min = rx
+    ry_min = ry
+    if x_periodic:
+        if np.abs(rx + Nx) < np.abs(rx_min):
+            rx_min = rx + Nx
+        if np.abs(rx - Nx) < np.abs(rx_min):
+            rx_min = rx - Nx
+    if y_periodic:
+        if np.abs(ry + Ny) < np.abs(ry_min):
+            ry_min = ry + Ny
+        if np.abs(ry - Ny) < np.abs(ry_min):
+            ry_min = ry - Ny
+    dist_sq_from_center = rx_min * rx_min + ry_min * ry_min
+    inside_solid = False
+    if dist_sq_from_center <= radius * radius:
+        inside_solid = True
+    return inside_solid, rx_min, ry_min
+
+
+@numba.njit(nogil=True)
+def construct_ellipse(
+    i_global,
+    j_global,
+    grid_global_shape,
+    x_periodic,
+    y_periodic,
+    center,
+    semi_major_axis,
+    semi_minor_axis,
+    cos_alpha,
+    sin_alpha
+):
+    Nx, Ny = grid_global_shape
+    rx = i_global - center[0]
+    ry = j_global - center[1]
+    rx_min = rx
+    ry_min = ry
+    if x_periodic:
+        if np.abs(rx + Nx) < np.abs(rx_min):
+            rx_min = rx + Nx
+        if np.abs(rx - Nx) < np.abs(rx_min):
+            rx_min = rx - Nx
+    if y_periodic:
+        if np.abs(ry + Ny) < np.abs(ry_min):
+            ry_min = ry + Ny
+        if np.abs(ry - Ny) < np.abs(ry_min):
+            ry_min = ry - Ny
+    x = rx_min * cos_alpha + ry_min * sin_alpha
+    y = - rx_min * sin_alpha + ry_min * cos_alpha
+    scaled_dist =\
+        (x * x) / (semi_major_axis * semi_major_axis) +\
+        (y * y) / (semi_minor_axis * semi_minor_axis)
+    inside_solid = False
+    if scaled_dist <= 1:
+        inside_solid = True
+    return inside_solid, rx_min, ry_min
+
+
+# @numba.njit(parallel=True, nogil=True)
+@numba.njit(parallel=False, nogil=True)
 def compute_obstacle_boundary(
-    # domain args
     size,
     shape,
-    # lattice args
     cx,
     cy,
     no_of_directions,
-    # fields
     solid,
     solid_boundary,
     fluid_boundary,
@@ -27,7 +98,7 @@ def compute_obstacle_boundary(
     """
     solid_boundary_nodes = []
     fluid_boundary_nodes = []
-    for ind in prange(size):
+    for ind in range(size):
         if not ghost_node[ind]:
             if solid[ind]:
                 i = ind // shape[1]
@@ -53,11 +124,10 @@ def compute_obstacle_boundary(
         np.array(fluid_boundary_nodes, dtype=np.int64)
 
 
+@numba.njit(parallel=True, nogil=True)
 def compute_normals_circle(
-    # domain args
     shape,
     offset,
-    # obstacle properties
     center,
     solid_boundary_nodes,
     fluid_boundary_nodes,
@@ -98,11 +168,10 @@ def compute_normals_circle(
         surface_normals_fluid[itr, 1] = ry / mag
 
 
+@numba.njit(parallel=True, nogil=True)
 def compute_normals_ellipse(
-    # domain args
     shape,
     offset,
-    # obstacle properties
     center,
     semi_major_axis,
     semi_minor_axis,

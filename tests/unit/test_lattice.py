@@ -118,10 +118,10 @@ def test_d2q9_entries():
     assert np.isclose(cs_2, lattice.cs_2)
     cs_4 = cs_2 * cs_2
     assert np.isclose(cs_4, lattice.cs_4)
-    c_x = np.array([0, 1, 0, -1, 0, 1, -1, -1, 1], dtype=np.int32)
-    c_y = np.array([0, 0, 1, 0, -1, 1, 1, -1, -1], dtype=np.int32)
-    assert np.all(c_x == lattice.c_x)
-    assert np.all(c_y == lattice.c_y)
+    cx = np.array([0, 1, 0, -1, 0, 1, -1, -1, 1], dtype=np.int32)
+    cy = np.array([0, 0, 1, 0, -1, 1, 1, -1, -1], dtype=np.int32)
+    assert np.all(cx == lattice.cx)
+    assert np.all(cy == lattice.cy)
     weights = np.array(
         [4/9, 1/9, 1/9, 1/9, 1/9, 1/36, 1/36, 1/36, 1/36],
         dtype=control.precision
@@ -162,10 +162,10 @@ def test_d1q3_entries():
     assert np.isclose(cs_2, lattice.cs_2)
     cs_4 = cs_2 * cs_2
     assert np.isclose(cs_4, lattice.cs_4)
-    c_x = np.array([0, 1, -1], dtype=np.int32)
-    c_y = np.array([0, 0, 0], dtype=np.int32)
-    assert np.all(c_x == lattice.c_x)
-    assert np.all(c_y == lattice.c_y)
+    cx = np.array([0, 1, -1], dtype=np.int32)
+    cy = np.array([0, 0, 0], dtype=np.int32)
+    assert np.all(cx == lattice.cx)
+    assert np.all(cy == lattice.cy)
     weights = np.array([2/3, 1/6, 1/6], dtype=control.precision)
     assert np.all(weights == lattice.weights)
     inv_list = np.array([0, 2, 1], dtype=np.int32)

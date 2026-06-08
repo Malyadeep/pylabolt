@@ -2,6 +2,10 @@ import numpy as np
 
 from pylabolt.utils.helpers import print_log
 from pylabolt.parallel.domain import local_to_global
+from pylabolt.parallel.cpu.obstacle_kernels import (
+    construct_circle,
+    construct_ellipse
+)
 
 
 class Obstacle:
@@ -91,6 +95,7 @@ class Obstacle:
                 user_obstacle_dict,
                 domain,
                 control,
+                mesh,
                 fields,
                 fluid=fluid,
                 phase=phase,
@@ -190,6 +195,7 @@ class Obstacle:
         user_obstacle_dict,
         domain,
         control,
+        mesh,
         fields,
         fluid=False,
         phase=False,
@@ -217,6 +223,7 @@ class Obstacle:
                 user_obstacle_dict,
                 control,
                 domain,
+                mesh,
                 fields
             )
         elif obstacle_type == "ellipse":
@@ -226,6 +233,7 @@ class Obstacle:
                 user_obstacle_dict,
                 control,
                 domain,
+                mesh,
                 fields
             )
         elif obstacle_type == "custom":
@@ -274,6 +282,7 @@ class Circle:
         user_obstacle_dict,
         control,
         domain,
+        mesh,
         fields
     ):
         """
@@ -288,8 +297,8 @@ class Circle:
         self.fluid_boundary_nodes = []
         self.surface_normals_solid = []
         self.surface_normals_fluid = []
-        self.forces = []
-        self.torque = []
+        self.forces = np.zeros(2, dtype=control.precision)
+        self.torque = control.precision(0)
 
         if "radius" not in user_obstacle_dict:
             raise ValueError(
@@ -329,6 +338,27 @@ class Circle:
             )
         self.density = control.precision(density)
 
+        if "periodicity" not in user_obstacle_dict:
+            raise ValueError(
+                "periodicity missing for obstacle: " + user_obstacle_name
+            )
+        self.periodicity = user_obstacle_dict["periodicity"]
+        self.x_periodic = False
+        self.y_periodic = False
+        if self.periodicity == "x":
+            self.x_periodic = True
+        elif self.periodicity == "y":
+            self.y_periodic = True
+        elif self.periodicity == "all":
+            self.x_periodic = True
+            self.y_periodic = True
+        elif self.periodicity == "none":
+            pass
+        else:
+            raise ValueError(
+                "illegal option for periodicity: " + user_obstacle_name
+            )
+
         if "static" not in user_obstacle_dict:
             raise ValueError(
                 "static missing for obstacle: " + user_obstacle_name
@@ -399,15 +429,24 @@ class Circle:
                 self.angular_velocity, dtype=control.precision
             )
 
+        self.reconstruct_args = (
+            self.x_periodic,
+            self.y_periodic,
+            self.center,
+            self.radius
+        )
+
         self.set_solid_nodes(
             fields,
-            domain
+            domain,
+            mesh
         )
 
     def set_solid_nodes(
         self,
         fields,
         domain,
+        mesh,
     ):
         """
         Sets solid node values for obstacle type circle
@@ -423,10 +462,13 @@ class Circle:
             i_global, j_global = local_to_global(
                 i - 1, j - 1, offset
             )
-            rx = i_global - self.center[0]
-            ry = j_global - self.center[1]
-            dist_sq_from_center = rx * rx + ry * ry
-            if dist_sq_from_center <= self.radius * self.radius:
+            inside_solid, rx, ry = construct_circle(
+                i_global,
+                j_global,
+                mesh.grid_global_shape,
+                *self.reconstruct_args
+            )
+            if inside_solid:
                 fields.solid[ind] = True
                 fields.solid_id[ind] = self.id
                 fields.velocity[ind, 0] = self.linear_velocity[0] -\
@@ -464,6 +506,7 @@ class Ellipse:
         user_obstacle_dict,
         control,
         domain,
+        mesh,
         fields
     ):
         """
@@ -478,8 +521,8 @@ class Ellipse:
         self.fluid_boundary_nodes = []
         self.surface_normals_solid = []
         self.surface_normals_fluid = []
-        self.forces = []
-        self.torque = []
+        self.forces = np.zeros(2, dtype=control.precision)
+        self.torque = control.precision(0)
 
         if "semi_major_axis" not in user_obstacle_dict:
             raise ValueError(
@@ -518,6 +561,8 @@ class Ellipse:
             )
         self.inclination_angle = control.precision(inclination_angle) *\
             np.pi / 180
+        self.cos_alpha = np.cos(self.inclination_angle)
+        self.sin_alpha = np.sin(self.inclination_angle)
 
         if "center" not in user_obstacle_dict:
             raise ValueError(
@@ -542,6 +587,27 @@ class Ellipse:
                 user_obstacle_name
             )
         self.density = control.precision(density)
+
+        if "periodicity" not in user_obstacle_dict:
+            raise ValueError(
+                "periodicity missing for obstacle: " + user_obstacle_name
+            )
+        self.periodicity = user_obstacle_dict["periodicity"]
+        self.x_periodic = False
+        self.y_periodic = False
+        if self.periodicity == "x":
+            self.x_periodic = True
+        elif self.periodicity == "y":
+            self.y_periodic = True
+        elif self.periodicity == "all":
+            self.x_periodic = True
+            self.y_periodic = True
+        elif self.periodicity == "none":
+            pass
+        else:
+            raise ValueError(
+                "illegal option for periodicity: " + user_obstacle_name
+            )
 
         if "static" not in user_obstacle_dict:
             raise ValueError(
@@ -613,15 +679,27 @@ class Ellipse:
                 self.angular_velocity, dtype=control.precision
             )
 
+        self.reconstruct_args = (
+            self.x_periodic,
+            self.y_periodic,
+            self.center,
+            self.semi_major_axis,
+            self.semi_minor_axis,
+            self.cos_alpha,
+            self.sin_alpha
+        )
+
         self.set_solid_nodes(
             fields,
-            domain
+            domain,
+            mesh,
         )
 
     def set_solid_nodes(
         self,
         fields,
         domain,
+        mesh,
     ):
         """
         Sets solid node values for obstacle type circle
@@ -631,22 +709,19 @@ class Ellipse:
 
         """
         offset = domain.offset
-        cos_alpha = np.cos(self.inclination_angle)
-        sin_alpha = np.sin(self.inclination_angle)
         for ind in range(domain.size):
             i = ind // domain.shape[1]
             j = ind - i * domain.shape[1]
             i_global, j_global = local_to_global(
                 i - 1, j - 1, offset
             )
-            rx = i_global - self.center[0]
-            ry = j_global - self.center[1]
-            x = rx * cos_alpha + ry * sin_alpha
-            y = - rx * sin_alpha + ry * cos_alpha
-            scaled_dist =\
-                (x * x) / (self.semi_major_axis * self.semi_major_axis) +\
-                (y * y) / (self.semi_minor_axis * self.semi_minor_axis)
-            if scaled_dist <= 1:
+            inside_solid, rx, ry = construct_ellipse(
+                i_global,
+                j_global,
+                mesh.grid_global_shape,
+                *self.reconstruct_args
+            )
+            if inside_solid:
                 fields.solid[ind] = True
                 fields.solid_id[ind] = self.id
                 fields.velocity[ind, 0] = self.linear_velocity[0] -\
