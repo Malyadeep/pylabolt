@@ -3,7 +3,12 @@ import pytest
 import re
 
 from pylabolt.parallel.domain import Domain, local_to_global, global_to_local
-from factories import make_decompose_dict, make_mesh, make_comm, make_simulation
+from factories import (
+    make_decompose_dict,
+    make_mesh,
+    make_comm,
+    make_simulation
+)
 
 """
 Base fixtures
@@ -133,8 +138,8 @@ def test_decompose_logic(nx, ny, global_shape):
 
         assert domain.mpi_rank == mpi_rank
         assert domain.mpi_size == mpi_size
-        assert domain.Nx_proc == nx
-        assert domain.Ny_proc == ny
+        assert domain.no_of_procs_x == nx
+        assert domain.no_of_procs_y == ny
 
         i_proc_exp = mpi_rank // ny
         j_proc_exp = mpi_rank - ny * i_proc_exp

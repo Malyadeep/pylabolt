@@ -151,6 +151,8 @@ class Boundary:
             )
         self.boundary_dict = simulation.boundary_dict
         self.compute_forces = False
+        self.x_periodic = False
+        self.y_periodic = False
         self.boundary_elements = []
 
         # ------- Read and initialize boundary elements ------- #
@@ -518,21 +520,19 @@ class Boundary:
                     user_boundary_name
                 )
 
-        # check length
-        if not (np.isclose(lx1, lx2) and np.isclose(ly1, ly2)):
-            raise ValueError(
-                "invalid periodic pair - unequal length segments: " +
-                user_boundary_name
-            )
-
         # check periodic connection
         (x1_min, y1_min), (x1_max, y1_max) = segment_1
         (x2_min, y2_min), (x2_max, y2_max) = segment_2
         if is_horizontal:
-            if (x1_min, x1_max) != (x2_min, x2_max):
+            if (
+                (x1_min, x1_max) !=
+                (0, mesh.grid_global_shape[0] - 1) or
+                (x2_min, x2_max) !=
+                (0, mesh.grid_global_shape[0] - 1)
+            ):
                 raise ValueError(
                     "horizontal periodic boundaries must span" +
-                    " same x-range: " + user_boundary_name
+                    " the entire x-direction: " + user_boundary_name
                 )
             if sorted([y1_min, y2_min]) != [0, mesh.grid_global_shape[1] - 1]:
                 raise ValueError(
@@ -540,16 +540,26 @@ class Boundary:
                     " top-bottom boundaries: " + user_boundary_name
                 )
         elif is_vertical:
-            if (y1_min, y1_max) != (y2_min, y2_max):
+            if (
+                (y1_min, y1_max) !=
+                (0, mesh.grid_global_shape[1] - 1) or
+                (y2_min, y2_max) !=
+                (0, mesh.grid_global_shape[1] - 1)
+            ):
                 raise ValueError(
                     "vertical periodic boundaries must span" +
-                    " same y-range: " + user_boundary_name
+                    " the entire y-direction: " + user_boundary_name
                 )
             if sorted([x1_min, x2_min]) != [0, mesh.grid_global_shape[0] - 1]:
                 raise ValueError(
                     "vertical periodic boundaries must connect" +
                     " left-right boundaries: " + user_boundary_name
                 )
+
+        if is_vertical:
+            self.x_periodic = True
+        if is_horizontal:
+            self.y_periodic = True
 
     def log_boundary_data(
         self,

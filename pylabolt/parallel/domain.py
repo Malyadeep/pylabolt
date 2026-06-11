@@ -15,8 +15,8 @@ class Domain:
         Attributes:
             mpi_rank: int
             mpi_size: int
-            Nx_proc: int
-            Ny_proc: int
+            no_of_procs_x: int
+            no_of_procs_y: int
             i_proc: int
             j_proc: int
             Nx_rank: int
@@ -39,43 +39,43 @@ class Domain:
         if ("nx" not in decompose_dict or
                 "ny" not in decompose_dict):
             raise ValueError("nx or ny missing decompose_dict")
-        self.Nx_proc = decompose_dict["nx"]
-        self.Ny_proc = decompose_dict["ny"]
+        self.no_of_procs_x = decompose_dict["nx"]
+        self.no_of_procs_y = decompose_dict["ny"]
 
-        if self.mpi_size != self.Nx_proc * self.Ny_proc:
+        if self.mpi_size != self.no_of_procs_x * self.no_of_procs_y:
             raise ValueError(
                 "invalid domain decomposition. " +
                 "nx * ny not equal to total no.of MPI processes"
             )
 
-        self.i_proc = self.mpi_rank // self.Ny_proc
-        self.j_proc = self.mpi_rank % self.Ny_proc
+        self.i_proc = self.mpi_rank // self.no_of_procs_y
+        self.j_proc = self.mpi_rank % self.no_of_procs_y
         offset_x, offset_y = 0, 0
-        if self.i_proc != self.Nx_proc - 1:
+        if self.i_proc != self.no_of_procs_x - 1:
             self.Nx_rank = int(
-                np.ceil(mesh.grid_global_shape[0] / self.Nx_proc)
+                np.ceil(mesh.grid_global_shape[0] / self.no_of_procs_x)
             )
             offset_x = self.i_proc * self.Nx_rank
         else:
             self.Nx_rank = int(
                 mesh.grid_global_shape[0] - self.i_proc *
-                np.ceil(mesh.grid_global_shape[0] / self.Nx_proc)
+                np.ceil(mesh.grid_global_shape[0] / self.no_of_procs_x)
             )
             offset_x = self.i_proc * int(
-                np.ceil(mesh.grid_global_shape[0] / self.Nx_proc)
+                np.ceil(mesh.grid_global_shape[0] / self.no_of_procs_x)
             )
-        if self.j_proc != self.Ny_proc - 1:
+        if self.j_proc != self.no_of_procs_y - 1:
             self.Ny_rank = int(
-                np.ceil(mesh.grid_global_shape[1] / self.Ny_proc)
+                np.ceil(mesh.grid_global_shape[1] / self.no_of_procs_y)
             )
             offset_y = self.j_proc * self.Ny_rank
         else:
             self.Ny_rank = int(
                 mesh.grid_global_shape[1] - self.j_proc *
-                np.ceil(mesh.grid_global_shape[1] / self.Ny_proc)
+                np.ceil(mesh.grid_global_shape[1] / self.no_of_procs_y)
             )
             offset_y = self.j_proc * int(
-                np.ceil(mesh.grid_global_shape[1] / self.Ny_proc)
+                np.ceil(mesh.grid_global_shape[1] / self.no_of_procs_y)
             )
         self.offset = np.array([offset_x, offset_y], dtype=np.int32)
         self.Nx_pad = self.Nx_rank + 2
@@ -86,7 +86,7 @@ class Domain:
     def details(self):
         print("Domain decomposition details - global domain = ",
               self.Nx_global, self.Ny_global)
-        print("(nx, ny):", self.Nx_proc, self.Ny_proc)
+        print("(nx, ny):", self.no_of_procs_x, self.no_of_procs_y)
         print("rank:", self.rank)
         print("(i_proc, j_proc):", self.i_proc, self.j_proc)
         print("(Nx, Ny):", self.Nx_rank, self.Ny_rank)

@@ -482,36 +482,6 @@ class TestPeriodicValidation:
         with pytest.raises(ValueError, match=mssg):
             build_boundary(simulation, setup_env, fluid=True)
 
-    def test_segment_length(self, setup_env, boundary_dicts_fluid):
-        mesh, domain, control, fields = setup_env
-        Nx, Ny = mesh.grid_global_shape
-        boundary_dict = boundary_dicts_fluid.get_periodic_dict(
-            Nx,
-            Ny,
-            orientation="vertical"
-        )
-        simulation = make_simulation(boundary_dict=boundary_dict)
-        simulation.boundary_dict["check"]["segments"] = [
-            [[0, 0], [0, Ny - 1]],
-            [[Nx - 1, 0], [Nx - 1, Ny - 3]]
-        ]
-        mssg = "invalid periodic pair - unequal length segments: check"
-
-        with pytest.raises(ValueError, match=mssg):
-            build_boundary(simulation, setup_env, fluid=True)
-        boundary_dict = boundary_dicts_fluid.get_periodic_dict(
-            Nx,
-            Ny,
-            orientation="horizontal"
-        )
-        simulation = make_simulation(boundary_dict=boundary_dict)
-        simulation.boundary_dict["check"]["segments"] = [
-            [[0, 0], [Nx - 1, 0]],
-            [[0, Ny - 1], [Nx - 3, Ny - 1]]
-        ]
-        with pytest.raises(ValueError, match=mssg):
-            build_boundary(simulation, setup_env, fluid=True)
-
     def test_connection_horizontal(self, setup_env, boundary_dicts_fluid):
         mesh, domain, control, fields = setup_env
         Nx, Ny = mesh.grid_global_shape
@@ -526,7 +496,7 @@ class TestPeriodicValidation:
             [[0, Ny - 1], [Nx - 3, Ny - 1]]
         ]
         mssg = "horizontal periodic boundaries must span" +\
-            " same x-range: check"
+            " the entire x-direction: check"
         with pytest.raises(ValueError, match=mssg):
             build_boundary(simulation, setup_env, fluid=True)
 
@@ -553,7 +523,7 @@ class TestPeriodicValidation:
             [[Nx - 1, 0], [Nx - 1, Ny - 3]]
         ]
         mssg = "vertical periodic boundaries must span" +\
-            " same y-range: check"
+            " the entire y-direction: check"
         with pytest.raises(ValueError, match=mssg):
             build_boundary(simulation, setup_env, fluid=True)
 
@@ -565,6 +535,32 @@ class TestPeriodicValidation:
             " left-right boundaries: check"
         with pytest.raises(ValueError, match=mssg):
             build_boundary(simulation, setup_env, fluid=True)
+    
+    def test_global_periodic_flag(self, setup_env, boundary_dicts_fluid):
+        mesh, domain, control, fields = setup_env
+        Nx, Ny = mesh.grid_global_shape
+        boundary_dict = boundary_dicts_fluid.get_periodic_dict(
+            Nx,
+            Ny,
+            orientation="vertical"
+        )
+        simulation = make_simulation(boundary_dict=boundary_dict)
+        simulation.boundary_dict["check"]["segments"] = [
+            [[0, 0], [0, Ny - 1]],
+            [[Nx - 1, 0], [Nx - 1, Ny - 1]]
+        ]
+        simulation.boundary_dict["check_2"] = {
+            "fluid": {
+                "type": "periodic"
+            },
+            "segments": [
+                [[0, 0], [Nx - 1, 0]],
+                [[0, Ny - 1], [Nx - 1, Ny - 1]]
+            ]
+        }
+        boundary = build_boundary(simulation, setup_env, fluid=True)
+        assert boundary.x_periodic is True
+        assert boundary.y_periodic is True
 
 
 class TestBoundaryNodeAllocation:
@@ -607,7 +603,7 @@ class TestBoundaryNodeAllocation:
                     node_list.append(ind)
                 return np.array(node_list, dtype=np.int32)
         elif location == "right":
-            if domain.i_proc != domain.Nx_proc - 1:
+            if domain.i_proc != domain.no_of_procs_x - 1:
                 return node_list
             else:
                 i = domain.shape[0] - 2
@@ -627,7 +623,7 @@ class TestBoundaryNodeAllocation:
                     node_list.append(ind)
                 return np.array(node_list, dtype=np.int32)
         elif location == "top":
-            if domain.j_proc != domain.Ny_proc - 1:
+            if domain.j_proc != domain.no_of_procs_y - 1:
                 return node_list
             else:
                 j = domain.shape[1] - 2
@@ -714,10 +710,6 @@ class TestBoundaryNodeAllocation:
             boundary_dict=boundary_dict,
             decompose_dict=decompose_dict
         )
-        control_all = []
-        mesh_all = []
-        comm_all = []
-        domain_all = []
         boundary_all = []
         fields_all = []
         for mpi_rank in range(mpi_size):

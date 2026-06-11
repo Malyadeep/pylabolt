@@ -28,6 +28,26 @@ class ObstacleOperator:
         # ------- Find solid-fluid normals ------- #
         self.find_obstacle_normals_cpu(state)
 
+        # """ Output initial fields for testing """
+        # import os
+        # obstacle_type = "circle"
+        # if not os.path.isdir("procs_" + obstacle_type):
+        #     os.makedirs("procs_" + obstacle_type)
+        # np.savez(
+        #     "procs_" + obstacle_type + "/proc_" +
+        #     str(state.domain.mpi_rank) + ".npz",
+        #     solid=state.fields.solid,
+        #     solid_id=state.fields.solid_id,
+        #     solid_boundary=state.fields.solid_boundary,
+        #     fluid_boundary=state.fields.fluid_boundary,
+        #     ghost_node=state.fields.ghost_node,
+        #     Nx=state.mesh.grid_global_shape[0],
+        #     Ny=state.mesh.grid_global_shape[1],
+        #     offset=state.domain.offset,
+        #     Nx_rank=state.domain.Nx_rank,
+        #     Ny_rank=state.domain.Ny_rank
+        # )
+
         self.set_backend(backend)
 
     def find_obstacle_boundary_nodes_cpu(

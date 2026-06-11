@@ -457,24 +457,25 @@ class Circle:
         """
         offset = domain.offset
         for ind in range(domain.size):
-            i = ind // domain.shape[1]
-            j = ind - i * domain.shape[1]
-            i_global, j_global = local_to_global(
-                i - 1, j - 1, offset
-            )
-            inside_solid, rx, ry = construct_circle(
-                i_global,
-                j_global,
-                mesh.grid_global_shape,
-                *self.reconstruct_args
-            )
-            if inside_solid:
-                fields.solid[ind] = True
-                fields.solid_id[ind] = self.id
-                fields.velocity[ind, 0] = self.linear_velocity[0] -\
-                    self.angular_velocity * ry
-                fields.velocity[ind, 1] = self.linear_velocity[1] +\
-                    self.angular_velocity * rx
+            if not fields.ghost_node[ind]:
+                i = ind // domain.shape[1]
+                j = ind - i * domain.shape[1]
+                i_global, j_global = local_to_global(
+                    i - 1, j - 1, offset
+                )
+                inside_solid, rx, ry = construct_circle(
+                    i_global,
+                    j_global,
+                    mesh.grid_global_shape,
+                    *self.reconstruct_args
+                )
+                if inside_solid:
+                    fields.solid[ind] = True
+                    fields.solid_id[ind] = self.id
+                    fields.velocity[ind, 0] = self.linear_velocity[0] -\
+                        self.angular_velocity * ry
+                    fields.velocity[ind, 1] = self.linear_velocity[1] +\
+                        self.angular_velocity * rx
 
     @property
     def properties(self):
@@ -710,24 +711,25 @@ class Ellipse:
         """
         offset = domain.offset
         for ind in range(domain.size):
-            i = ind // domain.shape[1]
-            j = ind - i * domain.shape[1]
-            i_global, j_global = local_to_global(
-                i - 1, j - 1, offset
-            )
-            inside_solid, rx, ry = construct_ellipse(
-                i_global,
-                j_global,
-                mesh.grid_global_shape,
-                *self.reconstruct_args
-            )
-            if inside_solid:
-                fields.solid[ind] = True
-                fields.solid_id[ind] = self.id
-                fields.velocity[ind, 0] = self.linear_velocity[0] -\
-                    self.angular_velocity * ry
-                fields.velocity[ind, 1] = self.linear_velocity[1] +\
-                    self.angular_velocity * rx
+            if not fields.ghost_node[ind]:
+                i = ind // domain.shape[1]
+                j = ind - i * domain.shape[1]
+                i_global, j_global = local_to_global(
+                    i - 1, j - 1, offset
+                )
+                inside_solid, rx, ry = construct_ellipse(
+                    i_global,
+                    j_global,
+                    mesh.grid_global_shape,
+                    *self.reconstruct_args
+                )
+                if inside_solid:
+                    fields.solid[ind] = True
+                    fields.solid_id[ind] = self.id
+                    fields.velocity[ind, 0] = self.linear_velocity[0] -\
+                        self.angular_velocity * ry
+                    fields.velocity[ind, 1] = self.linear_velocity[1] +\
+                        self.angular_velocity * rx
 
     @property
     def properties(self):
