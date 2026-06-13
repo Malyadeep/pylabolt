@@ -23,12 +23,14 @@ class Solver:
             fluid=True
         )
         self.mpi_operator = MPIOperator(
+            comm,
             self.state,
-            comm
         )
         self.obstacle_operator = ObstacleOperator(
+            comm,
             self.state,
-            self.backend
+            self.backend,
+            self.mpi_operator
         )
 
 

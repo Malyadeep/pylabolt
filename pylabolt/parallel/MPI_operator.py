@@ -59,8 +59,8 @@ class HaloBuffer:
 class MPIOperator:
     def __init__(
         self,
-        state,
-        comm
+        comm,
+        state
     ):
         """
         MPI operator - operations for MPI communication
@@ -163,51 +163,433 @@ class MPIOperator:
         Returns:
 
         """
+        comm.Barrier()
         if bool_buffers is not None:
-            # ------- Send to left, receive from left ------- #
-            if self.left_rank is not None:
-                for field_name in bool_buffers:
-                    layout_start, layout_end = \
-                        self.bool_buffer.layout[field_name]
-                    field_to_copy = getattr(state.fields, field_name)
-                    send_copy_y(
-                        self.bool_buffer.send_buff_left_right,
-                        field_to_copy,
-                        layout_start,
-                        layout_end,
-                        state.domain.shape,
-                        x=1
-                    )
+            buffer_object = self.bool_buffer
+            args = (comm, bool_buffers, buffer_object, state)
+            if state.domain.i_proc % 2 == 0:
+                # ------- Send to left, receive from left ------- #
+                self._exchange_left(*args)
 
-                comm.Sendrecv(
-                    sendbuf=self.bool_buffer.send_buff_left_right,
-                    dest=self.left_rank,
-                    sendtag=0,
-                    recvbuf=self.bool_buffer.recv_buff_left_right,
-                    source=self.left_rank,
-                    recvtag=0
+                # ------- Send to right, receive from right ------- #
+                self._exchange_right(*args)
+            else:
+                # ------- Send to right, receive from right ------- #
+                self._exchange_right(*args)
+
+                # ------- Send to left, receive from left ------- #
+                self._exchange_left(*args)
+
+            comm.Barrier()
+            if state.domain.j_proc % 2 == 0:
+                # ------- Send to bottom, receive from bottom ------- #
+                self._exchange_bottom(*args)
+
+                # ------- Send to top, receive from top ------- #
+                self._exchange_top(*args)
+            else:
+                # ------- Send to top, receive from top ------- #
+                self._exchange_top(*args)
+
+                # ------- Send to bottom, receive from bottom ------- #
+                self._exchange_bottom(*args)
+
+        if int_buffers is not None:
+            buffer_object = self.int_buffer
+            args = (comm, int_buffers, buffer_object, state)
+            if state.domain.i_proc % 2 == 0:
+                # ------- Send to left, receive from left ------- #
+                self._exchange_left(*args)
+
+                # ------- Send to right, receive from right ------- #
+                self._exchange_right(*args)
+            else:
+                # ------- Send to right, receive from right ------- #
+                self._exchange_right(*args)
+
+                # ------- Send to left, receive from left ------- #
+                self._exchange_left(*args)
+
+            comm.Barrier()
+            if state.domain.j_proc % 2 == 0:
+                # ------- Send to bottom, receive from bottom ------- #
+                self._exchange_bottom(*args)
+
+                # ------- Send to top, receive from top ------- #
+                self._exchange_top(*args)
+            else:
+                # ------- Send to top, receive from top ------- #
+                self._exchange_top(*args)
+
+                # ------- Send to bottom, receive from bottom ------- #
+                self._exchange_bottom(*args)
+
+        if float_buffers is not None:
+            buffer_object = self.float_buffer
+            args = (comm, float_buffers, buffer_object, state)
+            if state.domain.i_proc % 2 == 0:
+                # ------- Send to left, receive from left ------- #
+                self._exchange_left(*args)
+
+                # ------- Send to right, receive from right ------- #
+                self._exchange_right(*args)
+            else:
+                # ------- Send to right, receive from right ------- #
+                self._exchange_right(*args)
+
+                # ------- Send to left, receive from left ------- #
+                self._exchange_left(*args)
+
+            comm.Barrier()
+            if state.domain.j_proc % 2 == 0:
+                # ------- Send to bottom, receive from bottom ------- #
+                self._exchange_bottom(*args)
+
+                # ------- Send to top, receive from top ------- #
+                self._exchange_top(*args)
+            else:
+                # ------- Send to top, receive from top ------- #
+                self._exchange_top(*args)
+
+                # ------- Send to bottom, receive from bottom ------- #
+                self._exchange_bottom(*args)
+
+    def _exchange_left(
+        self,
+        comm,
+        buffer_names,
+        buffer_object,
+        state
+    ):
+        """
+        Exchange left mpi processor boundary
+        Args:
+
+        Returns:
+
+        """
+        if self.left_rank is not None:
+            for field_name in buffer_names:
+                layout_start, layout_end = \
+                    buffer_object.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                send_copy_y = send_copy_y_scalar
+                if (layout_end - layout_start) > 1:
+                    send_copy_y = send_copy_y_vector
+                send_copy_y(
+                    buffer_object.send_buff_left_right,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    x=1
+                )
+
+            comm.Sendrecv(
+                sendbuf=buffer_object.send_buff_left_right,
+                dest=self.left_rank,
+                sendtag=0,
+                recvbuf=buffer_object.recv_buff_left_right,
+                source=self.left_rank,
+                recvtag=0
+            )
+
+            for field_name in buffer_names:
+                layout_start, layout_end = \
+                    buffer_object.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                recv_copy_y = recv_copy_y_scalar
+                if (layout_end - layout_start) > 1:
+                    recv_copy_y = recv_copy_y_vector
+                recv_copy_y(
+                    buffer_object.recv_buff_left_right,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    x=0
+                )
+
+    def _exchange_right(
+        self,
+        comm,
+        buffer_names,
+        buffer_object,
+        state
+    ):
+        """
+        Exchange right mpi processor boundary
+        Args:
+
+        Returns:
+
+        """
+        if self.right_rank is not None:
+            for field_name in buffer_names:
+                layout_start, layout_end = \
+                    buffer_object.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                send_copy_y = send_copy_y_scalar
+                if (layout_end - layout_start) > 1:
+                    send_copy_y = send_copy_y_vector
+                send_copy_y(
+                    buffer_object.send_buff_left_right,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    x=(state.domain.shape[0] - 2)
+                )
+
+            comm.Sendrecv(
+                sendbuf=buffer_object.send_buff_left_right,
+                dest=self.right_rank,
+                sendtag=0,
+                recvbuf=buffer_object.recv_buff_left_right,
+                source=self.right_rank,
+                recvtag=0
+            )
+
+            for field_name in buffer_names:
+                layout_start, layout_end = \
+                    buffer_object.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                recv_copy_y = recv_copy_y_scalar
+                if (layout_end - layout_start) > 1:
+                    recv_copy_y = recv_copy_y_vector
+                recv_copy_y(
+                    buffer_object.recv_buff_left_right,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    x=(state.domain.shape[0] - 1)
+                )
+
+    def _exchange_top(
+        self,
+        comm,
+        buffer_names,
+        buffer_object,
+        state
+    ):
+        """
+        Exchange top mpi processor boundary
+        Args:
+
+        Returns:
+
+        """
+        if self.top_rank is not None:
+            for field_name in buffer_names:
+                layout_start, layout_end = \
+                    buffer_object.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                send_copy_x = send_copy_x_scalar
+                if (layout_end - layout_start) > 1:
+                    send_copy_x = send_copy_x_vector
+                send_copy_x(
+                    buffer_object.send_buff_top_bottom,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    y=(state.domain.shape[1] - 2)
+                )
+
+            comm.Sendrecv(
+                sendbuf=buffer_object.send_buff_top_bottom,
+                dest=self.top_rank,
+                sendtag=0,
+                recvbuf=buffer_object.recv_buff_top_bottom,
+                source=self.top_rank,
+                recvtag=0
+            )
+
+            for field_name in buffer_names:
+                layout_start, layout_end = \
+                    buffer_object.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                recv_copy_x = recv_copy_x_scalar
+                if (layout_end - layout_start) > 1:
+                    recv_copy_x = recv_copy_x_vector
+                recv_copy_x(
+                    buffer_object.recv_buff_top_bottom,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    y=(state.domain.shape[1] - 1)
+                )
+
+    def _exchange_bottom(
+        self,
+        comm,
+        buffer_names,
+        buffer_object,
+        state
+    ):
+        """
+        Exchange top mpi processor boundary
+        Args:
+
+        Returns:
+
+        """
+        if self.bottom_rank is not None:
+            for field_name in buffer_names:
+                layout_start, layout_end = \
+                    buffer_object.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                send_copy_x = send_copy_x_scalar
+                if (layout_end - layout_start) > 1:
+                    send_copy_x = send_copy_x_vector
+                send_copy_x(
+                    buffer_object.send_buff_top_bottom,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    y=1
+                )
+
+            comm.Sendrecv(
+                sendbuf=buffer_object.send_buff_top_bottom,
+                dest=self.bottom_rank,
+                sendtag=0,
+                recvbuf=buffer_object.recv_buff_top_bottom,
+                source=self.bottom_rank,
+                recvtag=0
+            )
+
+            for field_name in buffer_names:
+                layout_start, layout_end = \
+                    buffer_object.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                recv_copy_x = recv_copy_x_scalar
+                if (layout_end - layout_start) > 1:
+                    recv_copy_x = recv_copy_x_vector
+                recv_copy_x(
+                    buffer_object.recv_buff_top_bottom,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    y=0
                 )
 
 
-@numba.njit
-def send_copy_y(
+@numba.njit(parallel=True, nogil=True)
+def send_copy_y_vector(
     send_buff,
     field,
     layout_start,
     layout_end,
     shape,
-    x=1
+    x=0
 ):
-    if (layout_end - layout_start) > 1:
-        for y in prange(0, shape[1]):
-            ind = x * shape[1] + y
-            for itr in range(layout_start, layout_end):
-                send_buff[y, itr] = field[ind, itr - layout_start]
-    else:
-        for y in prange(0, shape[1]):
-            ind = x * shape[1] + y
-            send_buff[y, layout_start] = field[ind]
+    for y in prange(0, shape[1]):
+        ind = x * shape[1] + y
+        for itr in range(layout_start, layout_end):
+            send_buff[y, itr] = field[ind, itr - layout_start]
 
 
-def recv_copy():
-    pass
+@numba.njit(parallel=True, nogil=True)
+def send_copy_y_scalar(
+    send_buff,
+    field,
+    layout_start,
+    layout_end,
+    shape,
+    x=0
+):
+    for y in prange(0, shape[1]):
+        ind = x * shape[1] + y
+        send_buff[y, layout_start] = field[ind]
+
+
+@numba.njit(parallel=True, nogil=True)
+def recv_copy_y_vector(
+    recv_buff,
+    field,
+    layout_start,
+    layout_end,
+    shape,
+    x=0
+):
+    for y in prange(0, shape[1]):
+        ind = x * shape[1] + y
+        for itr in range(layout_start, layout_end):
+            field[ind, itr - layout_start] = recv_buff[y, itr]
+
+
+@numba.njit(parallel=True, nogil=True)
+def recv_copy_y_scalar(
+    recv_buff,
+    field,
+    layout_start,
+    layout_end,
+    shape,
+    x=0
+):
+    for y in prange(0, shape[1]):
+        ind = x * shape[1] + y
+        field[ind] = recv_buff[y, layout_start]
+
+
+@numba.njit(parallel=True, nogil=True)
+def send_copy_x_vector(
+    send_buff,
+    field,
+    layout_start,
+    layout_end,
+    shape,
+    y=0
+):
+    for x in prange(0, shape[0]):
+        ind = x * shape[1] + y
+        for itr in range(layout_start, layout_end):
+            send_buff[x, itr] = field[ind, itr - layout_start]
+
+
+@numba.njit(parallel=True, nogil=True)
+def send_copy_x_scalar(
+    send_buff,
+    field,
+    layout_start,
+    layout_end,
+    shape,
+    y=0
+):
+    for x in prange(0, shape[0]):
+        ind = x * shape[1] + y
+        send_buff[x, layout_start] = field[ind]
+
+
+@numba.njit(parallel=True, nogil=True)
+def recv_copy_x_vector(
+    recv_buff,
+    field,
+    layout_start,
+    layout_end,
+    shape,
+    y=0
+):
+    for x in prange(0, shape[0]):
+        ind = x * shape[1] + y
+        for itr in range(layout_start, layout_end):
+            field[ind, itr - layout_start] = recv_buff[x, itr]
+
+
+@numba.njit(parallel=True, nogil=True)
+def recv_copy_x_scalar(
+    recv_buff,
+    field,
+    layout_start,
+    layout_end,
+    shape,
+    y=0
+):
+    for x in prange(0, shape[0]):
+        ind = x * shape[1] + y
+        field[ind] = recv_buff[x, layout_start]
