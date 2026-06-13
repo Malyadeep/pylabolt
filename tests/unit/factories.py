@@ -85,7 +85,8 @@ def make_simulation(
     lattice_dict=None,
     decompose_dict=None,
     boundary_dict=None,
-    initial_fields_dict=None
+    initial_fields_dict=None,
+    obstacle_dict=None,
 ):
     data = {}
     if control_dict is not None:
@@ -100,6 +101,8 @@ def make_simulation(
         data["lattice_dict"] = lattice_dict
     if initial_fields_dict is not None:
         data["initial_fields_dict"] = initial_fields_dict
+    if obstacle_dict is not None:
+        data["obstacle_dict"] = obstacle_dict
     return SimpleNamespace(**data)
 
 

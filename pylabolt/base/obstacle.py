@@ -35,7 +35,7 @@ class Obstacle:
             )
         self.obstacle_dict = simulation.obstacle_dict
         self.compute_forces = False
-        self.compute_forces = False
+        self.compute_torque = False
         self.ref_point_torque = np.zeros(2, dtype=control.precision)
         self.write_obstacle_data = False
         self.write_interval = 1
@@ -134,7 +134,7 @@ class Obstacle:
             self.compute_torque = options_dict["compute_torque"]
             if not isinstance(self.compute_torque, (bool, np.bool_)):
                 raise ValueError(
-                    "compute_forces must be a bool:" +
+                    "compute_torque must be a bool:" +
                     " True/False (default: False)"
                 )
         print_log(
@@ -302,7 +302,7 @@ class Circle:
 
         if "radius" not in user_obstacle_dict:
             raise ValueError(
-                "radius missing for obstacle: " + user_obstacle_name
+                "radius missing in obstacle: " + user_obstacle_name
             )
         radius = user_obstacle_dict["radius"]
         if not isinstance(radius, (float, int)):
@@ -314,7 +314,7 @@ class Circle:
 
         if "center" not in user_obstacle_dict:
             raise ValueError(
-                "center missing for obstacle: " + user_obstacle_name
+                "center missing in obstacle: " + user_obstacle_name
             )
         center = user_obstacle_dict["center"]
         if not isinstance(center, list):
@@ -328,7 +328,7 @@ class Circle:
 
         if "density" not in user_obstacle_dict:
             raise ValueError(
-                "density missing for obstacle: " + user_obstacle_name
+                "density missing in obstacle: " + user_obstacle_name
             )
         density = user_obstacle_dict["density"]
         if not isinstance(density, (float, int)):
@@ -340,7 +340,7 @@ class Circle:
 
         if "periodicity" not in user_obstacle_dict:
             raise ValueError(
-                "periodicity missing for obstacle: " + user_obstacle_name
+                "periodicity missing in obstacle: " + user_obstacle_name
             )
         self.periodicity = user_obstacle_dict["periodicity"]
         self.x_periodic = False
@@ -361,7 +361,7 @@ class Circle:
 
         if "static" not in user_obstacle_dict:
             raise ValueError(
-                "static missing for obstacle: " + user_obstacle_name
+                "static missing in obstacle: " + user_obstacle_name
             )
         static = user_obstacle_dict["static"]
         if not isinstance(static, (bool, np.bool_)):
@@ -527,7 +527,7 @@ class Ellipse:
 
         if "semi_major_axis" not in user_obstacle_dict:
             raise ValueError(
-                "semi_major_axis missing for obstacle: " + user_obstacle_name
+                "semi_major_axis missing in obstacle: " + user_obstacle_name
             )
         semi_major_axis = user_obstacle_dict["semi_major_axis"]
         if not isinstance(semi_major_axis, (float, int)):
@@ -539,7 +539,7 @@ class Ellipse:
 
         if "semi_minor_axis" not in user_obstacle_dict:
             raise ValueError(
-                "semi_minor_axis missing for obstacle: " + user_obstacle_name
+                "semi_minor_axis missing in obstacle: " + user_obstacle_name
             )
         semi_minor_axis = user_obstacle_dict["semi_minor_axis"]
         if not isinstance(semi_minor_axis, (float, int)):
@@ -551,7 +551,7 @@ class Ellipse:
 
         if "inclination_angle" not in user_obstacle_dict:
             raise ValueError(
-                "inclination_angle missing for obstacle: " + user_obstacle_name
+                "inclination_angle missing in obstacle: " + user_obstacle_name
             )
         inclination_angle = user_obstacle_dict["inclination_angle"]
         if not isinstance(semi_minor_axis, (float, int)):
@@ -567,7 +567,7 @@ class Ellipse:
 
         if "center" not in user_obstacle_dict:
             raise ValueError(
-                "center missing for obstacle: " + user_obstacle_name
+                "center missing in obstacle: " + user_obstacle_name
             )
         center = user_obstacle_dict["center"]
         if not isinstance(center, list):
@@ -579,7 +579,7 @@ class Ellipse:
 
         if "density" not in user_obstacle_dict:
             raise ValueError(
-                "density missing for obstacle: " + user_obstacle_name
+                "density missing in obstacle: " + user_obstacle_name
             )
         density = user_obstacle_dict["density"]
         if not isinstance(density, (float, int)):
@@ -591,7 +591,7 @@ class Ellipse:
 
         if "periodicity" not in user_obstacle_dict:
             raise ValueError(
-                "periodicity missing for obstacle: " + user_obstacle_name
+                "periodicity missing in obstacle: " + user_obstacle_name
             )
         self.periodicity = user_obstacle_dict["periodicity"]
         self.x_periodic = False
@@ -612,7 +612,7 @@ class Ellipse:
 
         if "static" not in user_obstacle_dict:
             raise ValueError(
-                "static missing for obstacle: " + user_obstacle_name
+                "static missing in obstacle: " + user_obstacle_name
             )
         static = user_obstacle_dict["static"]
         if not isinstance(static, (bool, np.bool_)):
