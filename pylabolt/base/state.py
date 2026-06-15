@@ -108,6 +108,7 @@ class State:
                 self.domain,
                 self.control,
                 self.fields,
+                self.boundary,
                 fluid=self.fluid,
                 phase=self.phase,
                 scalar=self.scalar,

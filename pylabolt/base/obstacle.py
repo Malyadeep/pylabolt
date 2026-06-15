@@ -16,6 +16,7 @@ class Obstacle:
         domain,
         control,
         fields,
+        boundary,
         fluid=False,
         phase=False,
         scalar=False,
@@ -41,12 +42,13 @@ class Obstacle:
         self.write_interval = 1
         self.obstacles = []
 
-        # ------- Read and initialize obstacles elements ------- #
+        # ------- Read and initialize obstacles ------- #
         self.read_obstacle_dict(
             mesh,
             domain,
             control,
             fields,
+            boundary,
             fluid=fluid,
             phase=phase,
             scalar=scalar,
@@ -63,6 +65,7 @@ class Obstacle:
         domain,
         control,
         fields,
+        boundary,
         fluid=False,
         phase=False,
         scalar=False,
@@ -97,6 +100,7 @@ class Obstacle:
                 control,
                 mesh,
                 fields,
+                boundary,
                 fluid=fluid,
                 phase=phase,
                 scalar=scalar,
@@ -122,7 +126,7 @@ class Obstacle:
             self.compute_forces = options_dict["compute_forces"]
             if not isinstance(self.compute_forces, (bool, np.bool_)):
                 raise ValueError(
-                    "compute_forces must be a bool:" +
+                    "compute_forces must be bool:" +
                     " True/False (default: False)"
                 )
         print_log(
@@ -134,7 +138,7 @@ class Obstacle:
             self.compute_torque = options_dict["compute_torque"]
             if not isinstance(self.compute_torque, (bool, np.bool_)):
                 raise ValueError(
-                    "compute_torque must be a bool:" +
+                    "compute_torque must be bool:" +
                     " True/False (default: False)"
                 )
         print_log(
@@ -154,7 +158,7 @@ class Obstacle:
                 ref_point_torque = options_dict["ref_point_torque"]
                 if not isinstance(ref_point_torque, list):
                     raise ValueError(
-                        "ref_point_torque must be a list: (x, y)"
+                        "ref_point_torque must be list: (x, y)"
                     )
                 self.ref_point_torque = np.array(
                     ref_point_torque, dtype=control.precision
@@ -197,6 +201,7 @@ class Obstacle:
         control,
         mesh,
         fields,
+        boundary,
         fluid=False,
         phase=False,
         scalar=False,
@@ -224,7 +229,8 @@ class Obstacle:
                 control,
                 domain,
                 mesh,
-                fields
+                fields,
+                boundary
             )
         elif obstacle_type == "ellipse":
             obstacle = Ellipse(
@@ -234,7 +240,8 @@ class Obstacle:
                 control,
                 domain,
                 mesh,
-                fields
+                fields,
+                boundary
             )
         elif obstacle_type == "custom":
             pass
@@ -283,7 +290,8 @@ class Circle:
         control,
         domain,
         mesh,
-        fields
+        fields,
+        boundary
     ):
         """
         Container object for obstacle type: circle
@@ -305,9 +313,9 @@ class Circle:
                 "radius missing in obstacle: " + user_obstacle_name
             )
         radius = user_obstacle_dict["radius"]
-        if not isinstance(radius, (float, int)):
+        if type(radius) not in (float, int):
             raise ValueError(
-                "radius must be a float or int for obstacle type circle: " +
+                "radius must be float or int for obstacle type circle: " +
                 user_obstacle_name
             )
         self.radius = control.precision(radius)
@@ -319,7 +327,7 @@ class Circle:
         center = user_obstacle_dict["center"]
         if not isinstance(center, list):
             raise ValueError(
-                "center must be a list for obstacle type circle: " +
+                "center must be list for obstacle type circle: " +
                 user_obstacle_name
             )
         self.center = np.array(center, dtype=control.precision)
@@ -331,33 +339,12 @@ class Circle:
                 "density missing in obstacle: " + user_obstacle_name
             )
         density = user_obstacle_dict["density"]
-        if not isinstance(density, (float, int)):
+        if type(density) not in (float, int):
             raise ValueError(
-                "density must be a float or int for obstacle type circle: " +
+                "density must be float or int for obstacle type circle: " +
                 user_obstacle_name
             )
         self.density = control.precision(density)
-
-        if "periodicity" not in user_obstacle_dict:
-            raise ValueError(
-                "periodicity missing in obstacle: " + user_obstacle_name
-            )
-        self.periodicity = user_obstacle_dict["periodicity"]
-        self.x_periodic = False
-        self.y_periodic = False
-        if self.periodicity == "x":
-            self.x_periodic = True
-        elif self.periodicity == "y":
-            self.y_periodic = True
-        elif self.periodicity == "all":
-            self.x_periodic = True
-            self.y_periodic = True
-        elif self.periodicity == "none":
-            pass
-        else:
-            raise ValueError(
-                "illegal option for periodicity: " + user_obstacle_name
-            )
 
         if "static" not in user_obstacle_dict:
             raise ValueError(
@@ -407,13 +394,13 @@ class Circle:
                 "both"
             ]:
                 raise ValueError(
-                    "Unsupported degree of freedom: " + self.motion_type +
-                    " in obstacle: " + user_obstacle_name
+                    "Unsupported degree of freedom: " + self.degree_of_freedom
+                    + " in obstacle: " + user_obstacle_name
                 )
             self.linear_velocity = solid_motion_dict["linear_velocity"]
             if not isinstance(self.linear_velocity, list):
                 raise ValueError(
-                    "linear_velocity must be a list [ux, uy]: " +
+                    "linear_velocity must be list [ux, uy]: " +
                     user_obstacle_name
                 )
             self.linear_velocity = np.array(
@@ -422,7 +409,7 @@ class Circle:
             self.angular_velocity = solid_motion_dict["angular_velocity"]
             if not isinstance(self.angular_velocity, (int, float)):
                 raise ValueError(
-                    "angular_velocity must be a int/float: " +
+                    "angular_velocity must be int/float: " +
                     user_obstacle_name
                 )
             self.angular_velocity = np.array(
@@ -430,14 +417,13 @@ class Circle:
             )
 
         self.reconstruct_args = (
-            self.x_periodic,
-            self.y_periodic,
             self.center,
             self.radius
         )
 
         self.set_solid_nodes(
             fields,
+            boundary,
             domain,
             mesh
         )
@@ -445,6 +431,7 @@ class Circle:
     def set_solid_nodes(
         self,
         fields,
+        boundary,
         domain,
         mesh,
     ):
@@ -467,6 +454,8 @@ class Circle:
                     i_global,
                     j_global,
                     mesh.grid_global_shape,
+                    boundary.x_periodic,
+                    boundary.y_periodic,
                     *self.reconstruct_args
                 )
                 if inside_solid:
@@ -508,7 +497,8 @@ class Ellipse:
         control,
         domain,
         mesh,
-        fields
+        fields,
+        boundary
     ):
         """
         Container object for obstacle type: circle
@@ -530,9 +520,9 @@ class Ellipse:
                 "semi_major_axis missing in obstacle: " + user_obstacle_name
             )
         semi_major_axis = user_obstacle_dict["semi_major_axis"]
-        if not isinstance(semi_major_axis, (float, int)):
+        if type(semi_major_axis) not in (float, int):
             raise ValueError(
-                "semi_major_axis must be a float or int for obstacle" +
+                "semi_major_axis must be float or int for obstacle" +
                 " type ellipse: " + user_obstacle_name
             )
         self.semi_major_axis = control.precision(semi_major_axis)
@@ -542,9 +532,9 @@ class Ellipse:
                 "semi_minor_axis missing in obstacle: " + user_obstacle_name
             )
         semi_minor_axis = user_obstacle_dict["semi_minor_axis"]
-        if not isinstance(semi_minor_axis, (float, int)):
+        if type(semi_minor_axis) not in (float, int):
             raise ValueError(
-                "semi_minor_axis must be a float or int for obstacle" +
+                "semi_minor_axis must be float or int for obstacle" +
                 " type ellipse: " + user_obstacle_name
             )
         self.semi_minor_axis = control.precision(semi_minor_axis)
@@ -554,9 +544,9 @@ class Ellipse:
                 "inclination_angle missing in obstacle: " + user_obstacle_name
             )
         inclination_angle = user_obstacle_dict["inclination_angle"]
-        if not isinstance(semi_minor_axis, (float, int)):
+        if type(semi_minor_axis) not in (float, int):
             raise ValueError(
-                "inclination_angle must be a float or int for obstacle" +
+                "inclination_angle must be float or int for obstacle" +
                 " type ellipse representing angle in degrees: " +
                 user_obstacle_name
             )
@@ -572,7 +562,7 @@ class Ellipse:
         center = user_obstacle_dict["center"]
         if not isinstance(center, list):
             raise ValueError(
-                "center must be a list for obstacle type circle: " +
+                "center must be list for obstacle type circle: " +
                 user_obstacle_name
             )
         self.center = np.array(center, dtype=control.precision)
@@ -582,33 +572,12 @@ class Ellipse:
                 "density missing in obstacle: " + user_obstacle_name
             )
         density = user_obstacle_dict["density"]
-        if not isinstance(density, (float, int)):
+        if type(density) not in (float, int):
             raise ValueError(
-                "density must be a float or int for obstacle type circle: " +
+                "density must be float or int for obstacle type circle: " +
                 user_obstacle_name
             )
         self.density = control.precision(density)
-
-        if "periodicity" not in user_obstacle_dict:
-            raise ValueError(
-                "periodicity missing in obstacle: " + user_obstacle_name
-            )
-        self.periodicity = user_obstacle_dict["periodicity"]
-        self.x_periodic = False
-        self.y_periodic = False
-        if self.periodicity == "x":
-            self.x_periodic = True
-        elif self.periodicity == "y":
-            self.y_periodic = True
-        elif self.periodicity == "all":
-            self.x_periodic = True
-            self.y_periodic = True
-        elif self.periodicity == "none":
-            pass
-        else:
-            raise ValueError(
-                "illegal option for periodicity: " + user_obstacle_name
-            )
 
         if "static" not in user_obstacle_dict:
             raise ValueError(
@@ -664,7 +633,7 @@ class Ellipse:
             self.linear_velocity = solid_motion_dict["linear_velocity"]
             if not isinstance(self.linear_velocity, list):
                 raise ValueError(
-                    "linear_velocity must be a list [ux, uy]: " +
+                    "linear_velocity must be list [ux, uy]: " +
                     user_obstacle_name
                 )
             self.linear_velocity = np.array(
@@ -673,7 +642,7 @@ class Ellipse:
             self.angular_velocity = solid_motion_dict["angular_velocity"]
             if not isinstance(self.angular_velocity, (int, float)):
                 raise ValueError(
-                    "angular_velocity must be a int/float: " +
+                    "angular_velocity must be int/float: " +
                     user_obstacle_name
                 )
             self.angular_velocity = np.array(
@@ -681,8 +650,6 @@ class Ellipse:
             )
 
         self.reconstruct_args = (
-            self.x_periodic,
-            self.y_periodic,
             self.center,
             self.semi_major_axis,
             self.semi_minor_axis,
@@ -692,6 +659,7 @@ class Ellipse:
 
         self.set_solid_nodes(
             fields,
+            boundary,
             domain,
             mesh,
         )
@@ -699,6 +667,7 @@ class Ellipse:
     def set_solid_nodes(
         self,
         fields,
+        boundary,
         domain,
         mesh,
     ):
@@ -721,6 +690,8 @@ class Ellipse:
                     i_global,
                     j_global,
                     mesh.grid_global_shape,
+                    boundary.x_periodic,
+                    boundary.y_periodic,
                     *self.reconstruct_args
                 )
                 if inside_solid:

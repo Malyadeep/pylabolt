@@ -43,6 +43,13 @@ def make_lattice(no_of_directions):
     )
 
 
+def make_boundary():
+    return SimpleNamespace(
+        x_periodic=True,
+        y_periodic=True,
+    )
+
+
 class DummyFields:
     def __init__(self, domain, control):
         self.velocity = np.zeros((domain.size, 2), dtype=control.precision)
@@ -51,6 +58,8 @@ class DummyFields:
         self.phase_field = np.zeros(domain.size, dtype=control.precision)
         self.ghost_node = np.zeros(domain.size, dtype=np.bool_)
         self.periodic_boundary = np.zeros(domain.size, dtype=np.bool_)
+        self.solid = np.zeros(domain.size, dtype=np.bool_)
+        self.solid_id = np.zeros(domain.size, dtype=np.int32)
         for ind in range(domain.size):
             i = ind // domain.shape[1]
             j = ind - i * domain.shape[1]
