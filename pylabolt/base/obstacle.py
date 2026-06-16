@@ -544,7 +544,7 @@ class Ellipse:
                 "inclination_angle missing in obstacle: " + user_obstacle_name
             )
         inclination_angle = user_obstacle_dict["inclination_angle"]
-        if type(semi_minor_axis) not in (float, int):
+        if type(inclination_angle) not in (float, int):
             raise ValueError(
                 "inclination_angle must be float or int for obstacle" +
                 " type ellipse representing angle in degrees: " +
@@ -562,7 +562,7 @@ class Ellipse:
         center = user_obstacle_dict["center"]
         if not isinstance(center, list):
             raise ValueError(
-                "center must be list for obstacle type circle: " +
+                "center must be list for obstacle type ellipse: " +
                 user_obstacle_name
             )
         self.center = np.array(center, dtype=control.precision)
@@ -574,7 +574,7 @@ class Ellipse:
         density = user_obstacle_dict["density"]
         if type(density) not in (float, int):
             raise ValueError(
-                "density must be float or int for obstacle type circle: " +
+                "density must be float or int for obstacle type ellipse: " +
                 user_obstacle_name
             )
         self.density = control.precision(density)
@@ -586,7 +586,7 @@ class Ellipse:
         static = user_obstacle_dict["static"]
         if not isinstance(static, (bool, np.bool_)):
             raise ValueError(
-                "static must be True/False for obstacle type circle: " +
+                "static must be True/False for obstacle type ellipse: " +
                 user_obstacle_name
             )
         self.static = static
@@ -627,8 +627,8 @@ class Ellipse:
                 "both"
             ]:
                 raise ValueError(
-                    "Unsupported degree of freedom: " + self.motion_type +
-                    " in obstacle: " + user_obstacle_name
+                    "Unsupported degree of freedom: " + self.degree_of_freedom
+                    + " in obstacle: " + user_obstacle_name
                 )
             self.linear_velocity = solid_motion_dict["linear_velocity"]
             if not isinstance(self.linear_velocity, list):
