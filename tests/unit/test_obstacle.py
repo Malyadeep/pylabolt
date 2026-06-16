@@ -252,6 +252,22 @@ class TestObstacleCircle:
             with pytest.raises(ValueError, match=re.escape(mssgs[key_no])):
                 build_obstacle(simulation, setup_env)
 
+    def test_static_obstacle_entries(self, setup_env):
+        obstacle_dict = get_circle_dict()
+        obstacle_dict["cylinder"]["static"] = True
+        del obstacle_dict["cylinder"]["solid_motion_dict"]
+        simulation = make_simulation(obstacle_dict=obstacle_dict)
+        obstacle = build_obstacle(simulation, setup_env)
+        obstacle_circle = obstacle.obstacles[0]
+
+        assert obstacle_circle.motion_type is None
+        assert obstacle_circle.degree_of_freedom is None
+        assert np.allclose(
+            obstacle_circle.linear_velocity,
+            np.zeros(2, dtype=np.float64)
+        )
+        assert np.allclose(obstacle_circle.angular_velocity, 0)
+
     def test_illegal_solid_motion_entries(self, setup_env):
         illegal_entry_map = {
             "type": "none",
@@ -321,6 +337,7 @@ class TestObstacleCircle:
         domain_size = Nx_pad * Ny_pad
         solid_check = np.zeros(domain_size, dtype=np.bool_)
         solid_id_check = np.zeros(domain_size, dtype=np.int32)
+        solid_id_check[:] = -1
         velocity_check = np.zeros((domain_size, 2), dtype=np.float64)
         for ind in range(domain_size):
             i = ind // Ny_pad
@@ -339,7 +356,7 @@ class TestObstacleCircle:
             if np.abs(ry - Ny) < np.abs(ry_min):
                 ry_min = ry - Ny
             # ------------- All boundaries periodic -------------
-            dist = np.sqrt(rx * rx + ry * ry)
+            dist = np.sqrt(rx_min * rx_min + ry_min * ry_min)
             if dist <= obstacle_circle.radius and not fields.ghost_node[ind]:
                 solid_check[ind] = True
                 solid_id_check[ind] = obstacle_circle.id
@@ -417,6 +434,22 @@ class TestObstacleEllipse:
             simulation = make_simulation(obstacle_dict=obstacle_dict)
             with pytest.raises(ValueError, match=re.escape(mssgs[key_no])):
                 build_obstacle(simulation, setup_env)
+
+    def test_static_obstacle_entries(self, setup_env):
+        obstacle_dict = get_ellipse_dict()
+        obstacle_dict["ellipsoid"]["static"] = True
+        del obstacle_dict["ellipsoid"]["solid_motion_dict"]
+        simulation = make_simulation(obstacle_dict=obstacle_dict)
+        obstacle = build_obstacle(simulation, setup_env)
+        obstacle_circle = obstacle.obstacles[0]
+
+        assert obstacle_circle.motion_type is None
+        assert obstacle_circle.degree_of_freedom is None
+        assert np.allclose(
+            obstacle_circle.linear_velocity,
+            np.zeros(2, dtype=np.float64)
+        )
+        assert np.allclose(obstacle_circle.angular_velocity, 0)
 
     def test_illegal_solid_motion_entries(self, setup_env):
         illegal_entry_map = {
@@ -508,6 +541,7 @@ class TestObstacleEllipse:
         domain_size = Nx_pad * Ny_pad
         solid_check = np.zeros(domain_size, dtype=np.bool_)
         solid_id_check = np.zeros(domain_size, dtype=np.int32)
+        solid_id_check[:] = -1
         velocity_check = np.zeros((domain_size, 2), dtype=np.float64)
         for ind in range(domain_size):
             i = ind // Ny_pad
@@ -547,6 +581,116 @@ class TestObstacleEllipse:
                     obstacle_ellipse.angular_velocity * ry_min
                 velocity_check[ind, 1] = obstacle_ellipse.linear_velocity[1] +\
                     obstacle_ellipse.angular_velocity * rx_min
+
+        assert np.all(fields.solid == solid_check)
+        assert np.all(fields.solid_id == solid_id_check)
+        assert np.allclose(fields.velocity, velocity_check)
+
+
+class TestMultipleObstacle:
+    def test_multiple_obstacle(self, setup_env):
+        obstacle_dict_circle = get_circle_dict()
+        obstacle_dict_ellipse = get_ellipse_dict()
+        obstacle_dict = {
+            "options": {},
+            "cylinder": obstacle_dict_circle["cylinder"],
+            "ellipsoid": obstacle_dict_ellipse["ellipsoid"]
+        }
+        simulation = make_simulation(obstacle_dict=obstacle_dict)
+        obstacle = build_obstacle(simulation, setup_env)
+
+        assert len(obstacle.obstacles) == 2
+        assert obstacle.obstacles[0].id == 0
+        assert obstacle.obstacles[1].id == 1
+
+        assert obstacle.obstacles[0].type == "circle"
+        assert obstacle.obstacles[1].type == "ellipse"
+
+    def test_multiple_obstacle_node_initialization(self, setup_env):
+        obstacle_dict_circle = get_circle_dict()
+        obstacle_dict_ellipse = get_ellipse_dict()
+        obstacle_dict = {
+            "options": {},
+            "cylinder": obstacle_dict_circle["cylinder"],
+            "ellipsoid": obstacle_dict_ellipse["ellipsoid"]
+        }
+        simulation = make_simulation(obstacle_dict=obstacle_dict)
+        obstacle = build_obstacle(simulation, setup_env)
+
+        mesh, domain, control, fields, boundary = setup_env
+        Nx, Ny = mesh.grid_global_shape[0], mesh.grid_global_shape[1]
+        Nx_pad, Ny_pad = Nx + 2, Ny + 2
+        domain_size = Nx_pad * Ny_pad
+        solid_check = np.zeros(domain_size, dtype=np.bool_)
+        solid_id_check = np.zeros(domain_size, dtype=np.int32)
+        solid_id_check[:] = -1
+        velocity_check = np.zeros((domain_size, 2), dtype=np.float64)
+
+        obstacle_circle = obstacle.obstacles[0]
+        obstacle_ellipse = obstacle.obstacles[1]
+        for ind in range(domain_size):
+            i = ind // Ny_pad
+            j = ind % Ny_pad
+            rx = i - (obstacle_ellipse.center[0] + 1)
+            ry = j - (obstacle_ellipse.center[1] + 1)
+            rx_min = rx
+            ry_min = ry
+            # ------------- All boundaries periodic -------------
+            if np.abs(rx + Nx) < np.abs(rx_min):
+                rx_min = rx + Nx
+            if np.abs(rx - Nx) < np.abs(rx_min):
+                rx_min = rx - Nx
+            if np.abs(ry + Ny) < np.abs(ry_min):
+                ry_min = ry + Ny
+            if np.abs(ry - Ny) < np.abs(ry_min):
+                ry_min = ry - Ny
+            # ------------- All boundaries periodic -------------
+            x = (rx_min * obstacle_ellipse.cos_alpha +
+                 ry_min * obstacle_ellipse.sin_alpha)
+            y = (-rx_min * obstacle_ellipse.sin_alpha +
+                 ry_min * obstacle_ellipse.cos_alpha)
+            scaled_dist = (
+                (x * x) / (
+                    obstacle_ellipse.semi_major_axis *
+                    obstacle_ellipse.semi_major_axis
+                ) +
+                (y * y) / (
+                    obstacle_ellipse.semi_minor_axis *
+                    obstacle_ellipse.semi_minor_axis
+                )
+            )
+            if scaled_dist <= 1 and not fields.ghost_node[ind]:
+                solid_check[ind] = True
+                solid_id_check[ind] = obstacle_ellipse.id
+                velocity_check[ind, 0] = obstacle_ellipse.linear_velocity[0] -\
+                    obstacle_ellipse.angular_velocity * ry_min
+                velocity_check[ind, 1] = obstacle_ellipse.linear_velocity[1] +\
+                    obstacle_ellipse.angular_velocity * rx_min
+
+            rx = i - (obstacle_circle.center[0] + 1)
+            ry = j - (obstacle_circle.center[1] + 1)
+            rx_min = rx
+            ry_min = ry
+            # ------------- All boundaries periodic -------------
+            if np.abs(rx + Nx) < np.abs(rx_min):
+                rx_min = rx + Nx
+            if np.abs(rx - Nx) < np.abs(rx_min):
+                rx_min = rx - Nx
+            if np.abs(ry + Ny) < np.abs(ry_min):
+                ry_min = ry + Ny
+            if np.abs(ry - Ny) < np.abs(ry_min):
+                ry_min = ry - Ny
+            # ------------- All boundaries periodic -------------
+            scaled_dist = np.sqrt(
+                rx_min * rx_min + ry_min * ry_min
+            ) / obstacle_circle.radius
+            if scaled_dist <= 1 and not fields.ghost_node[ind]:
+                solid_check[ind] = True
+                solid_id_check[ind] = obstacle_circle.id
+                velocity_check[ind, 0] = obstacle_circle.linear_velocity[0] -\
+                    obstacle_circle.angular_velocity * ry_min
+                velocity_check[ind, 1] = obstacle_circle.linear_velocity[1] +\
+                    obstacle_circle.angular_velocity * rx_min
 
         assert np.all(fields.solid == solid_check)
         assert np.all(fields.solid_id == solid_id_check)

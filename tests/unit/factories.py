@@ -60,6 +60,7 @@ class DummyFields:
         self.periodic_boundary = np.zeros(domain.size, dtype=np.bool_)
         self.solid = np.zeros(domain.size, dtype=np.bool_)
         self.solid_id = np.zeros(domain.size, dtype=np.int32)
+        self.solid_id[:] = -1
         for ind in range(domain.size):
             i = ind // domain.shape[1]
             j = ind - i * domain.shape[1]
