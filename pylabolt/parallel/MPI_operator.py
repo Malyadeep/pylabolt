@@ -15,14 +15,14 @@ class HaloBuffer:
         Attributes:
 
         """
-        self.dict = field_dict
+        self.field_dict = field_dict
         self.layout = {}
         self.components = 0
         self.offset = 0
-        for key in self.dict:
-            self.components += self.dict[key]
+        for key in self.field_dict:
+            self.components += self.field_dict[key]
             self.register_field(key)
-            self.offset += self.dict[key]
+            self.offset += self.field_dict[key]
         self.send_buff_left_right = np.zeros(
             (state.domain.shape[1], self.components),
             dtype=dtype
@@ -52,7 +52,7 @@ class HaloBuffer:
 
         """
         self.layout.update({
-            key: (self.offset, self.offset + self.dict[key])
+            key: (self.offset, self.offset + self.field_dict[key])
         })
 
 

@@ -59,6 +59,8 @@ class DummyFields:
         self.ghost_node = np.zeros(domain.size, dtype=np.bool_)
         self.periodic_boundary = np.zeros(domain.size, dtype=np.bool_)
         self.solid = np.zeros(domain.size, dtype=np.bool_)
+        self.solid_boundary = np.zeros(domain.size, dtype=np.bool_)
+        self.fluid_boundary = np.zeros(domain.size, dtype=np.bool_)
         self.solid_id = np.zeros(domain.size, dtype=np.int32)
         self.solid_id[:] = -1
         for ind in range(domain.size):
@@ -67,6 +69,12 @@ class DummyFields:
             if (i == 0 or j == 0 or i == domain.shape[0] - 1 or
                     j == domain.shape[1] - 1):
                 self.ghost_node[ind] = True
+        # TODO: extend this class description for other lattice types
+        self.pop_fluid = np.zeros((domain.size, 9), dtype=control.precision)
+        self.pop_phase = np.zeros((domain.size, 9), dtype=control.precision)
+        self.grad_phase_field = np.zeros(
+            (domain.size, 2), dtype=control.precision
+        )
 
 
 def make_fields(domain, control):
