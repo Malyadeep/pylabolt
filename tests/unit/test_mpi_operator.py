@@ -249,51 +249,92 @@ class TestCopyFunctions:
         state.fields.grad_phase_field[:, 0] = np.random.uniform(-1, 1, state.domain.size)
         state.fields.grad_phase_field[:, 1] = np.random.uniform(-1, 1, state.domain.size)
         
-    def compare_buffers_y(self, buffer_object, state, x_val=1):
+    def compare_buffers(self, buffer_object, state, val=1, direction="x"):
         test_buffer = np.copy(buffer_object.send_buff_left_right)
         for key in list(buffer_object.field_dict.keys()):
             field_to_copy = getattr(state.fields, key)
             field_back_copy =  np.copy(field_to_copy)
             no_of_components = buffer_object.field_dict[key]
             layout_start, layout_end = buffer_object.layout[key]
-            send_copy_func = send_copy_y_scalar
-            recv_copy_func = recv_copy_y_scalar
+            send_copy_y = send_copy_y_scalar
+            recv_copy_y = recv_copy_y_scalar
+            send_copy_x = send_copy_x_scalar
+            recv_copy_x = recv_copy_x_scalar
             if no_of_components > 1:
-                send_copy_func = send_copy_y_vector
-                recv_copy_func = recv_copy_y_vector   
-            send_copy_func(
-                buffer_object.send_buff_left_right,
-                field_to_copy,
-                layout_start,
-                layout_end,
-                state.domain.shape,
-                x=x_val
-            )
-            x = x_val
-            for y in range(0, state.domain.shape[1]):
-                ind = x * state.domain.shape[1] + y
-                if no_of_components == 1:
-                    test_buffer[y, layout_start] =\
-                        field_to_copy[ind]
-                    buffer_object.recv_buff_left_right[y, layout_start] =\
-                        field_to_copy[ind]
-                else:
-                    for component in range(layout_start, layout_end):
-                        test_buffer[y, component] =\
-                            field_to_copy[ind, component - layout_start]
-                        buffer_object.recv_buff_left_right[y, component] =\
-                            field_to_copy[ind, component - layout_start]
-            
-            recv_copy_func(
-                buffer_object.recv_buff_left_right,
-                field_back_copy,
-                layout_start,
-                layout_end,
-                state.domain.shape,
-                x=x_val
-            )
-            assert np.all(field_to_copy == field_back_copy)
-        assert np.all(buffer_object.send_buff_left_right == test_buffer)
+                send_copy_y = send_copy_y_vector
+                recv_copy_y = recv_copy_y_vector
+                send_copy_x = send_copy_x_vector
+                recv_copy_x = recv_copy_x_vector
+            if direction == "x":
+                send_copy_y(
+                    buffer_object.send_buff_left_right,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    x=val
+                )
+                x = val
+                for y in range(0, state.domain.shape[1]):
+                    ind = x * state.domain.shape[1] + y
+                    if no_of_components == 1:
+                        test_buffer[y, layout_start] =\
+                            field_to_copy[ind]
+                        buffer_object.recv_buff_left_right[y, layout_start] =\
+                            field_to_copy[ind]
+                    else:
+                        for component in range(layout_start, layout_end):
+                            test_buffer[y, component] =\
+                                field_to_copy[ind, component - layout_start]
+                            buffer_object.recv_buff_left_right[y, component] =\
+                                field_to_copy[ind, component - layout_start]
+                
+                recv_copy_y(
+                    buffer_object.recv_buff_left_right,
+                    field_back_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    x=val
+                )
+                assert np.all(field_to_copy == field_back_copy)
+            elif direction == "y":
+                send_copy_x(
+                    buffer_object.send_buff_top_bottom,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    y=val
+                )
+                y = val
+                for x in range(0, state.domain.shape[0]):
+                    ind = x * state.domain.shape[1] + y
+                    if no_of_components == 1:
+                        test_buffer[x, layout_start] =\
+                            field_to_copy[ind]
+                        buffer_object.recv_buff_top_bottom[x, layout_start] =\
+                            field_to_copy[ind]
+                    else:
+                        for component in range(layout_start, layout_end):
+                            test_buffer[x, component] =\
+                                field_to_copy[ind, component - layout_start]
+                            buffer_object.recv_buff_top_bottom[x, component] =\
+                                field_to_copy[ind, component - layout_start]
+                
+                recv_copy_x(
+                    buffer_object.recv_buff_top_bottom,
+                    field_back_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape,
+                    y=val
+                )
+                assert np.all(field_to_copy == field_back_copy)
+        if direction == "x":
+            assert np.all(buffer_object.send_buff_left_right == test_buffer)
+        elif direction == "y":
+            assert np.all(buffer_object.send_buff_top_bottom == test_buffer)
 
     def test_send_recv_copy_left(self):
         decompose_dict = make_decompose_dict(1, 1)
@@ -306,20 +347,23 @@ class TestCopyFunctions:
         )
         self.set_fields_value(state)
         mpi_operator = MPIOperator(comm, state)
-        self.compare_buffers_y(
+        self.compare_buffers(
             mpi_operator.bool_buffer,
             state,
-            x_val=1
+            val=1,
+            direction="x"
         )
-        self.compare_buffers_y(
+        self.compare_buffers(
             mpi_operator.int_buffer,
             state,
-            x_val=1
+            val=1,
+            direction="x"
         )
-        self.compare_buffers_y(
+        self.compare_buffers(
             mpi_operator.float_buffer,
             state,
-            x_val=1
+            val=1,
+            direction="x"
         )
         
     
@@ -334,20 +378,83 @@ class TestCopyFunctions:
         )
         self.set_fields_value(state)
         mpi_operator = MPIOperator(comm, state)
-        self.compare_buffers_y(
+        self.compare_buffers(
             mpi_operator.bool_buffer,
             state,
-            x_val=(state.domain.shape[0] - 2)
+            val=(state.domain.shape[0] - 2),
+            direction="x"
         )
-        self.compare_buffers_y(
+        self.compare_buffers(
             mpi_operator.int_buffer,
             state,
-            x_val=(state.domain.shape[0] - 2)
+            val=(state.domain.shape[0] - 2),
+            direction="x"
         )
-        self.compare_buffers_y(
+        self.compare_buffers(
             mpi_operator.float_buffer,
             state,
-            x_val=(state.domain.shape[0] - 2)
+            val=(state.domain.shape[0] - 2),
+            direction="x"
+        )
+
+    def test_send_recv_copy_bottom(self):
+        decompose_dict = make_decompose_dict(1, 1)
+        simulation = make_simulation(decompose_dict=decompose_dict)
+        state = DummyState(
+            comm,
+            simulation,
+            fluid=True,
+            phase=True
+        )
+        self.set_fields_value(state)
+        mpi_operator = MPIOperator(comm, state)
+        self.compare_buffers(
+            mpi_operator.bool_buffer,
+            state,
+            val=1,
+            direction="y"
+        )
+        self.compare_buffers(
+            mpi_operator.int_buffer,
+            state,
+            val=1,
+            direction="y"
+        )
+        self.compare_buffers(
+            mpi_operator.float_buffer,
+            state,
+            val=1,
+            direction="y"
+        )
+
+    def test_send_recv_copy_top(self):
+        decompose_dict = make_decompose_dict(1, 1)
+        simulation = make_simulation(decompose_dict=decompose_dict)
+        state = DummyState(
+            comm,
+            simulation,
+            fluid=True,
+            phase=True
+        )
+        self.set_fields_value(state)
+        mpi_operator = MPIOperator(comm, state)
+        self.compare_buffers(
+            mpi_operator.bool_buffer,
+            state,
+            val=(state.domain.shape[1] - 2),
+            direction="y"
+        )
+        self.compare_buffers(
+            mpi_operator.int_buffer,
+            state,
+            val=(state.domain.shape[1] - 2),
+            direction="y"
+        )
+        self.compare_buffers(
+            mpi_operator.float_buffer,
+            state,
+            val=(state.domain.shape[1] - 2),
+            direction="y"
         )
             
 
