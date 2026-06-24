@@ -469,7 +469,7 @@ mpi_size = MPI.COMM_WORLD.Get_size()
 def valid_decompositions():
     return [
         (nx, mpi_size // nx)
-        for nx in (1, mpi_size + 1)
+        for nx in range(1, mpi_size + 1)
         if mpi_size % nx == 0
     ]
 
@@ -671,7 +671,7 @@ class TestHaloExchange:
         i_proc = state.domain.i_proc
         j_proc = state.domain.j_proc
         i_proc_left = (i_proc - 1 + nx) % nx
-        i_proc_right = (i_proc - 1 + nx) % nx
+        i_proc_right = (i_proc + 1 + nx) % nx
         j_proc_top = (j_proc + 1 + ny) % ny
         j_proc_bottom = (j_proc - 1 + ny) % ny
         left_rank = i_proc_left * ny + j_proc
@@ -762,3 +762,640 @@ class TestHaloExchange:
             x=(state.domain.shape[0] - 1),
             y=0
         )
+
+    def test_exchange_x_periodic(self, decomposition):
+        nx, ny = decomposition
+        decompose_dict = make_decompose_dict(nx, ny)
+        simulation = make_simulation(decompose_dict=decompose_dict)
+        state = DummyState(
+            comm,
+            simulation,
+            fluid=True,
+            phase=True
+        )
+        state.boundary.x_periodic = True
+        state.boundary.y_periodic = False
+        self.set_fields_value(state)
+        mpi_operator = MPIOperator(comm, state)
+        bool_buffers = ["solid", "solid_boundary", "fluid_boundary"]
+        int_buffers = ["solid_id"]
+        float_buffers = [
+            "velocity",
+            "pressure",
+            "density",
+            "phase_field",
+            "grad_phase_field",
+            "pop_fluid",
+            "pop_phase"
+        ]
+        mpi_operator.halo_exchange(
+            comm,
+            state,
+            bool_buffers=bool_buffers,
+            int_buffers=int_buffers,
+            float_buffers=float_buffers
+        )
+
+        # Check neighboring ranks
+        i_proc = state.domain.i_proc
+        j_proc = state.domain.j_proc
+        current_rank = i_proc * ny + j_proc
+        i_proc_left = (i_proc - 1 + nx) % nx
+        i_proc_right = (i_proc + 1 + nx) % nx
+        j_proc_top = (j_proc + 1 + ny) % ny
+        j_proc_bottom = (j_proc - 1 + ny) % ny
+        left_rank = i_proc_left * ny + j_proc
+        right_rank = i_proc_right * ny + j_proc
+        if j_proc == ny - 1:
+            top_rank = None
+        else:
+            top_rank = i_proc * ny + j_proc_top
+        if j_proc == 0:
+            bottom_rank = None
+        else:
+            bottom_rank = i_proc * ny + j_proc_bottom
+        assert mpi_operator.left_rank == left_rank
+        assert mpi_operator.right_rank == right_rank
+        assert mpi_operator.top_rank == top_rank
+        assert mpi_operator.bottom_rank == bottom_rank
+
+        # Compare edge buffers
+        self.compare_buffers_edges(
+            state,
+            left_rank,
+            bool_buffers,
+            int_buffers,
+            float_buffers,
+            direction="x",
+            val=0
+        )
+        self.compare_buffers_edges(
+            state,
+            right_rank,
+            bool_buffers,
+            int_buffers,
+            float_buffers,
+            direction="x",
+            val=(state.domain.shape[0] - 1)
+        )
+
+        if bottom_rank is None:
+            self.compare_buffers_edges(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="y",
+                val=0
+            )
+        else:
+            self.compare_buffers_edges(
+                state,
+                bottom_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="y",
+                val=0
+            )
+
+        if top_rank is None:
+            self.compare_buffers_edges(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="y",
+                val=(state.domain.shape[1] - 1)
+            )
+        else:
+            self.compare_buffers_edges(
+                state,
+                top_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="y",
+                val=(state.domain.shape[1] - 1)
+            )
+
+        # Compare corners
+        if top_rank is None:
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=(state.domain.shape[1] - 1)
+            )
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=(state.domain.shape[1] - 1)
+            )
+        else:
+            left_top_rank = i_proc_left * ny + j_proc_top
+            right_top_rank = i_proc_right * ny + j_proc_top
+            self.compare_buffers_corners(
+                state,
+                left_top_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=(state.domain.shape[1] - 1)
+            )
+            self.compare_buffers_corners(
+                state,
+                right_top_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=(state.domain.shape[1] - 1)
+            )
+        if bottom_rank is None:
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=0
+            )
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=0
+            )
+        else:
+            left_bottom_rank = i_proc_left * ny + j_proc_bottom
+            right_bottom_rank = i_proc_right * ny + j_proc_bottom
+            self.compare_buffers_corners(
+                state,
+                left_bottom_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=0
+            )
+            self.compare_buffers_corners(
+                state,
+                right_bottom_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=0
+            )
+
+    def test_exchange_y_periodic(self, decomposition):
+        nx, ny = decomposition
+        decompose_dict = make_decompose_dict(nx, ny)
+        simulation = make_simulation(decompose_dict=decompose_dict)
+        state = DummyState(
+            comm,
+            simulation,
+            fluid=True,
+            phase=True
+        )
+        state.boundary.x_periodic = False
+        state.boundary.y_periodic = True
+        self.set_fields_value(state)
+        mpi_operator = MPIOperator(comm, state)
+        bool_buffers = ["solid", "solid_boundary", "fluid_boundary"]
+        int_buffers = ["solid_id"]
+        float_buffers = [
+            "velocity",
+            "pressure",
+            "density",
+            "phase_field",
+            "grad_phase_field",
+            "pop_fluid",
+            "pop_phase"
+        ]
+        mpi_operator.halo_exchange(
+            comm,
+            state,
+            bool_buffers=bool_buffers,
+            int_buffers=int_buffers,
+            float_buffers=float_buffers
+        )
+
+        # Check neighboring ranks
+        i_proc = state.domain.i_proc
+        j_proc = state.domain.j_proc
+        current_rank = i_proc * ny + j_proc
+        i_proc_left = (i_proc - 1 + nx) % nx
+        i_proc_right = (i_proc + 1 + nx) % nx
+        j_proc_top = (j_proc + 1 + ny) % ny
+        j_proc_bottom = (j_proc - 1 + ny) % ny
+        if i_proc == 0:
+            left_rank = None
+        else:
+            left_rank = i_proc_left * ny + j_proc
+        if i_proc == nx - 1:
+            right_rank = None
+        else:
+            right_rank = i_proc_right * ny + j_proc
+        top_rank = i_proc * ny + j_proc_top
+        bottom_rank = i_proc * ny + j_proc_bottom
+        assert mpi_operator.left_rank == left_rank
+        assert mpi_operator.right_rank == right_rank
+        assert mpi_operator.top_rank == top_rank
+        assert mpi_operator.bottom_rank == bottom_rank
+
+        # Compare edge buffers
+        if left_rank is None:
+            self.compare_buffers_edges(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="x",
+                val=0
+            )
+        else:
+            self.compare_buffers_edges(
+                state,
+                left_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="x",
+                val=0
+            )
+
+        if right_rank is None:
+            self.compare_buffers_edges(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="x",
+                val=(state.domain.shape[0] - 1)
+            )
+        else:
+            self.compare_buffers_edges(
+                state,
+                right_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="x",
+                val=(state.domain.shape[0] - 1)
+            )
+
+        self.compare_buffers_edges(
+            state,
+            bottom_rank,
+            bool_buffers,
+            int_buffers,
+            float_buffers,
+            direction="y",
+            val=0
+        )
+
+        self.compare_buffers_edges(
+            state,
+            top_rank,
+            bool_buffers,
+            int_buffers,
+            float_buffers,
+            direction="y",
+            val=(state.domain.shape[1] - 1)
+        )
+
+        # Compare corners
+        if left_rank is None:
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=0
+            )
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=(state.domain.shape[1] - 1)
+            )
+        else:
+            left_top_rank = i_proc_left * ny + j_proc_top
+            left_bottom_rank = i_proc_left * ny + j_proc_bottom
+            self.compare_buffers_corners(
+                state,
+                left_bottom_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=0
+            )
+            self.compare_buffers_corners(
+                state,
+                left_top_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=(state.domain.shape[1] - 1)
+            )
+        if right_rank is None:
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=0
+            )
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=(state.domain.shape[1] - 1)
+            )
+        else:
+            right_top_rank = i_proc_right * ny + j_proc_top
+            right_bottom_rank = i_proc_right * ny + j_proc_bottom
+            self.compare_buffers_corners(
+                state,
+                right_bottom_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=0
+            )
+            self.compare_buffers_corners(
+                state,
+                right_top_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=(state.domain.shape[1] - 1)
+            )
+
+    def test_exchange_none_periodic(self, decomposition):
+        nx, ny = decomposition
+        decompose_dict = make_decompose_dict(nx, ny)
+        simulation = make_simulation(decompose_dict=decompose_dict)
+        state = DummyState(
+            comm,
+            simulation,
+            fluid=True,
+            phase=True
+        )
+        self.set_fields_value(state)
+        state.boundary.x_periodic = False
+        state.boundary.y_periodic = False
+        mpi_operator = MPIOperator(comm, state)
+        bool_buffers = ["solid", "solid_boundary", "fluid_boundary"]
+        int_buffers = ["solid_id"]
+        float_buffers = [
+            "velocity",
+            "pressure",
+            "density",
+            "phase_field",
+            "grad_phase_field",
+            "pop_fluid",
+            "pop_phase"
+        ]
+        mpi_operator.halo_exchange(
+            comm,
+            state,
+            bool_buffers=bool_buffers,
+            int_buffers=int_buffers,
+            float_buffers=float_buffers
+        )
+
+        # Check neighboring ranks
+        i_proc = state.domain.i_proc
+        j_proc = state.domain.j_proc
+        current_rank = i_proc * ny + j_proc
+        i_proc_left = (i_proc - 1 + nx) % nx
+        i_proc_right = (i_proc + 1 + nx) % nx
+        j_proc_top = (j_proc + 1 + ny) % ny
+        j_proc_bottom = (j_proc - 1 + ny) % ny
+        if i_proc == 0:
+            left_rank = None
+        else:
+            left_rank = i_proc_left * ny + j_proc
+        if i_proc == nx - 1:
+            right_rank = None
+        else:
+            right_rank = i_proc_right * ny + j_proc
+        if j_proc == ny - 1:
+            top_rank = None
+        else:
+            top_rank = i_proc * ny + j_proc_top
+        if j_proc == 0:
+            bottom_rank = None
+        else:
+            bottom_rank = i_proc * ny + j_proc_bottom
+        assert mpi_operator.left_rank == left_rank
+        assert mpi_operator.right_rank == right_rank
+        assert mpi_operator.top_rank == top_rank
+        assert mpi_operator.bottom_rank == bottom_rank
+
+        # Compare edge buffers
+        if left_rank is None:
+            self.compare_buffers_edges(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="x",
+                val=0
+            )
+        else:
+            self.compare_buffers_edges(
+                state,
+                left_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="x",
+                val=0
+            )
+
+        if right_rank is None:
+            self.compare_buffers_edges(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="x",
+                val=(state.domain.shape[0] - 1)
+            )
+        else:
+            self.compare_buffers_edges(
+                state,
+                right_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="x",
+                val=(state.domain.shape[0] - 1)
+            )
+
+        if bottom_rank is None:
+            self.compare_buffers_edges(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="y",
+                val=0
+            )
+        else:
+            self.compare_buffers_edges(
+                state,
+                bottom_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="y",
+                val=0
+            )
+
+        if top_rank is None:
+            self.compare_buffers_edges(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="y",
+                val=(state.domain.shape[1] - 1)
+            )
+        else:
+            self.compare_buffers_edges(
+                state,
+                top_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                direction="y",
+                val=(state.domain.shape[1] - 1)
+            )
+
+        # Compare corners
+        if left_rank is None and top_rank is None:
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=(state.domain.shape[1] - 1)
+            )
+        else:
+            left_top_rank = i_proc_left * ny + j_proc_top
+            self.compare_buffers_corners(
+                state,
+                left_top_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=(state.domain.shape[1] - 1)
+            )
+
+        if right_rank is None and top_rank is None:
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=(state.domain.shape[1] - 1)
+            )
+        else:
+            right_top_rank = i_proc_right * ny + j_proc_top
+            self.compare_buffers_corners(
+                state,
+                right_top_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=(state.domain.shape[1] - 1)
+            )
+
+        if left_rank is None and bottom_rank is None:
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=0
+            )
+        else:
+            left_bottom_rank = i_proc_left * ny + j_proc_bottom
+            self.compare_buffers_corners(
+                state,
+                left_bottom_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=0,
+                y=0
+            )
+
+        if right_rank is None and bottom_rank is None:
+            self.compare_buffers_corners(
+                state,
+                current_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=0
+            )
+        else:
+            right_bottom_rank = i_proc_right * ny + j_proc_bottom
+            self.compare_buffers_corners(
+                state,
+                right_bottom_rank,
+                bool_buffers,
+                int_buffers,
+                float_buffers,
+                x=(state.domain.shape[0] - 1),
+                y=0
+            )
