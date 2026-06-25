@@ -6,6 +6,7 @@ from pylabolt.parallel.backend import Backend
 from pylabolt.parallel.MPI_operator import MPIOperator
 from pylabolt.base.state import State
 from pylabolt.base.obstacle_operator import ObstacleOperator
+from pylabolt.base.collision_operator import CollisionOperator
 
 
 class Solver:
@@ -31,6 +32,12 @@ class Solver:
             self.state,
             self.backend,
             self.mpi_operator
+        )
+        self.collision_operator = CollisionOperator(
+            comm,
+            simulation,
+            self.state,
+            self.backend
         )
 
 
