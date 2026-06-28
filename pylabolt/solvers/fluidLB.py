@@ -1,7 +1,7 @@
 import time
 from mpi4py import MPI
 
-from pylabolt.utils.helpers import load_simulation
+from pylabolt.utils.helpers import load_simulation, print_log
 from pylabolt.parallel.backend import Backend
 from pylabolt.parallel.MPI_operator import MPIOperator
 from pylabolt.base.state import State
@@ -9,9 +9,47 @@ from pylabolt.base.obstacle_operator import ObstacleOperator
 from pylabolt.base.collision_operator import CollisionOperator
 
 
+class FluidLB:
+    def __init__(self):
+        self.equilibrium_models = {
+            "fluid": ["density_based_second_order"]
+        }
+        self.forcing_models = {
+            "fluid": [
+                None,
+                "guo_linear",
+                "guo_second_order"
+            ]
+        }
+        self.collision_models = {
+            "fluid": [
+                "BGK",
+                "MRT"
+            ]
+        }
+
+    def get_collision_args(self):
+        return {
+            "domain": ["size"],
+            "lattice": [
+                "cx", "cy", "weights", "no_of_directions", "cs_2", "cs_4"
+            ],
+            "fields": [
+                "solid", "ghost_node", "density", "velocity", "pop_fluid",
+                "pop_fluid_new"
+            ]
+        }
+
+
 class Solver:
     def __init__(self, comm, backend, n_threads):
         mpi_rank = comm.Get_rank()
+        from importlib.metadata import version
+        print_log(
+            "\nPyLaBolt: " + version("pylabolt"),
+            mpi_rank, verbose=True
+        )
+        self.model = FluidLB()
         simulation = load_simulation(comm, mpi_rank)
         self.backend = Backend(
             backend,
@@ -36,6 +74,7 @@ class Solver:
         self.collision_operator = CollisionOperator(
             comm,
             simulation,
+            self.model,
             self.state,
             self.backend
         )

@@ -48,9 +48,9 @@ class Lattice:
                     "grid dimensions and lattice type are incompatible"
                 )
             self.cx = np.array([0, 1, 0, -1, 0, 1, -1, -1, 1],
-                                dtype=np.int32)
+                               dtype=np.int32)
             self.cy = np.array([0, 0, 1, 0, -1, 1, 1, -1, -1],
-                                dtype=np.int32)
+                               dtype=np.int32)
             self.weights = np.array(
                 [4/9, 1/9, 1/9, 1/9, 1/9, 1/36, 1/36, 1/36, 1/36],
                 dtype=control.precision
