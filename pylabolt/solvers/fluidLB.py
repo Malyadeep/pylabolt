@@ -7,6 +7,7 @@ from pylabolt.parallel.MPI_operator import MPIOperator
 from pylabolt.base.state import State
 from pylabolt.base.obstacle_operator import ObstacleOperator
 from pylabolt.base.collision_operator import CollisionOperator
+from pylabolt.base.streaming_operator import StreamingOperator
 
 
 class FluidLB:
@@ -27,17 +28,37 @@ class FluidLB:
                 "MRT"
             ]
         }
+        self.streaming_type = {
+            "fluid": "scalar"
+        }
 
     def get_collision_args(self):
         return {
-            "domain": ["size"],
-            "lattice": [
-                "cx", "cy", "weights", "no_of_directions", "cs_2", "cs_4"
-            ],
-            "fields": [
-                "solid", "ghost_node", "density", "velocity", "pop_fluid",
-                "pop_fluid_new"
-            ]
+            "fluid": {
+                "domain": ["size"],
+                "lattice": [
+                    "cx", "cy", "weights", "no_of_directions", "cs_2", "cs_4"
+                ],
+                "fields": [
+                    "solid", "ghost_node", "density", "velocity", "pop_fluid",
+                    "pop_fluid_new"
+                ]
+            }
+        }
+
+    def get_streaming_args(self):
+        return {
+            "fluid": {
+                "domain": ["size", "shape"],
+                "lattice": [
+                    "cx", "cy", "weights", "inv_list", "no_of_directions",
+                    "cs_2"
+                ],
+                "fields": [
+                    "solid", "ghost_node", "density", "velocity", "pop_fluid",
+                    "pop_fluid_new"
+                ]
+            }
         }
 
 
@@ -46,9 +67,10 @@ class Solver:
         mpi_rank = comm.Get_rank()
         from importlib.metadata import version
         print_log(
-            "\nPyLaBolt: " + version("pylabolt"),
+            f"\n{'PyLaBolt':<10}: {version("pylabolt")}",
             mpi_rank, verbose=True
         )
+        print_log(f"{'Solver':<10}: fluidLB", mpi_rank, verbose=True)
         self.model = FluidLB()
         simulation = load_simulation(comm, mpi_rank)
         self.backend = Backend(
@@ -74,6 +96,11 @@ class Solver:
         self.collision_operator = CollisionOperator(
             comm,
             simulation,
+            self.model,
+            self.state,
+            self.backend
+        )
+        self.streaming_operator = StreamingOperator(
             self.model,
             self.state,
             self.backend

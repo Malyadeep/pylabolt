@@ -1,0 +1,89 @@
+import numpy as np
+import numba
+from numba import prange
+
+
+@numba.njit(parallel=True, nogil=True)
+def scalar_kernel(
+    size,
+    shape,
+    cx,
+    cy,
+    weights,
+    inv_list,
+    no_of_directions,
+    cs_2,
+    solid,
+    ghost_node,
+    density,
+    velocity,
+    pop,
+    pop_new
+):
+    """
+    Streaming kernel with scalar during bounce-back
+    Args:
+
+    Returns:
+
+    """
+    for ind in prange(size):
+        if not solid[ind] and not ghost_node[ind]:
+            i = ind // shape[1]
+            j = ind - i * shape[1]
+            density_local = density[ind]
+            for k in range(1, no_of_directions):
+                i_nb = i - cx[k]
+                j_nb = j - cy[k]
+                ind_nb = i_nb * shape[1] + j_nb
+                if not solid[ind_nb]:
+                    pop_new[ind, k] = pop[ind_nb, k]
+                else:
+                    k_inv = inv_list[k]
+                    temp = 2 * weights[k_inv] * density_local * cs_2 * (
+                        cx[k_inv] * velocity[ind_nb, 0] +
+                        cy[k_inv] * velocity[ind_nb, 1]
+                    )
+                    pop_new[ind, k] = pop[ind, k_inv] - temp
+
+
+@numba.njit(parallel=True, nogil=True)
+def no_scalar_kernel(
+    size,
+    shape,
+    cx,
+    cy,
+    weights,
+    inv_list,
+    no_of_directions,
+    cs_2,
+    solid,
+    ghost_node,
+    velocity,
+    pop,
+    pop_new
+):
+    """
+    Streaming kernel without any scalar during bounce-back
+    Args:
+
+    Returns:
+
+    """
+    for ind in prange(size):
+        if not solid[ind] and not ghost_node[ind]:
+            i = ind // shape[1]
+            j = ind - i * shape[1]
+            for k in range(1, no_of_directions):
+                i_nb = i - cx[k]
+                j_nb = j - cy[k]
+                ind_nb = i_nb * shape[1] + j_nb
+                if not solid[ind_nb]:
+                    pop_new[ind, k] = pop[ind, k]
+                else:
+                    k_inv = inv_list[k]
+                    temp = 2 * weights[k_inv] * cs_2 * (
+                        cx[k_inv] * velocity[ind_nb, 0] +
+                        cy[k_inv] * velocity[ind_nb, 1]
+                    )
+                    pop_new[ind, k] = pop[ind, k_inv] - temp

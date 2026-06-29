@@ -273,6 +273,8 @@ class CollisionOperator:
             self.collide = self.collide_gpu
             # TODO: transfer collision operator attributes to device
 
+        args = model.get_collision_args()
+
         if state.fluid:
             kernel_name = (
                 self.collision_fluid + "_" +
@@ -282,10 +284,10 @@ class CollisionOperator:
             self.collision_kernel_fluid = getattr(
                 collision_kernels_cpu, kernel_name
             )
-            args = model.get_collision_args()
+            args_fluid = args["fluid"]
             self.collision_args_fluid = ()
-            for key_no, key in enumerate(args):
-                args_list = args[key]
+            for key_no, key in enumerate(args_fluid):
+                args_list = args_fluid[key]
                 attribute = getattr(state, key)
                 if backend.backend_type == "cpu":
                     key_args = tuple(
@@ -308,10 +310,10 @@ class CollisionOperator:
             self.collision_kernel_phase = getattr(
                 collision_kernels_cpu, kernel_name
             )
-            args = model.get_collision_args()
+            args_phase = args["phase"]
             self.collision_args_phase = ()
-            for key_no, key in enumerate(args):
-                args_list = args[key]
+            for key_no, key in enumerate(args_phase):
+                args_list = args_phase[key]
                 attribute = getattr(state, key)
                 if backend.backend_type == "cpu":
                     key_args = tuple(
