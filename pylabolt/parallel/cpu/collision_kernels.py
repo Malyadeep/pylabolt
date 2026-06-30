@@ -10,8 +10,8 @@ def BGK_density_based_second_order_None(
     cy,
     weights,
     no_of_directions,
-    cs_2,
-    cs_4,
+    inv_cs_2,
+    inv_cs_4,
     solid,
     ghost_node,
     density,
@@ -40,7 +40,7 @@ def BGK_density_based_second_order_None(
             for k in range(no_of_directions):
                 cu = cx[k] * velocity_local_x + cy[k] * velocity_local_y
                 pop_eq = weights[k] * density_local * (
-                    1 + cs_2 * cu + 0.5 * cs_4 * cu * cu - 0.5 * cs_2 * u2
+                    1 + inv_cs_2 * cu + 0.5 * inv_cs_4 * cu * cu - 0.5 * inv_cs_2 * u2
                 )
                 pop[ind, k] = (1 - omega) * pop_new[ind, k] + omega * pop_eq
 
@@ -52,8 +52,8 @@ def BGK_density_based_second_order_guo_linear(
     cy,
     weights,
     no_of_directions,
-    cs_2,
-    cs_4,
+    inv_cs_2,
+    inv_cs_4,
     solid,
     ghost_node,
     density,
@@ -84,7 +84,7 @@ def BGK_density_based_second_order_guo_linear(
             for k in range(no_of_directions):
                 cu = cx[k] * velocity_local_x + cy[k] * velocity_local_y
                 pop_eq = weights * density * (
-                    1 + cs_2 * cu + 0.5 * cs_4 * cu * cu - 0.5 * cs_2 * u2
+                    1 + inv_cs_2 * cu + 0.5 * inv_cs_4 * cu * cu - 0.5 * inv_cs_2 * u2
                 )
                 force_term = weights[k] * (
                     cx[k] * force_local_x + cy[k] * force_local_y
@@ -103,8 +103,8 @@ def BGK_density_based_second_order_guo_second_order(
     cy,
     weights,
     no_of_directions,
-    cs_2,
-    cs_4,
+    inv_cs_2,
+    inv_cs_4,
     solid,
     ghost_node,
     density,
@@ -135,10 +135,10 @@ def BGK_density_based_second_order_guo_second_order(
             for k in range(no_of_directions):
                 cu = cx[k] * velocity_local_x + cy[k] * velocity_local_y
                 pop_eq = weights * density * (
-                    1 + cs_2 * cu + 0.5 * cs_4 * cu * cu - 0.5 * cs_2 * u2
+                    1 + inv_cs_2 * cu + 0.5 * inv_cs_4 * cu * cu - 0.5 * inv_cs_2 * u2
                 )
-                const_x = (cx[k] - velocity_local_x) * cs_2 + cu * cx[k] * cs_4
-                const_y = (cy[k] - velocity_local_y) * cs_2 + cu * cy[k] * cs_4
+                const_x = (cx[k] - velocity_local_x) * inv_cs_2 + cu * cx[k] * inv_cs_4
+                const_y = (cy[k] - velocity_local_y) * inv_cs_2 + cu * cy[k] * inv_cs_4
                 force_term = weights[k] * (
                     const_x * force_local_x + const_y * force_local_y
                 )

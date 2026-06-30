@@ -17,9 +17,9 @@ class Lattice:
         Attributes:
             lattice_type: str
             cs: float
-            cs2: float
             cs_2: float
-            cs_4: float
+            inv_cs_2: float
+            inv_cs_4: float
             no_of_directions: int
             cx: (no_of_directions) int array
             cy: (no_of_directions) int array
@@ -39,9 +39,9 @@ class Lattice:
         self.lattice_type = lattice_dict["lattice_type"]
 
         self.cs = control.precision(1/np.sqrt(3))
-        self.cs2 = (self.cs * self.cs)
-        self.cs_2 = 1.0 / self.cs2
-        self.cs_4 = self.cs_2 * self.cs_2
+        self.cs_2 = (self.cs * self.cs)
+        self.inv_cs_2 = 1.0 / self.cs_2
+        self.inv_cs_4 = self.inv_cs_2 * self.inv_cs_2
         if self.lattice_type == "D2Q9":
             if mesh.dimensions != 2:
                 raise ValueError(

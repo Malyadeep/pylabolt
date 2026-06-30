@@ -4,7 +4,7 @@ from numba import prange
 
 
 @numba.njit(parallel=True, nogil=True)
-def scalar_kernel(
+def scalar_based_kernel(
     size,
     shape,
     cx,
@@ -12,7 +12,7 @@ def scalar_kernel(
     weights,
     inv_list,
     no_of_directions,
-    cs_2,
+    inv_cs_2,
     solid,
     ghost_node,
     density,
@@ -40,7 +40,7 @@ def scalar_kernel(
                     pop_new[ind, k] = pop[ind_nb, k]
                 else:
                     k_inv = inv_list[k]
-                    temp = 2 * weights[k_inv] * density_local * cs_2 * (
+                    temp = 2 * weights[k_inv] * density_local * inv_cs_2 * (
                         cx[k_inv] * velocity[ind_nb, 0] +
                         cy[k_inv] * velocity[ind_nb, 1]
                     )
@@ -48,7 +48,7 @@ def scalar_kernel(
 
 
 @numba.njit(parallel=True, nogil=True)
-def no_scalar_kernel(
+def no_scalar_based_kernel(
     size,
     shape,
     cx,
@@ -56,7 +56,7 @@ def no_scalar_kernel(
     weights,
     inv_list,
     no_of_directions,
-    cs_2,
+    inv_cs_2,
     solid,
     ghost_node,
     velocity,
@@ -82,7 +82,7 @@ def no_scalar_kernel(
                     pop_new[ind, k] = pop[ind, k]
                 else:
                     k_inv = inv_list[k]
-                    temp = 2 * weights[k_inv] * cs_2 * (
+                    temp = 2 * weights[k_inv] * inv_cs_2 * (
                         cx[k_inv] * velocity[ind_nb, 0] +
                         cy[k_inv] * velocity[ind_nb, 1]
                     )

@@ -8,6 +8,7 @@ from pylabolt.base.state import State
 from pylabolt.base.obstacle_operator import ObstacleOperator
 from pylabolt.base.collision_operator import CollisionOperator
 from pylabolt.base.streaming_operator import StreamingOperator
+from pylabolt.base.boundary_operator import BoundaryOperator
 
 
 class FluidLB:
@@ -29,7 +30,10 @@ class FluidLB:
             ]
         }
         self.streaming_type = {
-            "fluid": "scalar"
+            "fluid": "scalar_based"
+        }
+        self.boundary_condition_type = {
+            "fluid": "density_based"
         }
 
     def get_collision_args(self):
@@ -37,7 +41,7 @@ class FluidLB:
             "fluid": {
                 "domain": ["size"],
                 "lattice": [
-                    "cx", "cy", "weights", "no_of_directions", "cs_2", "cs_4"
+                    "cx", "cy", "weights", "no_of_directions", "inv_cs_2", "inv_cs_4"
                 ],
                 "fields": [
                     "solid", "ghost_node", "density", "velocity", "pop_fluid",
@@ -52,7 +56,7 @@ class FluidLB:
                 "domain": ["size", "shape"],
                 "lattice": [
                     "cx", "cy", "weights", "inv_list", "no_of_directions",
-                    "cs_2"
+                    "inv_cs_2"
                 ],
                 "fields": [
                     "solid", "ghost_node", "density", "velocity", "pop_fluid",
@@ -101,6 +105,11 @@ class Solver:
             self.backend
         )
         self.streaming_operator = StreamingOperator(
+            self.model,
+            self.state,
+            self.backend
+        )
+        self.boundary_operator = BoundaryOperator(
             self.model,
             self.state,
             self.backend

@@ -28,6 +28,7 @@ class CollisionOperator:
                 raise ValueError("fluid missing in collision_dict")
             self.collision_dict = simulation.collision_dict
             self.read_collision_dict(model, state, verbose=verbose)
+            self.set_backend(model, state, backend)
             print_log("\nSetting up collision operator done!",
                       state.domain.mpi_rank, verbose)
             print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -36,7 +37,6 @@ class CollisionOperator:
             print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
             print_log(str(e), state.domain.mpi_rank, verbose=True)
             comm.Abort()
-        self.set_backend(model, state, backend)
 
     def read_collision_dict(
         self,
@@ -102,7 +102,7 @@ class CollisionOperator:
                 )
 
             self.tau_fluid = state.transport.kin_visc *\
-                state.lattice.cs_2 + 0.5
+                state.lattice.inv_cs_2 + 0.5
             self.omega_fluid = 1 / self.tau_fluid
             if self.collision_fluid == "MRT":
                 self.setup_MRT_params()
