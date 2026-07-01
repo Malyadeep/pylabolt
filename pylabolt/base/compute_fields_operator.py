@@ -1,26 +1,28 @@
 from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.cpu import streaming_kernels as streaming_kernels_cpu
+from pylabolt.parallel.cpu import compute_fields_kernels as\
+    compute_fields_kernels_cpu
 # from pylabolt.parallel.gpu import streaming_kernels as streaming_kernels_gpu
 
 
-class StreamingOperator:
+class ComputeFieldsOperator:
     def __init__(
         self,
         model,
         state,
+        collision_operator,
         backend,
         verbose=True
     ):
         """
-        Streaming operator
+        Compute fields operator
         Attributes:
 
         """
         print_log("-" * 80, state.domain.mpi_rank, verbose)
-        print_log("Setting up streaming operator...",
+        print_log("Setting up compute fields operator...",
                   state.domain.mpi_rank, verbose)
-        self.set_backend(model, state, backend)
-        print_log("Setting up streaming operator done!",
+        self.set_backend(model, state, collision_operator, backend)
+        print_log("Setting up compute fields operator done!",
                   state.domain.mpi_rank, verbose)
         print_log("-" * 80, state.domain.mpi_rank, verbose)
 
@@ -31,49 +33,53 @@ class StreamingOperator:
         verbose=True
     ):
         """
-        JIT compile streaming kernels
+        JIT compile compute fields kernels
         Args:
 
         Returns:
 
         """
         if state.fluid:
-            compile_args = backend.make_compile_args(self.streaming_args_fluid)
-            self.streaming_kernel_fluid(*compile_args)
+            compile_args = backend.make_compile_args(
+                self.compute_fields_args_fluid
+            )
+            self.compute_fields_kernel_fluid(*compile_args)
 
         elif state.phase:
-            compile_args = backend.make_compile_args(self.streaming_args_phase)
-            self.streaming_kernel_phase(*compile_args)
-        print_log("Compiled streaming operator",
+            compile_args = backend.make_compile_args(
+                self.compute_fields_args_phase
+            )
+            self.compute_fields_kernel_phase(*compile_args)
+        print_log("Compiled compute fields operator",
                   state.domain.mpi_rank, verbose)
 
-    def stream_cpu(
+    def compute_fields_cpu(
         self,
         state,
         fluid=False,
         phase=False
     ):
         """
-        Perform streaming operation on CPU kernels
+        Perform fields update on CPU kernels
         Args:
 
         Returns:
 
         """
         if fluid:
-            self.streaming_kernel_fluid(*self.streaming_args_fluid)
+            self.compute_fields_kernel_fluid(*self.compute_fields_args_fluid)
 
         if phase:
-            self.streaming_kernel_phase(*self.streaming_args_phase)
+            self.compute_fields_kernel_phase(*self.compute_fields_args_phase)
 
-    def stream_gpu(
+    def compute_fields_gpu(
         self,
         state,
         fluid=False,
         phase=False
     ):
         """
-        Perform streaming operation on GPU kernels
+        Perform fields update on GPU kernels
         Args:
 
         Returns:
@@ -85,33 +91,39 @@ class StreamingOperator:
         self,
         model,
         state,
+        collision_operator,
         backend
     ):
         """
-        Set backend for streaming operator
+        Set backend for compute fields operator
         Args:
 
         Returns:
 
         """
         if backend.backend_type == "cpu":
-            self.stream = self.stream_cpu
+            self.compute_fields = self.compute_fields_cpu
         elif backend.backend_type == "gpu":
-            self.stream = self.stream_gpu
+            self.compute_fields = self.compute_fields_gpu
             # TODO: transfer streaming operator attributes to device
 
-        self.streaming_type = model.streaming_type
-        args = model.get_streaming_args()
+        self.compute_fields_type = model.compute_fields_type
+        args = model.get_compute_fields_args()
 
         if state.fluid:
-            kernel_name = (
-                self.streaming_type["fluid"] + "_kernel"
-            )
-            self.streaming_kernel_fluid = getattr(
-                streaming_kernels_cpu, kernel_name
+            if collision_operator.forcing_fluid is not None:
+                kernel_name = (
+                    self.compute_fields_type["fluid"] + "_force"
+                )
+            else:
+                kernel_name = (
+                    self.compute_fields_type["fluid"] + "_no_force"
+                )
+            self.compute_fields_kernel_fluid = getattr(
+                compute_fields_kernels_cpu, kernel_name
             )
             args_fluid = args["fluid"]
-            self.streaming_args_fluid = ()
+            self.compute_fields_args_fluid = ()
             for key_no, key in enumerate(args_fluid):
                 args_list = args_fluid[key]
                 attribute = getattr(state, key)
@@ -124,17 +136,17 @@ class StreamingOperator:
                         getattr(attribute, item + "_device")
                         for item in args_list
                     )
-                self.streaming_args_fluid += key_args
+                self.compute_fields_args_fluid += key_args
 
         if state.phase:
             kernel_name = (
-                self.streaming_type["phase"] + "_kernel"
+                self.streaming_type["phase"]
             )
             self.streaming_kernel_phase = getattr(
-                streaming_kernels_cpu, kernel_name
+                compute_fields_kernels_cpu, kernel_name
             )
             args_phase = args["phase"]
-            self.streaming_args_phase = ()
+            self.compute_fields_args_phase = ()
             for key_no, key in enumerate(args_phase):
                 args_list = args_phase[key]
                 attribute = getattr(state, key)
@@ -147,4 +159,4 @@ class StreamingOperator:
                         getattr(attribute, item + "_device")
                         for item in args_list
                     )
-                self.streaming_args_phase += key_args
+                self.compute_fields_args_phase += key_args

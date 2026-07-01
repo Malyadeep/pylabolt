@@ -220,6 +220,29 @@ class CollisionOperator:
                 state.domain.mpi_rank, verbose=verbose
             )
 
+    def compile(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        JIT compile collision kernels
+        Args:
+
+        Returns:
+
+        """
+        if state.fluid:
+            compile_args = backend.make_compile_args(self.collision_args_fluid)
+            self.collision_kernel_fluid(*compile_args)
+
+        elif state.phase:
+            compile_args = backend.make_compile_args(self.collision_args_phase)
+            self.collision_kernel_phase(*compile_args)
+        print_log("Compiled collision operator",
+                  state.domain.mpi_rank, verbose)
+
     def collide_cpu(
         self,
         state,

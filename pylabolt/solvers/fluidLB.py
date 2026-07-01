@@ -7,6 +7,7 @@ from pylabolt.parallel.MPI_operator import MPIOperator
 from pylabolt.base.state import State
 from pylabolt.base.obstacle_operator import ObstacleOperator
 from pylabolt.base.collision_operator import CollisionOperator
+from pylabolt.base.compute_fields_operator import ComputeFieldsOperator
 from pylabolt.base.streaming_operator import StreamingOperator
 from pylabolt.base.boundary_operator import BoundaryOperator
 
@@ -35,13 +36,17 @@ class FluidLB:
         self.boundary_condition_type = {
             "fluid": "density_based"
         }
+        self.compute_fields_type = {
+            "fluid": "density_based"
+        }
 
     def get_collision_args(self):
         return {
             "fluid": {
                 "domain": ["size"],
                 "lattice": [
-                    "cx", "cy", "weights", "no_of_directions", "inv_cs_2", "inv_cs_4"
+                    "cx", "cy", "weights", "no_of_directions", "inv_cs_2",
+                    "inv_cs_4"
                 ],
                 "fields": [
                     "solid", "ghost_node", "density", "velocity", "pop_fluid",
@@ -60,6 +65,20 @@ class FluidLB:
                 ],
                 "fields": [
                     "solid", "ghost_node", "density", "velocity", "pop_fluid",
+                    "pop_fluid_new"
+                ]
+            }
+        }
+
+    def get_compute_fields_args(self):
+        return {
+            "fluid": {
+                "domain": ["size"],
+                "lattice": [
+                    "cx", "cy", "no_of_directions"
+                ],
+                "fields": [
+                    "solid", "ghost_node", "density", "velocity",
                     "pop_fluid_new"
                 ]
             }
@@ -104,6 +123,12 @@ class Solver:
             self.state,
             self.backend
         )
+        self.compute_fields_operator = ComputeFieldsOperator(
+            self.model,
+            self.state,
+            self.collision_operator,
+            self.backend
+        )
         self.streaming_operator = StreamingOperator(
             self.model,
             self.state,
@@ -115,9 +140,24 @@ class Solver:
             self.backend
         )
 
+    def compile(self, verbose=True):
+        print_log("-" * 80, self.state.domain.mpi_rank, verbose)
+        print_log("JIT Compilation starts...\n",
+                  self.state.domain.mpi_rank, verbose)
+
+        self.collision_operator.compile(self.state, self.backend)
+        self.compute_fields_operator.compile(self.state, self.backend)
+        self.streaming_operator.compile(self.state, self.backend)
+        self.boundary_operator.compile(self.state, self.backend)
+
+        print_log("\nJIT Compilation done!",
+                  self.state.domain.mpi_rank, verbose)
+        print_log("-" * 80, self.state.domain.mpi_rank, verbose)
+
 
 def main(backend, n_threads):
     MPI.Init()
     comm = MPI.COMM_WORLD
     solver = Solver(comm, backend, n_threads)
+    solver.compile()
     MPI.Finalize()

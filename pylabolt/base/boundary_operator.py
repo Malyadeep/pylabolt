@@ -18,15 +18,46 @@ class BoundaryOperator:
 
         """
         print_log("-" * 80, state.domain.mpi_rank, verbose)
-        print_log("Setting up boundary condition operator...\n",
+        print_log("Setting up boundary condition operator...",
                   state.domain.mpi_rank, verbose)
         self.boundary_conditions = []
         self.boundary_args = []
         self.set_backend(model, state, backend)
-        print_log("\nSetting up boundary condition operator done!",
+        print_log("Setting up boundary condition operator done!",
                   state.domain.mpi_rank, verbose)
         print_log("-" * 80, state.domain.mpi_rank, verbose)
 
+    def compile(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        JIT compile boundary condition kernels
+        Args:
+
+        Returns:
+
+        """
+        if state.fluid:
+            for itr in range(len(self.boundary_kernels_fluid)):
+                if self.boundary_kernels_fluid[itr] is not None:
+                    compile_args = backend.make_compile_args(
+                        self.boundary_args_fluid[itr]
+                    )
+                    self.boundary_kernels_fluid[itr](*compile_args)
+
+        elif state.phase:
+            for itr in range(len(self.boundary_kernels_phase)):
+                if self.boundary_kernels_phase[itr] is not None:
+                    compile_args = backend.make_compile_args(
+                        self.boundary_args_phase[itr]
+                    )
+                    self.boundary_kernels_phase[itr](*compile_args)
+        print_log("Compiled boundary collision operator",
+                  state.domain.mpi_rank, verbose)
+    
     def set_boundary_cpu(
         self,
         state,
