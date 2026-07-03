@@ -82,6 +82,8 @@ class Domain:
         self.Ny_pad = self.Ny_rank + 2
         self.shape = np.array([self.Nx_pad, self.Ny_pad])
         self.size = np.prod(self.shape)
+        self.inner_shape = np.array([self.Nx_rank, self.Ny_rank])
+        self.inner_size = np.prod(self.inner_shape)
 
     def details(self):
         print("Domain decomposition details - global domain = ",

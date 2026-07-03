@@ -24,7 +24,7 @@ class ResidueOperator:
             print_log("Setting up residue computation operator...\n",
                       state.domain.mpi_rank, verbose)
             self.setup_residue_operator(model, state)
-            self.set_backend(model, state, backend)
+            self.set_backend(backend)
             print_log("\nSetting up residue computation operator done!",
                       state.domain.mpi_rank, verbose)
             print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -51,7 +51,10 @@ class ResidueOperator:
         self.residues = {}
         for field_name in self.fields_list:
             if not hasattr(state.fields, field_name):
-                raise ValueError(field_name + " is not a valid field")
+                raise ValueError(
+                    field_name + " is not a valid field for" +
+                    " residue computation"
+                )
             setattr(
                 self,
                 field_name + "_old",
@@ -98,9 +101,7 @@ class ResidueOperator:
 
     def compute_residues_cpu(
         self,
-        state,
-        fluid=False,
-        phase=False
+        state
     ):
         """
         Compute residuals on CPU kernels
@@ -124,9 +125,7 @@ class ResidueOperator:
 
     def compute_residues_gpu(
         self,
-        state,
-        fluid=False,
-        phase=False
+        state
     ):
         """
         Compute residuals on GPU kernels
@@ -139,8 +138,6 @@ class ResidueOperator:
 
     def set_backend(
         self,
-        model,
-        state,
         backend
     ):
         """

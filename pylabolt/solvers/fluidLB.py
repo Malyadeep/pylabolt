@@ -3,6 +3,7 @@ from mpi4py import MPI
 
 from pylabolt.utils.helpers import load_simulation, print_log
 from pylabolt.utils.residues import ResidueOperator
+from pylabolt.utils.io_operator import InputOutputOperator
 from pylabolt.parallel.backend import Backend
 from pylabolt.parallel.MPI_operator import MPIOperator
 from pylabolt.base.state import State
@@ -15,6 +16,7 @@ from pylabolt.base.boundary_operator import BoundaryOperator
 
 class FluidLB:
     def __init__(self):
+        self.solver_name = "fluidLB"
         self.equilibrium_models = {
             "fluid": ["density_based_second_order"]
         }
@@ -41,6 +43,7 @@ class FluidLB:
             "fluid": "density_based"
         }
         self.residue_fields = ["density", "velocity"]
+        self.save_fields = ["density", "velocity", "solid"]
 
     def get_collision_args(self):
         return {
@@ -147,6 +150,12 @@ class Solver:
             self.state,
             self.backend
         )
+        self.io_operator = InputOutputOperator(
+            comm,
+            self.model,
+            self.state,
+            self.backend
+        )
 
     def compile(self, verbose=True):
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
@@ -158,6 +167,8 @@ class Solver:
         self.streaming_operator.compile(self.state, self.backend)
         self.boundary_operator.compile(self.state, self.backend)
         self.residue_operator.compile(self.state, self.backend)
+        self.io_operator.compile(self.state, self.backend)
+        self.io_operator.write_fields(self.state, 0)
 
         print_log("\nJIT Compilation done!",
                   self.state.domain.mpi_rank, verbose)
