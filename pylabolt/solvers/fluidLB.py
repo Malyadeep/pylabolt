@@ -43,7 +43,7 @@ class FluidLB:
             "fluid": "density_based"
         }
         self.residue_fields = ["density", "velocity"]
-        self.save_fields = ["density", "velocity", "solid"]
+        self.save_fields = ["density", "velocity", "solid", "solid_id"]
 
     def get_collision_args(self):
         return {

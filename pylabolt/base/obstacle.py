@@ -465,6 +465,7 @@ class Circle:
                         self.angular_velocity * ry
                     fields.velocity[ind, 1] = self.linear_velocity[1] +\
                         self.angular_velocity * rx
+                    fields.density[ind] = self.density
 
     @property
     def properties(self):
@@ -701,6 +702,7 @@ class Ellipse:
                         self.angular_velocity * ry
                     fields.velocity[ind, 1] = self.linear_velocity[1] +\
                         self.angular_velocity * rx
+                    fields.density[ind] = self.density
 
     @property
     def properties(self):

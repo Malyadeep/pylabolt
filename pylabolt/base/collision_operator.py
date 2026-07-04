@@ -25,7 +25,9 @@ class CollisionOperator:
             print_log("Setting up collision operator...\n",
                       state.domain.mpi_rank, verbose)
             if not hasattr(simulation, "collision_dict"):
-                raise ValueError("fluid missing in collision_dict")
+                raise ValueError(
+                    "collision_dict not found in simulation.py file"
+                )
             self.collision_dict = simulation.collision_dict
             self.read_collision_dict(model, state, verbose=verbose)
             self.set_backend(model, state, backend)
@@ -65,18 +67,19 @@ class CollisionOperator:
                 raise ValueError(
                     "Unsupported fluid collision model: " +
                     self.collision_fluid +
-                    "\nAvailable models: " + model.collision_models["fluid"]
+                    "\nAvailable models: " + str(model.collision_models["fluid"])
                 )
             if self.equilibrium_fluid not in model.equilibrium_models["fluid"]:
                 raise ValueError(
                     "Unsupported fluid equilibrium model: " +
                     self.equilibrium_fluid +
-                    "\nAvailable models: " + model.equilibrium_models["fluid"]
+                    "\nAvailable models: " +
+                    str(model.equilibrium_models["fluid"])
                 )
             if self.forcing_fluid not in model.forcing_models["fluid"]:
                 raise ValueError(
                     "Unsupported fluid forcing model: " + self.forcing_fluid +
-                    "\nAvailable models: " + model.forcing_models["fluid"]
+                    "\nAvailable models: " + str(model.forcing_models["fluid"])
                 )
             if self.forcing_fluid is None:
                 self.gravity = np.zeros(2, dtype=state.control.precision)
