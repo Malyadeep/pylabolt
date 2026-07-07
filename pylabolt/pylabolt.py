@@ -14,12 +14,12 @@ def main():
                         help="set to run simulation in parallel using CUDA")
     parser.add_argument("-nt", "--n_threads", type=int, default=1,
                         help="Number of threads for OpenMP/CUDA")
-    parser.add_argument("--reconstruct", choices=["last", "all", "time", None],
+    parser.add_argument("--reconstruct", choices=["all", "time", None],
                         default=None, help="Domain reconstruction"
                         )
     parser.add_argument("-t", "--time", type=int, default=0,
                         help="Specify time which is to be reconstructed")
-    parser.add_argument("--toVTK", choices=["last", "all", "time", None],
+    parser.add_argument("--toVTK", choices=["all", "time", None],
                         default=None, help="Convert output data to VTK format")
     args = parser.parse_args()
 
@@ -33,9 +33,9 @@ def main():
     #     from pylabolt.solvers.cgLB import cgLB
     #     cgLB.main(parallelization, n_threads=args.n_threads)
 
-    # if args.reconstruct is not None:
-    #     from pylabolt.parallel.MPI_reconstruct import reconstruct
-    #     reconstruct(args.reconstruct, args.time)
+    if args.reconstruct is not None:
+        from pylabolt.utils.reconstruct import reconstruct_data
+        reconstruct_data(args.reconstruct, time=args.time)
 
     if args.toVTK is not None:
         from pylabolt.utils.vtkconvert import toVTK

@@ -67,7 +67,8 @@ class CollisionOperator:
                 raise ValueError(
                     "Unsupported fluid collision model: " +
                     self.collision_fluid +
-                    "\nAvailable models: " + str(model.collision_models["fluid"])
+                    "\nAvailable models: " +
+                    str(model.collision_models["fluid"])
                 )
             if self.equilibrium_fluid not in model.equilibrium_models["fluid"]:
                 raise ValueError(

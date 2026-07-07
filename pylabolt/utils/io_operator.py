@@ -112,12 +112,22 @@ class InputOutputOperator:
                 "version": version("pylabolt"),
                 "solver": model.solver_name
             },
+            "control": {
+                "end_time": state.control.end_time,
+                "start_time": state.control.start_time,
+                "save_interval": state.control.save_interval,
+                "checkpoint_interval": state.control.checkpoint_interval,
+            },
             "mesh": {
                 "size": int(state.mesh.grid_global_size),
                 "shape": (
                     int(state.mesh.grid_global_shape[0]),
                     int(state.mesh.grid_global_shape[1])
                 )
+            },
+            "decomposition": {
+                "nx": int(state.domain.no_of_procs_x),
+                "ny": int(state.domain.no_of_procs_y),
             },
             "fields_saved": self.fields_save_metadata
         }
