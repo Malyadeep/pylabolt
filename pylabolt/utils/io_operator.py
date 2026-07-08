@@ -78,16 +78,14 @@ class InputOutputOperator:
                 }
             })
         if state.domain.mpi_size == 1:
-            if not os.path.isdir("output"):
-                os.makedirs("output")
+            os.makedirs("output", exist_ok=True)
             self.field_save_path = "output/"
         elif state.domain.mpi_size > 1:
-            if not os.path.isdir("procs"):
-                os.makedirs("procs")
-            if not os.path.isdir(
-                "procs/proc_" + str(state.domain.mpi_rank)
-            ):
-                os.makedirs("procs/proc_" + str(state.domain.mpi_rank))
+            os.makedirs("procs", exist_ok=True)
+            os.makedirs(
+                "procs/proc_" + str(state.domain.mpi_rank),
+                exist_ok=True
+            )
             self.field_save_path = "procs/proc_" +\
                 str(state.domain.mpi_rank) + "/"
         self.dump_metadata(state, model)
@@ -218,7 +216,7 @@ class InputOutputOperator:
         backend
     ):
         """
-        Set backend for residue operator
+        Set backend for I/O operator
         Args:
 
         Returns:

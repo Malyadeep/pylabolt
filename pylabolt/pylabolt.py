@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-import os
 import mpi4py
 
 
