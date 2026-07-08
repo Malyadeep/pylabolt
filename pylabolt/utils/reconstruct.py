@@ -262,7 +262,7 @@ class ReconstructOperator:
         all=True
     ):
         """
-        Save reconstructed fields
+        Reconstruct multiple time step data
         Args:
 
         Returns:
@@ -275,8 +275,6 @@ class ReconstructOperator:
                 self.control.save_interval,
                 dtype=np.int64
             )
-        if not os.path.isdir("output"):
-            os.makedirs("output")
         for time_step in save_times:
             self.reconstruct_time(time_step)
 
@@ -331,3 +329,5 @@ def reconstruct_data(
         reconstruct_operator.reconstruct_time(time_step)
     elif option == "all":
         reconstruct_operator.reconstruct_multi_time(all=True)
+
+    print_log("-" * 80, 0, verbose)

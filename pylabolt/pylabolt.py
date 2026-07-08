@@ -19,10 +19,11 @@ def main():
                         )
     parser.add_argument("-t", "--time", type=int, default=0,
                         help="Specify time which is to be reconstructed")
-    parser.add_argument("--toVTK", choices=["all", "time", None],
+    parser.add_argument("--to_vtk", choices=["all", "time", None],
                         default=None, help="Convert output data to VTK format")
     args = parser.parse_args()
 
+    """ Run Solver to generate raw output data """
     if args.solver == "fluidLB":
         from pylabolt.solvers import fluidLB
         fluidLB.main(args.backend, args.n_threads)
@@ -33,10 +34,12 @@ def main():
     #     from pylabolt.solvers.cgLB import cgLB
     #     cgLB.main(parallelization, n_threads=args.n_threads)
 
+    """ Reconstruct raw data from MPI simulations """
     if args.reconstruct is not None:
         from pylabolt.utils.reconstruct import reconstruct_data
         reconstruct_data(args.reconstruct, time_step=args.time)
 
-    if args.toVTK is not None:
-        from pylabolt.utils.vtkconvert import toVTK
-        toVTK(args.toVTK, args.time)
+    """ Convert raw data to VTK format """
+    if args.to_vtk is not None:
+        from pylabolt.utils.npz2vtk import convert_to_vtk
+        convert_to_vtk(args.to_vtk, args.time)

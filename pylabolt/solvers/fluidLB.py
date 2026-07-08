@@ -168,7 +168,14 @@ class Solver:
         self.boundary_operator.compile(self.state, self.backend)
         self.residue_operator.compile(self.state, self.backend)
         self.io_operator.compile(self.state, self.backend)
-        self.io_operator.write_fields(self.state, 0)
+        import numpy as np
+        for time_step in np.arange(
+            self.state.control.start_time,
+            self.state.control.end_time + 1,
+            self.state.control.save_interval,
+            dtype=np.int64
+        ):
+            self.io_operator.write_fields(self.state, time_step)
 
         print_log("\nJIT Compilation done!",
                   self.state.domain.mpi_rank, verbose)
