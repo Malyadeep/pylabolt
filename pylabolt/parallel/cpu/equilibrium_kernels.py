@@ -3,7 +3,7 @@ import numba
 from numba import prange
 
 
-@numba.njit(parallel=True, nogil=True)
+@numba.njit(inline="always", nogil=True)
 def equilibrium_density_based_second_order(
     cx,
     cy,
@@ -36,7 +36,7 @@ def equilibrium_density_based_second_order(
 
 
 @numba.njit(parallel=True, nogil=True)
-def initialize_dist_density_based_second_order(
+def initialize_pop_density_based_second_order(
     size,
     cx,
     cy,
@@ -52,7 +52,7 @@ def initialize_dist_density_based_second_order(
     pop_new
 ):
     """
-    Initialization of distributions using density based
+    Initialization of populations using density based
     second order equilibrium
     Args:
 

@@ -2,6 +2,8 @@ import numpy as np
 
 from pylabolt.utils.helpers import print_log
 from pylabolt.parallel.cpu import collision_kernels as collision_kernels_cpu
+from pylabolt.parallel.cpu import equilibrium_kernels as\
+    equilibrium_kernels_cpu
 # from pylabolt.parallel.gpu import collision_kernels as collision_kernels_gpu
 
 
@@ -240,10 +242,18 @@ class CollisionOperator:
         if state.fluid:
             compile_args = backend.make_compile_args(self.collision_args_fluid)
             self.collision_kernel_fluid(*compile_args)
+            compile_args = backend.make_compile_args(
+                self.initialize_pop_args_fluid
+            )
+            self.initialize_pop_kernel_fluid(*compile_args)
 
-        elif state.phase:
+        if state.phase:
             compile_args = backend.make_compile_args(self.collision_args_phase)
             self.collision_kernel_phase(*compile_args)
+            compile_args = backend.make_compile_args(
+                self.initialize_pop_args_phases
+            )
+            self.initialize_pop_kernel_phase(*compile_args)
         print_log("Compiled collision operator",
                   state.domain.mpi_rank, verbose)
 
@@ -281,6 +291,48 @@ class CollisionOperator:
         """
         pass
 
+    def initialize_pop(
+        self,
+        state,
+        backend,
+    ):
+        """
+        Initialize populations to their equilibrium values
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "cpu":
+            if state.fluid:
+                self.initialize_pop_kernel_fluid(
+                    *self.initialize_pop_args_fluid
+                )
+            if state.phase:
+                self.initialize_pop_kernel_phase(
+                    *self.initialize_pop_args_phase
+                )
+        elif backend.backend_type == "gpu":
+            pass
+
+    def set_kernel_args(self, state, backend, module, kernel_name, args_dict):
+        kernel = getattr(module, kernel_name)
+        args = ()
+        for key in args_dict:
+            args_list = args_dict[key]
+            attribute = getattr(state, key)
+            if backend.backend_type == "cpu":
+                key_args = tuple(
+                    getattr(attribute, item) for item in args_list
+                )
+            elif backend.backend_type == "gpu":
+                key_args = tuple(
+                    getattr(attribute, item + "_device")
+                    for item in args_list
+                )
+            args += key_args
+        return kernel, args
+
     def set_backend(
         self,
         model,
@@ -308,25 +360,37 @@ class CollisionOperator:
                 self.equilibrium_fluid + "_" +
                 str(self.forcing_fluid)
             )
-            self.collision_kernel_fluid = getattr(
-                collision_kernels_cpu, kernel_name
-            )
-            args_fluid = args["fluid"]
-            self.collision_args_fluid = ()
-            for key_no, key in enumerate(args_fluid):
-                args_list = args_fluid[key]
-                attribute = getattr(state, key)
-                if backend.backend_type == "cpu":
-                    key_args = tuple(
-                        getattr(attribute, item) for item in args_list
-                    )
-                elif backend.backend_type == "gpu":
-                    key_args = tuple(
-                        getattr(attribute, item + "_device")
-                        for item in args_list
-                    )
-                self.collision_args_fluid += key_args
+            self.collision_kernel_fluid, self.collision_args_fluid =\
+                self.set_kernel_args(
+                    state,
+                    backend,
+                    collision_kernels_cpu,
+                    kernel_name,
+                    args["collision"]["fluid"]
+                )
             self.collision_args_fluid += self.collision_params
+
+            kernel_name = (
+                "equilibrium_" +
+                self.equilibrium_fluid
+            )
+            self.equilibrium_kernel_fluid = getattr(
+                equilibrium_kernels_cpu,
+                kernel_name
+            )
+
+            kernel_name = (
+                "initialize_pop_" +
+                self.equilibrium_fluid
+            )
+            self.initialize_pop_kernel_fluid, self.initialize_pop_args_fluid =\
+                self.set_kernel_args(
+                    state,
+                    backend,
+                    equilibrium_kernels_cpu,
+                    kernel_name,
+                    args["initialization"]["fluid"]
+                )
 
         if state.phase:
             kernel_name = (
@@ -334,22 +398,34 @@ class CollisionOperator:
                 self.equilibrium_phase + "_" +
                 str(self.forcing_phase)
             )
-            self.collision_kernel_phase = getattr(
-                collision_kernels_cpu, kernel_name
-            )
-            args_phase = args["phase"]
-            self.collision_args_phase = ()
-            for key_no, key in enumerate(args_phase):
-                args_list = args_phase[key]
-                attribute = getattr(state, key)
-                if backend.backend_type == "cpu":
-                    key_args = tuple(
-                        getattr(attribute, item) for item in args_list
-                    )
-                elif backend.backend_type == "gpu":
-                    key_args = tuple(
-                        getattr(attribute, item + "_device")
-                        for item in args_list
-                    )
-                self.collision_args_phase += key_args
+            self.collision_kernel_phase, self.collision_args_fluid =\
+                self.set_kernel_args(
+                    state,
+                    backend,
+                    collision_kernels_cpu,
+                    kernel_name,
+                    args["collision"]["phase"]
+                )
             self.collision_args_phase += self.collision_params
+
+            kernel_name = (
+                "equilibrium_" +
+                self.equilibrium_phase
+            )
+            self.equilibrium_kernel_fluid = getattr(
+                equilibrium_kernels_cpu,
+                kernel_name
+            )
+
+            kernel_name = (
+                "initialize_pop_" +
+                self.equilibrium_phase
+            )
+            self.initialize_pop_kernel_phase, self.initialize_pop_args_phase =\
+                self.set_kernel_args(
+                    state,
+                    backend,
+                    equilibrium_kernels_cpu,
+                    kernel_name,
+                    args["initialization"]["phase"]
+                )
