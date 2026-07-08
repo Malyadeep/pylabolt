@@ -1,7 +1,5 @@
 import os
 import json
-import pickle
-import h5py
 import numpy as np
 
 from pylabolt.utils.helpers import print_log

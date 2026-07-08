@@ -68,8 +68,6 @@ class ReconstructOperator:
     def __init__(
         self,
         metadata,
-        option,
-        time=0,
         verbose=True
     ):
         """
@@ -78,8 +76,9 @@ class ReconstructOperator:
 
         """
         self.metadata = metadata
-        self.validate_metadata()
-        self.validate_rank_metadata()
+        self.validate_metadata(verbose=verbose)
+        self.validate_rank_metadata(verbose=verbose)
+        self.field_save_path = "output/"
 
     def validate_metadata(
         self,
@@ -100,12 +99,6 @@ class ReconstructOperator:
                 checkpoint_interval=self.metadata["control"]
                 ["checkpoint_interval"]
             )
-            self.control.no_of_snaps = (
-                self.control.end_time - self.control.start_time
-            ) // self.control.save_interval + 1
-            self.control.save_times = np.linspace(
-                0, self.control.end_time, self.control.no_of_snaps
-            )
             self.mesh = SimpleNamespace(
                 size=self.metadata["mesh"]["size"],
                 shape=np.array(self.metadata["mesh"]["shape"], dtype=np.int64)
@@ -119,7 +112,7 @@ class ReconstructOperator:
                 self.decomposition.ny
             )
             self.fields_metadata = self.metadata["fields_saved"]
-            self.fields = SimpleNamespace()
+            self.fields = {}
             print_log("\nFields to reconstruct:", 0, verbose)
             for field_name in self.fields_metadata:
                 components = self.fields_metadata[field_name]["components"]
@@ -131,14 +124,16 @@ class ReconstructOperator:
                         (self.mesh.size, components),
                         dtype=dtype
                     )
-                setattr(self.fields, field_name, field)
+                self.fields[field_name] = field
                 print_log(
                     f"{field_name:<10}: {str(field.dtype):>5}", 0, verbose
                 )
             print_log("\n", 0, verbose)
         except KeyError as e:
-            print_log("Invalid metadata.json! missing key: " + str(e),
-                      0, verbose)
+            raise KeyError(
+                "Invalid metadata.json! missing key: " + str(e),
+                0, verbose
+            )
 
     def validate_rank_metadata(
         self,
@@ -181,8 +176,10 @@ class ReconstructOperator:
                 )
                 self.domains.append(domain_data)
             except KeyError as e:
-                print_log("Invalid rank_metadata.json! missing key: " + str(e)
-                          + " || rank: " + str(rank), 0, verbose=verbose)
+                raise KeyError(
+                    "Invalid rank_metadata.json! missing key: " + str(e)
+                    + " || rank: " + str(rank), 0, verbose=verbose
+                )
 
     def reconstruct_time(
         self,
@@ -209,14 +206,14 @@ class ReconstructOperator:
             try:
                 for field_name in self.fields_metadata:
                     field_local = fields_rank[field_name]
-                    components = self.fields_metadata[field_name]
+                    components = self.fields_metadata[field_name]["components"]
                     if components == 1:
                         copy_scalar(
                             domain.size,
                             domain.shape,
                             domain.offset,
                             self.mesh.shape,
-                            getattr(self.fields, field_name),
+                            self.fields[field_name],
                             field_local
                         )
                     elif components == 2:
@@ -225,7 +222,7 @@ class ReconstructOperator:
                             domain.shape,
                             domain.offset,
                             self.mesh.shape,
-                            getattr(self.fields, field_name),
+                            self.fields[field_name],
                             field_local
                         )
             except KeyError as e:
@@ -235,81 +232,58 @@ class ReconstructOperator:
                     f"{'rank':<10}: {rank:<20}"
                 )
 
+        self.save_reconstructed_fields(time_step)
+
         print_log(
             f"{'Reconstruction done, time':<25}:"
             f"{time_step:>5}", 0, verbose
         )
 
-    def compile(
+    def save_reconstructed_fields(
         self,
-        state,
-        backend,
-        verbose=True
+        time_step
     ):
         """
-        JIT compile compute fields kernels
+        Save reconstructed fields
         Args:
 
         Returns:
 
         """
-        for item in self.residues:
-            args = (
-                state.domain.size,
-                state.fields.solid,
-                state.fields.ghost_node,
-                getattr(state.fields, item),
-                getattr(self, item + "_old"),
+        if not os.path.isdir("output"):
+            os.makedirs("output")
+        np.savez(
+            self.field_save_path + "t_" + str(time_step) + ".npz",
+            **self.fields
+        )
+
+    def reconstruct_multi_time(
+        self,
+        all=True
+    ):
+        """
+        Save reconstructed fields
+        Args:
+
+        Returns:
+
+        """
+        if all:
+            save_times = np.arange(
+                self.control.start_time,
+                self.control.end_time + 1,
+                self.control.save_interval,
+                dtype=np.int64
             )
-            compile_args = backend.make_compile_args(args)
-            if len(self.residues[item]) == 1:
-                self.compute_residues_kernel_scalar(*compile_args)
-            elif len(self.residues[item]) == 2:
-                self.compute_residues_kernel_vector(*compile_args)
-        print_log("Compiled compute residues operator",
-                  state.domain.mpi_rank, verbose)
-
-    def compute_residues_cpu(
-        self,
-        state
-    ):
-        """
-        Compute residuals on CPU kernels
-        Args:
-
-        Returns:
-
-        """
-        for item in self.residues:
-            args = (
-                state.domain.size,
-                state.fields.solid,
-                state.fields.ghost_node,
-                getattr(state.fields, item),
-                getattr(self, item + "_old")
-            )
-            if len(self.residues[item]) == 1:
-                self.compute_residues_kernel_scalar(*args)
-            elif len(self.residues[item]) == 2:
-                self.compute_residues_kernel_vector(*args)
-
-    def compute_residues_gpu(
-        self,
-        state
-    ):
-        """
-        Compute residuals on GPU kernels
-        Args:
-
-        Returns:
-
-        """
-        pass
+        if not os.path.isdir("output"):
+            os.makedirs("output")
+        for time_step in save_times:
+            self.reconstruct_time(time_step)
 
 
 def reconstruct_data(
     option,
-    time=0,
+    time_step=0,
     verbose=True
 ):
     """
@@ -329,11 +303,12 @@ def reconstruct_data(
         )
     print_log(f"{'Reconstruction option':<20}: {option:<20}", 0, verbose)
     if option == "time":
-        if not isinstance(time, int):
+        if not isinstance(time_step, int):
             raise ValueError(
                 "Reconstruction time must be an int!"
             )
-        print_log(f"{'Reconstruction time':<20}: {time:<20}", 0, verbose)
+        print_log(f"{'Reconstruction time':<20}: {time_step:<20}",
+                  0, verbose)
 
     if not os.path.isfile("metadata.json"):
         raise FileNotFoundError(
@@ -349,9 +324,10 @@ def reconstruct_data(
 
     reconstruct_operator = ReconstructOperator(
         metadata,
-        option,
-        time=time,
         verbose=verbose
     )
 
-    reconstruct_operator.reconstruct_time(0)
+    if option == "time":
+        reconstruct_operator.reconstruct_time(time_step)
+    elif option == "all":
+        reconstruct_operator.reconstruct_multi_time(all=True)

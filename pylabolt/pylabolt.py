@@ -35,7 +35,7 @@ def main():
 
     if args.reconstruct is not None:
         from pylabolt.utils.reconstruct import reconstruct_data
-        reconstruct_data(args.reconstruct, time=args.time)
+        reconstruct_data(args.reconstruct, time_step=args.time)
 
     if args.toVTK is not None:
         from pylabolt.utils.vtkconvert import toVTK
