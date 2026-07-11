@@ -1,6 +1,7 @@
 import numpy as np
 import numba
 from numba import prange
+from mpi4py import MPI
 
 
 class HaloBuffer:
@@ -67,6 +68,7 @@ class MPIOperator:
         Attributes:
 
         """
+        self.comm = comm
         bool_field_dict = {
             "solid": 1,
             "solid_boundary": 1,
@@ -150,7 +152,6 @@ class MPIOperator:
 
     def halo_exchange(
         self,
-        comm,
         state,
         bool_buffers=None,
         int_buffers=None,
@@ -163,10 +164,10 @@ class MPIOperator:
         Returns:
 
         """
-        comm.Barrier()
+        self.comm.Barrier()
         if bool_buffers is not None:
             buffer_object = self.bool_buffer
-            args = (comm, bool_buffers, buffer_object, state)
+            args = (bool_buffers, buffer_object, state)
             if state.domain.i_proc % 2 == 0:
                 # ------- Send to left, receive from left ------- #
                 self._exchange_left(*args)
@@ -180,7 +181,7 @@ class MPIOperator:
                 # ------- Send to left, receive from left ------- #
                 self._exchange_left(*args)
 
-            comm.Barrier()
+            self.comm.Barrier()
             if state.domain.j_proc % 2 == 0:
                 # ------- Send to bottom, receive from bottom ------- #
                 self._exchange_bottom(*args)
@@ -196,7 +197,7 @@ class MPIOperator:
 
         if int_buffers is not None:
             buffer_object = self.int_buffer
-            args = (comm, int_buffers, buffer_object, state)
+            args = (int_buffers, buffer_object, state)
             if state.domain.i_proc % 2 == 0:
                 # ------- Send to left, receive from left ------- #
                 self._exchange_left(*args)
@@ -210,7 +211,7 @@ class MPIOperator:
                 # ------- Send to left, receive from left ------- #
                 self._exchange_left(*args)
 
-            comm.Barrier()
+            self.comm.Barrier()
             if state.domain.j_proc % 2 == 0:
                 # ------- Send to bottom, receive from bottom ------- #
                 self._exchange_bottom(*args)
@@ -226,7 +227,7 @@ class MPIOperator:
 
         if float_buffers is not None:
             buffer_object = self.float_buffer
-            args = (comm, float_buffers, buffer_object, state)
+            args = (float_buffers, buffer_object, state)
             if state.domain.i_proc % 2 == 0:
                 # ------- Send to left, receive from left ------- #
                 self._exchange_left(*args)
@@ -240,7 +241,7 @@ class MPIOperator:
                 # ------- Send to left, receive from left ------- #
                 self._exchange_left(*args)
 
-            comm.Barrier()
+            self.comm.Barrier()
             if state.domain.j_proc % 2 == 0:
                 # ------- Send to bottom, receive from bottom ------- #
                 self._exchange_bottom(*args)
@@ -256,7 +257,6 @@ class MPIOperator:
 
     def _exchange_left(
         self,
-        comm,
         buffer_names,
         buffer_object,
         state
@@ -285,7 +285,7 @@ class MPIOperator:
                     x=1
                 )
 
-            comm.Sendrecv(
+            self.comm.Sendrecv(
                 sendbuf=buffer_object.send_buff_left_right,
                 dest=self.left_rank,
                 sendtag=0,
@@ -312,7 +312,6 @@ class MPIOperator:
 
     def _exchange_right(
         self,
-        comm,
         buffer_names,
         buffer_object,
         state
@@ -341,7 +340,7 @@ class MPIOperator:
                     x=(state.domain.shape[0] - 2)
                 )
 
-            comm.Sendrecv(
+            self.comm.Sendrecv(
                 sendbuf=buffer_object.send_buff_left_right,
                 dest=self.right_rank,
                 sendtag=0,
@@ -368,7 +367,6 @@ class MPIOperator:
 
     def _exchange_top(
         self,
-        comm,
         buffer_names,
         buffer_object,
         state
@@ -397,7 +395,7 @@ class MPIOperator:
                     y=(state.domain.shape[1] - 2)
                 )
 
-            comm.Sendrecv(
+            self.comm.Sendrecv(
                 sendbuf=buffer_object.send_buff_top_bottom,
                 dest=self.top_rank,
                 sendtag=0,
@@ -424,7 +422,6 @@ class MPIOperator:
 
     def _exchange_bottom(
         self,
-        comm,
         buffer_names,
         buffer_object,
         state
@@ -453,7 +450,7 @@ class MPIOperator:
                     y=1
                 )
 
-            comm.Sendrecv(
+            self.comm.Sendrecv(
                 sendbuf=buffer_object.send_buff_top_bottom,
                 dest=self.bottom_rank,
                 sendtag=0,
@@ -477,6 +474,24 @@ class MPIOperator:
                     state.domain.shape,
                     y=0
                 )
+
+    def reduce(
+        self,
+        local_array,
+        operation="sum"
+    ):
+        """
+        Performs specified reduction operation across all
+        MPI ranks
+        Args:
+
+        Returns:
+
+        """
+        global_array = np.zeros_like(local_array)
+        if operation == "sum":
+            self.comm.Allreduce(local_array, global_array, op=MPI.SUM)
+        return global_array
 
 
 @numba.njit(parallel=True, nogil=True)

@@ -1,4 +1,3 @@
-import numpy as np
 import numba
 from numba import prange
 
@@ -26,9 +25,9 @@ def density_based_no_force(
     """
     for ind in prange(size):
         if not solid[ind] and not ghost_node[ind]:
-            density_sum = 0
-            velocity_x_sum = 0
-            velocity_y_sum = 0
+            density_sum = 0.
+            velocity_x_sum = 0.
+            velocity_y_sum = 0.
             pop_local = pop_new[ind]
             for k in range(no_of_directions):
                 density_sum += pop_local[k]
@@ -63,9 +62,9 @@ def density_based_force(
     """
     for ind in prange(size):
         if not solid[ind] and not ghost_node[ind]:
-            density_sum = 0
-            velocity_x_sum = 0
-            velocity_y_sum = 0
+            density_sum = 0.
+            velocity_x_sum = 0.
+            velocity_y_sum = 0.
             pop_local = pop_new[ind]
             for k in range(no_of_directions):
                 density_sum += pop_local[k]

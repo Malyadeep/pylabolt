@@ -111,7 +111,6 @@ class FluidLB:
 
 class Solver:
     def __init__(self, comm, backend, n_threads):
-        self.comm = comm
         mpi_rank = comm.Get_rank()
         from importlib.metadata import version
         print_log(
@@ -136,17 +135,16 @@ class Solver:
             self.state,
         )
         self.obstacle_operator = ObstacleOperator(
-            comm,
             self.state,
             self.backend,
             self.mpi_operator
         )
         self.collision_operator = CollisionOperator(
-            comm,
             simulation,
             self.model,
             self.state,
-            self.backend
+            self.backend,
+            self.mpi_operator
         )
         self.compute_fields_operator = ComputeFieldsOperator(
             self.model,
@@ -165,16 +163,16 @@ class Solver:
             self.backend
         )
         self.residue_operator = ResidueOperator(
-            comm,
             self.model,
             self.state,
-            self.backend
+            self.backend,
+            self.mpi_operator
         )
         self.io_operator = InputOutputOperator(
-            comm,
             self.model,
             self.state,
-            self.backend
+            self.backend,
+            self.mpi_operator
         )
         self.logger = SimulationStatusLogger(
             self.state.domain.mpi_rank,
@@ -217,7 +215,6 @@ class Solver:
         ):
             self.collision_operator.collide(self.state, fluid=True)
             self.mpi_operator.halo_exchange(
-                self.comm,
                 self.state,
                 float_buffers=["pop_fluid"]
             )
@@ -225,7 +222,10 @@ class Solver:
             self.boundary_operator.set_boundary(self.state, fluid=True)
             self.compute_fields_operator.compute_fields(self.state, fluid=True)
             if time_step % self.state.control.std_out_interval == 0:
-                self.residue_operator.compute_residues(self.state)
+                self.residue_operator.compute_residues(
+                    self.state,
+                    self.mpi_operator
+                )
                 self.logger.log_data(
                     time_step,
                     res_density=self.residue_operator.residues["res_density"],

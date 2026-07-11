@@ -8,10 +8,10 @@ import pylabolt.parallel.cpu.compute_residues_kernels as\
 class ResidueOperator:
     def __init__(
         self,
-        comm,
         model,
         state,
         backend,
+        mpi_operator,
         verbose=True
     ):
         """
@@ -32,7 +32,7 @@ class ResidueOperator:
             print_log("-" * 80, state.domain.mpi_rank, verbose=True)
             print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
             print_log(str(e), state.domain.mpi_rank, verbose=True)
-            comm.Abort()
+            mpi_operator.comm.Abort()
 
     def setup_residue_operator(
         self,
@@ -85,7 +85,6 @@ class ResidueOperator:
         """
         for item in self.fields_list:
             args = (
-                state.control.float_min,
                 state.domain.size,
                 state.fields.solid,
                 state.fields.ghost_node,
@@ -102,7 +101,8 @@ class ResidueOperator:
 
     def compute_residues_cpu(
         self,
-        state
+        state,
+        mpi_operator
     ):
         """
         Compute residuals on CPU kernels
@@ -123,15 +123,28 @@ class ResidueOperator:
                 local_res_array =\
                     self.compute_residues_kernel_scalar(*args)
                 global_res_array = mpi_operator.reduce(
-                    local_res_array
+                    local_res_array,
+                    operation="sum"
                 )
                 self.residues["res_" + item][0] = np.sqrt(
                     global_res_array[0] /
                     (global_res_array[1] + state.control.float_min)
                 )
             elif len(self.residues["res_" + item]) == 2:
-                self.residues["res_" + item][:] =\
+                local_res_array =\
                     self.compute_residues_kernel_vector(*args)
+                global_res_array = mpi_operator.reduce(
+                    local_res_array,
+                    operation="sum"
+                )
+                self.residues["res_" + item][0] = np.sqrt(
+                    global_res_array[0] /
+                    (global_res_array[1] + state.control.float_min)
+                )
+                self.residues["res_" + item][1] = np.sqrt(
+                    global_res_array[2] /
+                    (global_res_array[3] + state.control.float_min)
+                )
 
     def compute_residues_gpu(
         self,

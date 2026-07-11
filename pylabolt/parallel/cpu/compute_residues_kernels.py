@@ -18,8 +18,8 @@ def compute_residue_scalar(
     Returns:
 
     """
-    numerator = 0
-    denominator = 0
+    numerator = 0.
+    denominator = 0.
     for ind in prange(size):
         if not solid[ind] and not ghost_node[ind]:
             field_old_local = field_old[ind]
@@ -49,8 +49,8 @@ def compute_residue_vector(
     Returns:
 
     """
-    numerator_x, numerator_y = 0, 0
-    denominator_x, denominator_y = 0, 0
+    numerator_x, numerator_y = 0., 0.
+    denominator_x, denominator_y = 0., 0.
     for ind in prange(size):
         if not solid[ind] and not ghost_node[ind]:
             field_old_local_x = field_old[ind, 0]

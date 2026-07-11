@@ -10,11 +10,11 @@ from pylabolt.parallel.cpu import equilibrium_kernels as\
 class CollisionOperator:
     def __init__(
         self,
-        comm,
         simulation,
         model,
         state,
         backend,
+        mpi_operator,
         verbose=True
     ):
         """
@@ -40,7 +40,7 @@ class CollisionOperator:
             print_log("-" * 80, state.domain.mpi_rank, verbose=True)
             print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
             print_log(str(e), state.domain.mpi_rank, verbose=True)
-            comm.Abort()
+            mpi_operator.comm.Abort()
 
     def read_collision_dict(
         self,

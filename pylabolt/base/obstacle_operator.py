@@ -10,7 +10,6 @@ from pylabolt.parallel.cpu.obstacle_kernels import (
 class ObstacleOperator:
     def __init__(
         self,
-        comm,
         state,
         backend,
         mpi_operator,
@@ -24,7 +23,6 @@ class ObstacleOperator:
         self.no_of_obstacles = len(state.obstacle.obstacles)
 
         mpi_operator.halo_exchange(
-            comm,
             state,
             bool_buffers=["solid"]
         )

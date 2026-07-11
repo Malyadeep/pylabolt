@@ -9,10 +9,10 @@ import pylabolt.parallel.cpu.io_operator_kernels as io_operator_kernels_cpu
 class InputOutputOperator:
     def __init__(
         self,
-        comm,
         model,
         state,
         backend,
+        mpi_operator,
         verbose=True
     ):
         """
@@ -33,7 +33,7 @@ class InputOutputOperator:
             print_log("-" * 80, state.domain.mpi_rank, verbose=True)
             print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
             print_log(str(e), state.domain.mpi_rank, verbose=True)
-            comm.Abort()
+            mpi_operator.comm.Abort()
 
     def setup_write_fields(
         self,
