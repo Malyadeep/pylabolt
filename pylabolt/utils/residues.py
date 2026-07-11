@@ -113,7 +113,6 @@ class ResidueOperator:
         """
         for item in self.fields_list:
             args = (
-                state.control.float_min,
                 state.domain.size,
                 state.fields.solid,
                 state.fields.ghost_node,
@@ -121,8 +120,15 @@ class ResidueOperator:
                 getattr(self, item + "_old")
             )
             if len(self.residues["res_" + item]) == 1:
-                self.residues["res_" + item][0] =\
+                local_res_array =\
                     self.compute_residues_kernel_scalar(*args)
+                global_res_array = mpi_operator.reduce(
+                    local_res_array
+                )
+                self.residues["res_" + item][0] = np.sqrt(
+                    global_res_array[0] /
+                    (global_res_array[1] + state.control.float_min)
+                )
             elif len(self.residues["res_" + item]) == 2:
                 self.residues["res_" + item][:] =\
                     self.compute_residues_kernel_vector(*args)
