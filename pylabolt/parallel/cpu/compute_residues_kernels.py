@@ -5,6 +5,7 @@ from numba import prange
 
 @numba.njit(parallel=True, nogil=True)
 def compute_residue_scalar(
+    float_min,
     size,
     solid,
     ghost_node,
@@ -28,12 +29,13 @@ def compute_residue_scalar(
             numerator += diff_field * diff_field
             denominator += field_old_local * field_old_local
             field_old[ind] = field_local
-    residue = np.sqrt(numerator / (denominator + 1e-16))
+    residue = np.sqrt(numerator / (denominator + float_min))
     return residue
 
 
 @numba.njit(parallel=True, nogil=True)
 def compute_residue_vector(
+    float_min,
     size,
     solid,
     ghost_node,
@@ -63,6 +65,6 @@ def compute_residue_vector(
             denominator_y += field_old_local_y * field_old_local_y
             field_old[ind, 0] = field_local_x
             field_old[ind, 1] = field_local_y
-    residue_x = np.sqrt(numerator_x / (denominator_x + 1e-16))
-    residue_y = np.sqrt(numerator_y / (denominator_y + 1e-16))
+    residue_x = np.sqrt(numerator_x / (denominator_x + float_min))
+    residue_y = np.sqrt(numerator_y / (denominator_y + float_min))
     return residue_x, residue_y

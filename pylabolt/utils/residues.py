@@ -66,7 +66,7 @@ class ResidueOperator:
             else:
                 components = field_shape[1]
             self.residues.update({
-                field_name:
+                "res_" + field_name:
                 np.zeros(components, dtype=state.control.precision)
             })
 
@@ -83,8 +83,9 @@ class ResidueOperator:
         Returns:
 
         """
-        for item in self.residues:
+        for item in self.fields_list:
             args = (
+                state.control.float_min,
                 state.domain.size,
                 state.fields.solid,
                 state.fields.ghost_node,
@@ -92,9 +93,9 @@ class ResidueOperator:
                 getattr(self, item + "_old"),
             )
             compile_args = backend.make_compile_args(args)
-            if len(self.residues[item]) == 1:
+            if len(self.residues["res_" + item]) == 1:
                 self.compute_residues_kernel_scalar(*compile_args)
-            elif len(self.residues[item]) == 2:
+            elif len(self.residues["res_" + item]) == 2:
                 self.compute_residues_kernel_vector(*compile_args)
         print_log("Compiled compute residues operator",
                   state.domain.mpi_rank, verbose)
@@ -110,18 +111,21 @@ class ResidueOperator:
         Returns:
 
         """
-        for item in self.residues:
+        for item in self.fields_list:
             args = (
+                state.control.float_min,
                 state.domain.size,
                 state.fields.solid,
                 state.fields.ghost_node,
                 getattr(state.fields, item),
                 getattr(self, item + "_old")
             )
-            if len(self.residues[item]) == 1:
-                self.compute_residues_kernel_scalar(*args)
-            elif len(self.residues[item]) == 2:
-                self.compute_residues_kernel_vector(*args)
+            if len(self.residues["res_" + item]) == 1:
+                self.residues["res_" + item][0] =\
+                    self.compute_residues_kernel_scalar(*args)
+            elif len(self.residues["res_" + item]) == 2:
+                self.residues["res_" + item][:] =\
+                    self.compute_residues_kernel_vector(*args)
 
     def compute_residues_gpu(
         self,

@@ -183,7 +183,6 @@ class SetupBoundaryFluid:
         )
         if self.boundary_condition_type_fluid == "density_based":
             args = (
-                state.domain.shape,
                 state.lattice.cx,
                 state.lattice.cy,
                 state.lattice.weights,
@@ -191,15 +190,14 @@ class SetupBoundaryFluid:
                 boundary_element.boundary_nodes,
                 boundary_element.out_list,
                 boundary_element.inv_list,
+                boundary_element.vector_fluid,
                 state.fields.solid,
                 state.fields.density,
-                state.fields.velocity,
                 state.fields.pop_fluid,
                 state.fields.pop_fluid_new
             )
         elif self.boundary_condition_type_fluid == "no_density_based":
             args = (
-                state.domain.shape,
                 state.lattice.cx,
                 state.lattice.cy,
                 state.lattice.weights,
@@ -207,8 +205,8 @@ class SetupBoundaryFluid:
                 boundary_element.boundary_nodes,
                 boundary_element.out_list,
                 boundary_element.inv_list,
+                boundary_element.vector_fluid,
                 state.fields.solid,
-                state.fields.velocity,
                 state.fields.pop_fluid,
                 state.fields.pop_fluid_new
             )

@@ -32,6 +32,7 @@ def scalar_based_kernel(
             i = ind // shape[1]
             j = ind - i * shape[1]
             density_local = density[ind]
+            pop_new[ind, 0] = pop[ind, 0]
             for k in range(1, no_of_directions):
                 i_nb = i - cx[k]
                 j_nb = j - cy[k]
@@ -74,6 +75,7 @@ def no_scalar_based_kernel(
         if not solid[ind] and not ghost_node[ind]:
             i = ind // shape[1]
             j = ind - i * shape[1]
+            pop_new[ind, 0] = pop[ind, 0]
             for k in range(1, no_of_directions):
                 i_nb = i - cx[k]
                 j_nb = j - cy[k]

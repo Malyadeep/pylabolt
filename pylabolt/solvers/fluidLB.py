@@ -1,7 +1,11 @@
 import time
 from mpi4py import MPI
 
-from pylabolt.utils.helpers import load_simulation, print_log
+from pylabolt.utils.helpers import (
+    load_simulation,
+    print_log,
+    SimulationStatusLogger
+)
 from pylabolt.utils.residues import ResidueOperator
 from pylabolt.utils.io_operator import InputOutputOperator
 from pylabolt.parallel.backend import Backend
@@ -107,6 +111,7 @@ class FluidLB:
 
 class Solver:
     def __init__(self, comm, backend, n_threads):
+        self.comm = comm
         mpi_rank = comm.Get_rank()
         from importlib.metadata import version
         print_log(
@@ -171,6 +176,10 @@ class Solver:
             self.state,
             self.backend
         )
+        self.logger = SimulationStatusLogger(
+            self.state.domain.mpi_rank,
+            verbose=True
+        )
 
     def compile(self, verbose=True):
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
@@ -183,26 +192,56 @@ class Solver:
         self.boundary_operator.compile(self.state, self.backend)
         self.residue_operator.compile(self.state, self.backend)
         self.io_operator.compile(self.state, self.backend)
-        # import numpy as np
-        # for time_step in np.arange(
-        #     self.state.control.start_time,
-        #     self.state.control.end_time + 1,
-        #     self.state.control.save_interval,
-        #     dtype=np.int64
-        # ):
-        #     self.io_operator.write_fields(self.state, time_step)
-        # self.collision_operator.initialize_pop(self.state, self.backend)
-        # np.savez(
-        #     "pop.npz", pop=self.state.fields.pop_fluid,
-        #     pop_new=self.state.fields.pop_fluid_new,
-        #     velocity=self.state.fields.velocity,
-        #     density=self.state.fields.density,
-        #     solid=self.state.fields.solid,
-        #     ghost_node=self.state.fields.ghost_node
-        # )
 
         print_log("\nJIT Compilation done!",
                   self.state.domain.mpi_rank, verbose)
+        print_log("-" * 80, self.state.domain.mpi_rank, verbose)
+
+    def run(
+        self,
+        verbose=True
+    ):
+        print_log("\n" + "-" * 80, self.state.domain.mpi_rank, verbose)
+        print_log("Running simulation...\n", self.state.domain.mpi_rank, verbose)
+        self.io_operator.write_fields(
+            self.state,
+            self.state.control.start_time
+        )
+        self.collision_operator.initialize_pop(self.state, self.backend)
+
+        run_time_start = time.perf_counter()
+
+        for time_step in range(
+            self.state.control.start_time + 1,
+            self.state.control.end_time + 1,
+        ):
+            self.collision_operator.collide(self.state, fluid=True)
+            self.mpi_operator.halo_exchange(
+                self.comm,
+                self.state,
+                float_buffers=["pop_fluid"]
+            )
+            self.streaming_operator.stream(self.state, fluid=True)
+            self.boundary_operator.set_boundary(self.state, fluid=True)
+            self.compute_fields_operator.compute_fields(self.state, fluid=True)
+            if time_step % self.state.control.std_out_interval == 0:
+                self.residue_operator.compute_residues(self.state)
+                self.logger.log_data(
+                    time_step,
+                    res_density=self.residue_operator.residues["res_density"],
+                    res_velocity=self.residue_operator.residues["res_velocity"]
+                )
+            if time_step % self.state.control.save_interval == 0:
+                self.io_operator.write_fields(self.state, time_step)
+
+        run_time = time.perf_counter() - run_time_start
+        print_log("\n" + "-" * 80, self.state.domain.mpi_rank, verbose)
+        print_log(
+            f"{'Simulation complete, run time':<30}: "
+            f"{str(run_time) + ' s':<30}",
+            self.state.domain.mpi_rank,
+            verbose
+        )
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
 
 
@@ -211,4 +250,5 @@ def main(backend, n_threads):
     comm = MPI.COMM_WORLD
     solver = Solver(comm, backend, n_threads)
     solver.compile()
+    solver.run()
     MPI.Finalize()

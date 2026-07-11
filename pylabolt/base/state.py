@@ -120,18 +120,3 @@ class State:
             print_log("FATAL ERROR!", mpi_rank, verbose=True)
             print_log(str(e), mpi_rank, verbose=True)
             comm.Abort()
-
-        # """ Output initial fields for testing """
-        # if not os.path.isdir("procs"):
-        #     os.makedirs("procs")
-        # np.savez(
-        #     "procs/proc_" + str(self.domain.mpi_rank) + ".npz",
-        #     solid=self.fields.solid,
-        #     solid_id=self.fields.solid_id,
-        #     velocity=self.fields.velocity,
-        #     Nx=self.mesh.grid_global_shape[0],
-        #     Ny=self.mesh.grid_global_shape[1],
-        #     offset=self.domain.offset,
-        #     Nx_rank=self.domain.Nx_rank,
-        #     Ny_rank=self.domain.Ny_rank
-        # )

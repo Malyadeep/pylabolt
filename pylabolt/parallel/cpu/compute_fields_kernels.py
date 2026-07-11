@@ -5,6 +5,7 @@ from numba import prange
 
 @numba.njit(parallel=True, nogil=True)
 def density_based_no_force(
+    float_min,
     size,
     cx,
     cy,
@@ -34,12 +35,13 @@ def density_based_no_force(
                 velocity_x_sum += cx[k] * pop_local[k]
                 velocity_y_sum += cy[k] * pop_local[k]
             density[ind] = density_sum
-            velocity[ind, 0] = velocity_x_sum
-            velocity[ind, 1] = velocity_y_sum
+            velocity[ind, 0] = velocity_x_sum / (density_sum + float_min)
+            velocity[ind, 1] = velocity_y_sum / (density_sum + float_min)
 
 
 @numba.njit(parallel=True, nogil=True)
 def density_based_force(
+    float_min,
     size,
     cx,
     cy,
@@ -72,5 +74,5 @@ def density_based_force(
             velocity_x_sum += 0.5 * gravity[0]
             velocity_y_sum += 0.5 * gravity[1]
             density[ind] = density_sum
-            velocity[ind, 0] = velocity_x_sum
-            velocity[ind, 1] = velocity_y_sum
+            velocity[ind, 0] = velocity_x_sum / (density_sum + float_min)
+            velocity[ind, 1] = velocity_y_sum / (density_sum + float_min)

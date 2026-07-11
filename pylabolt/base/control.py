@@ -45,6 +45,9 @@ class Control:
                 )
         except KeyError as e:
             raise ValueError(e.args[0] + " missing in control_dict")
+
+        self.float_min = np.finfo(self.precision).eps
+
         if rank == 0:
             print_log("Setting control parameters done!", rank, verbose=verbose)
             print_log("-" * 80, rank, verbose=verbose)

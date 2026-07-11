@@ -123,7 +123,7 @@ class ComputeFieldsOperator:
                 compute_fields_kernels_cpu, kernel_name
             )
             args_fluid = args["fluid"]
-            self.compute_fields_args_fluid = ()
+            self.compute_fields_args_fluid = tuple([state.control.float_min])
             for key_no, key in enumerate(args_fluid):
                 args_list = args_fluid[key]
                 attribute = getattr(state, key)
@@ -146,7 +146,7 @@ class ComputeFieldsOperator:
                 compute_fields_kernels_cpu, kernel_name
             )
             args_phase = args["phase"]
-            self.compute_fields_args_phase = ()
+            self.compute_fields_args_phase = tuple([state.control.float_min])
             for key_no, key in enumerate(args_phase):
                 args_list = args_phase[key]
                 attribute = getattr(state, key)
