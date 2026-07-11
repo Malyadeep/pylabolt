@@ -660,7 +660,6 @@ class TestHaloExchange:
             "pop_phase"
         ]
         mpi_operator.halo_exchange(
-            comm,
             state,
             bool_buffers=bool_buffers,
             int_buffers=int_buffers,
@@ -789,7 +788,6 @@ class TestHaloExchange:
             "pop_phase"
         ]
         mpi_operator.halo_exchange(
-            comm,
             state,
             bool_buffers=bool_buffers,
             int_buffers=int_buffers,
@@ -989,7 +987,6 @@ class TestHaloExchange:
             "pop_phase"
         ]
         mpi_operator.halo_exchange(
-            comm,
             state,
             bool_buffers=bool_buffers,
             int_buffers=int_buffers,
@@ -1190,7 +1187,6 @@ class TestHaloExchange:
             "pop_phase"
         ]
         mpi_operator.halo_exchange(
-            comm,
             state,
             bool_buffers=bool_buffers,
             int_buffers=int_buffers,

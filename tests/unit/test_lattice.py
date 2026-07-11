@@ -112,12 +112,12 @@ def test_d2q9_entries():
     cs = control.precision(1/np.sqrt(3))
     assert np.isclose(cs, lattice.cs)
     assert (lattice.cs.dtype == control.precision)
-    cs2 = cs * cs
-    assert np.isclose(cs2, lattice.cs2)
-    cs_2 = 1 / cs2
+    cs_2 = cs * cs
     assert np.isclose(cs_2, lattice.cs_2)
-    cs_4 = cs_2 * cs_2
-    assert np.isclose(cs_4, lattice.cs_4)
+    inv_cs_2 = 1 / cs_2
+    assert np.isclose(inv_cs_2, lattice.inv_cs_2)
+    inv_cs_4 = inv_cs_2 * inv_cs_2
+    assert np.isclose(inv_cs_4, lattice.inv_cs_4)
     cx = np.array([0, 1, 0, -1, 0, 1, -1, -1, 1], dtype=np.int32)
     cy = np.array([0, 0, 1, 0, -1, 1, 1, -1, -1], dtype=np.int32)
     assert np.all(cx == lattice.cx)
@@ -156,12 +156,12 @@ def test_d1q3_entries():
     cs = control.precision(1/np.sqrt(3))
     assert np.isclose(cs, lattice.cs)
     assert (lattice.cs.dtype == control.precision)
-    cs2 = cs * cs
-    assert np.isclose(cs2, lattice.cs2)
-    cs_2 = 1 / cs2
+    cs_2 = cs * cs
     assert np.isclose(cs_2, lattice.cs_2)
-    cs_4 = cs_2 * cs_2
-    assert np.isclose(cs_4, lattice.cs_4)
+    inv_cs_2 = 1 / cs_2
+    assert np.isclose(inv_cs_2, lattice.inv_cs_2)
+    inv_cs_4 = inv_cs_2 * inv_cs_2
+    assert np.isclose(inv_cs_4, lattice.inv_cs_4)
     cx = np.array([0, 1, -1], dtype=np.int32)
     cy = np.array([0, 0, 0], dtype=np.int32)
     assert np.all(cx == lattice.cx)
