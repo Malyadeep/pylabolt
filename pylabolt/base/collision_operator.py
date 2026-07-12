@@ -13,7 +13,6 @@ class CollisionOperator:
         simulation,
         model,
         state,
-        backend,
         mpi_operator,
         verbose=True
     ):
@@ -30,9 +29,9 @@ class CollisionOperator:
                 raise ValueError(
                     "collision_dict not found in simulation.py file"
                 )
+            self.model = model
             self.collision_dict = simulation.collision_dict
-            self.read_collision_dict(model, state, verbose=verbose)
-            self.set_backend(model, state, backend)
+            self.read_collision_dict(state, verbose=verbose)
             print_log("\nSetting up collision operator done!",
                       state.domain.mpi_rank, verbose)
             print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -44,7 +43,6 @@ class CollisionOperator:
 
     def read_collision_dict(
         self,
-        model,
         state,
         verbose=True
     ):
@@ -65,24 +63,24 @@ class CollisionOperator:
             self.collision_fluid = fluid_dict["model"]
             self.equilibrium_fluid = fluid_dict["equilibrium"]
             self.forcing_fluid = fluid_dict["forcing_model"]
-            if self.collision_fluid not in model.collision_models["fluid"]:
+            if self.collision_fluid not in self.model.collision_models["fluid"]:
                 raise ValueError(
                     "Unsupported fluid collision model: " +
                     self.collision_fluid +
                     "\nAvailable models: " +
-                    str(model.collision_models["fluid"])
+                    str(self.model.collision_models["fluid"])
                 )
-            if self.equilibrium_fluid not in model.equilibrium_models["fluid"]:
+            if self.equilibrium_fluid not in self.model.equilibrium_models["fluid"]:
                 raise ValueError(
                     "Unsupported fluid equilibrium model: " +
                     self.equilibrium_fluid +
                     "\nAvailable models: " +
-                    str(model.equilibrium_models["fluid"])
+                    str(self.model.equilibrium_models["fluid"])
                 )
-            if self.forcing_fluid not in model.forcing_models["fluid"]:
+            if self.forcing_fluid not in self.model.forcing_models["fluid"]:
                 raise ValueError(
                     "Unsupported fluid forcing model: " + self.forcing_fluid +
-                    "\nAvailable models: " + str(model.forcing_models["fluid"])
+                    "\nAvailable models: " + str(self.model.forcing_models["fluid"])
                 )
             if self.forcing_fluid is None:
                 self.gravity = np.zeros(2, dtype=state.control.precision)
@@ -133,10 +131,10 @@ class CollisionOperator:
             if "model" not in phase_dict:
                 raise ValueError("model missing in phase: collision_dict")
             self.model_phase = phase_dict["model"]
-            if self.model_phase not in model.collision_models["phase"]:
+            if self.model_phase not in self.model.collision_models["phase"]:
                 raise ValueError(
                     "Unsupported phase collision model: " + self.model_phase +
-                    "\nAvailable models: " + model.collision_models["phase"]
+                    "\nAvailable models: " + self.model.collision_models["phase"]
                 )
             if self.model_phase == "segregation":
                 self.equilibrium_phase = None
@@ -147,7 +145,7 @@ class CollisionOperator:
                     )
                 self.equilibrium_phase = phase_dict["equilibrium"]
                 if (self.equilibrium_phase not in
-                        model.equilibrium_models["phase"]):
+                        self.model.equilibrium_models["phase"]):
                     raise ValueError(
                         "Unsupported phase equilibrium model: " +
                         self.equilibrium_phase
@@ -335,9 +333,9 @@ class CollisionOperator:
 
     def set_backend(
         self,
-        model,
         state,
-        backend
+        backend,
+        verbose=True
     ):
         """
         Set backend for collision operator
@@ -352,7 +350,7 @@ class CollisionOperator:
             self.collide = self.collide_gpu
             # TODO: transfer collision operator attributes to device
 
-        args = model.get_collision_args()
+        args = self.model.get_collision_args()
 
         if state.fluid:
             kernel_name = (
@@ -429,3 +427,6 @@ class CollisionOperator:
                     kernel_name,
                     args["initialization"]["phase"]
                 )
+
+        print_log("Backend set for collision operator",
+                  state.domain.mpi_rank, verbose)

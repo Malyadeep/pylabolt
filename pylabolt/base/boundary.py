@@ -149,6 +149,9 @@ class Boundary:
             raise ValueError(
                 "boundary_dict not found in simulation.py file"
             )
+        self.fluid = fluid
+        self.phase = phase
+        self.scalar = scalar
         self.boundary_dict = simulation.boundary_dict
         self.compute_forces = False
         self.x_periodic = False
@@ -610,3 +613,50 @@ class Boundary:
                 verbose
             )
         print_log("\n", domain.mpi_rank, verbose)
+
+    def set_backend(
+        self,
+        backend
+    ):
+        """
+        Configure backend attributes for mesh object
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "gpu":
+            self._device_attrs = [
+                "boundary_nodes",
+                "out_list",
+                "inv_list",
+                "surface_normals"
+            ]
+            if self.fluid:
+                self._device_attrs.extend([
+                    "scalar_fluid",
+                    "vector_fluid",
+                ])
+            if self.phase:
+                self._device_attrs.extend([
+                    "scalar_phase",
+                    "vector_phase",
+                ])
+            for boundary_element in self.boundary_elements:
+                for arg_name in self._device_attrs:
+                    arg_device = backend.allocate_to_device(
+                        getattr(boundary_element, arg_name)
+                    )
+                    setattr(boundary_element, arg_name + "_device", arg_device)
+
+    def view_attrs(
+        self,
+        mpi_rank
+    ):
+        for boundary_element in self.boundary_elements:
+            var_names = vars(boundary_element)
+            for item in var_names:
+                print_log(
+                    f"{item:<30}: {var_names[item]}", mpi_rank, verbose=True
+                )
+            print_log("\n", mpi_rank, verbose=True)

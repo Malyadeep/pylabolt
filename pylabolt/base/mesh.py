@@ -44,3 +44,26 @@ class Mesh:
             "global grid size set: (" + str(self.grid_global_shape) + ")",
             rank, verbose
         )
+
+    def set_backend(
+        self,
+        backend
+    ):
+        """
+        Configure backend attributes for mesh object
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "gpu":
+            self._device_attrs = [
+                "dimensions",
+                "grid_global_shape",
+                "grid_global_size"
+            ]
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)

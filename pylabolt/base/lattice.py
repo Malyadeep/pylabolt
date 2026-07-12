@@ -73,3 +73,32 @@ class Lattice:
                 "Unsupported lattice type"
             )
         print_log("lattice type set: " + self.lattice_type, rank, verbose)
+
+    def set_backend(
+        self,
+        backend
+    ):
+        """
+        Configure backend attributes for lattice object
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "gpu":
+            self._device_attrs = [
+                "cs",
+                "cs_2",
+                "inv_cs_2",
+                "inv_cs_4",
+                "no_of_directions",
+                "cx",
+                "cy",
+                "weights",
+                "inv_list"
+            ]
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)

@@ -49,5 +49,25 @@ class Control:
         self.float_min = np.finfo(self.precision).eps
 
         if rank == 0:
-            print_log("Setting control parameters done!", rank, verbose=verbose)
+            print_log("Setting control parameters done!",
+                      rank, verbose=verbose)
             print_log("-" * 80, rank, verbose=verbose)
+
+    def set_backend(
+        self,
+        backend
+    ):
+        """
+        Configure backend attributes for control object
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "gpu":
+            self._device_attrs = ["float_min"]
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)

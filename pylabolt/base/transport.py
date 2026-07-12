@@ -84,3 +84,35 @@ class Transport:
         print_log("Setting transport properties done!",
                   domain.mpi_rank, verbose)
         print_log("-" * 80, domain.mpi_rank, verbose)
+
+    def set_backend(
+        self,
+        backend,
+        fluid=False,
+        phase=False,
+        scalar=False
+    ):
+        """
+        Configure backend attributes for transport object
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "gpu":
+            self._device_attrs = []
+            if fluid is True and phase is False:
+                self._device_attrs = ["kin_visc"]
+            if fluid is True and phase is True:
+                self._device_attrs = [
+                    "kin_visc_1",
+                    "kin_visc_2",
+                    "density_1",
+                    "density_2",
+                    "surface_tension"
+                ]
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)

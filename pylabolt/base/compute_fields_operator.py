@@ -10,7 +10,6 @@ class ComputeFieldsOperator:
         model,
         state,
         collision_operator,
-        backend,
         verbose=True
     ):
         """
@@ -21,7 +20,8 @@ class ComputeFieldsOperator:
         print_log("-" * 80, state.domain.mpi_rank, verbose)
         print_log("Setting up compute fields operator...",
                   state.domain.mpi_rank, verbose)
-        self.set_backend(model, state, collision_operator, backend)
+        self.model = model
+        self.forcing_fluid = collision_operator.forcing_fluid
         print_log("Setting up compute fields operator done!",
                   state.domain.mpi_rank, verbose)
         print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -89,10 +89,9 @@ class ComputeFieldsOperator:
 
     def set_backend(
         self,
-        model,
         state,
-        collision_operator,
-        backend
+        backend,
+        verbose=True
     ):
         """
         Set backend for compute fields operator
@@ -107,11 +106,11 @@ class ComputeFieldsOperator:
             self.compute_fields = self.compute_fields_gpu
             # TODO: transfer streaming operator attributes to device
 
-        self.compute_fields_type = model.compute_fields_type
-        args = model.get_compute_fields_args()
+        self.compute_fields_type = self.model.compute_fields_type
+        args = self.model.get_compute_fields_args()
 
         if state.fluid:
-            if collision_operator.forcing_fluid is not None:
+            if self.forcing_fluid is not None:
                 kernel_name = (
                     self.compute_fields_type["fluid"] + "_force"
                 )
@@ -123,7 +122,14 @@ class ComputeFieldsOperator:
                 compute_fields_kernels_cpu, kernel_name
             )
             args_fluid = args["fluid"]
-            self.compute_fields_args_fluid = tuple([state.control.float_min])
+            if backend.backend_type == "cpu":
+                self.compute_fields_args_fluid = tuple(
+                    [state.control.float_min]
+                )
+            elif backend.backend_type == "gpu":
+                self.compute_fields_args_fluid = tuple(
+                    [state.control.float_min_device]
+                )
             for key_no, key in enumerate(args_fluid):
                 args_list = args_fluid[key]
                 attribute = getattr(state, key)
@@ -140,13 +146,20 @@ class ComputeFieldsOperator:
 
         if state.phase:
             kernel_name = (
-                self.streaming_type["phase"]
+                self.compute_fields_type["phase"]
             )
             self.streaming_kernel_phase = getattr(
                 compute_fields_kernels_cpu, kernel_name
             )
             args_phase = args["phase"]
-            self.compute_fields_args_phase = tuple([state.control.float_min])
+            if backend.backend_type == "cpu":
+                self.compute_fields_args_phase = tuple(
+                    [state.control.float_min]
+                )
+            elif backend.backend_type == "gpu":
+                self.compute_fields_args_phase = tuple(
+                    [state.control.float_min_device]
+                )
             for key_no, key in enumerate(args_phase):
                 args_list = args_phase[key]
                 attribute = getattr(state, key)
@@ -160,3 +173,6 @@ class ComputeFieldsOperator:
                         for item in args_list
                     )
                 self.compute_fields_args_phase += key_args
+
+        print_log("Backend set for compute fields operator",
+                  state.domain.mpi_rank, verbose)

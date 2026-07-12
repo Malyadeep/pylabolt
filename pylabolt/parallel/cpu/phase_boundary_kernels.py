@@ -4,12 +4,12 @@ from numba import prange
 
 @numba.njit(parallel=True, nogil=True)
 def bounce_back(
-    boundary_nodes,
-    out_list,
-    inv_list,
     solid,
     pop,
-    pop_new
+    pop_new,
+    boundary_nodes,
+    out_list,
+    inv_list
 ):
     """
     Bounce back boundary condition kernel

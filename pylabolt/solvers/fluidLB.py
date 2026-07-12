@@ -122,7 +122,8 @@ class Solver:
         simulation = load_simulation(comm, mpi_rank)
         self.backend = Backend(
             backend,
-            n_threads
+            n_threads,
+            mpi_rank
         )
         self.state = State(
             simulation,
@@ -143,14 +144,12 @@ class Solver:
             simulation,
             self.model,
             self.state,
-            self.backend,
             self.mpi_operator
         )
         self.compute_fields_operator = ComputeFieldsOperator(
             self.model,
             self.state,
-            self.collision_operator,
-            self.backend
+            self.collision_operator
         )
         self.streaming_operator = StreamingOperator(
             self.model,
@@ -178,6 +177,25 @@ class Solver:
             self.state.domain.mpi_rank,
             verbose=True
         )
+
+    def set_backend(self, verbose=True):
+        print_log("-" * 80, self.state.domain.mpi_rank, verbose)
+        print_log("Setting simulation backend...\n",
+                  self.state.domain.mpi_rank, verbose)
+
+        self.state.set_backend(self.backend)
+        # self.mpi_operator.set_backend(self.backend)
+        # self.obstacle_operator.set_backend(self.backend)
+        self.collision_operator.set_backend(self.state, self.backend)
+        self.compute_fields_operator.set_backend(self.state, self.backend)
+        self.streaming_operator.set_backend(self.state, self.backend)
+        self.boundary_operator.set_backend(self.state, self.backend)
+        self.residue_operator.set_backend(self.state, self.backend)
+        self.io_operator.set_backend(self.state, self.backend)
+
+        print_log("\nSetting simulation backend done!",
+                  self.state.domain.mpi_rank, verbose)
+        print_log("-" * 80, self.state.domain.mpi_rank, verbose)
 
     def compile(self, verbose=True):
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
@@ -249,6 +267,7 @@ def main(backend, n_threads):
     MPI.Init()
     comm = MPI.COMM_WORLD
     solver = Solver(comm, backend, n_threads)
+    solver.set_backend()
     solver.compile()
     solver.run()
     MPI.Finalize()

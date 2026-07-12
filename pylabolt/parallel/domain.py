@@ -85,15 +85,24 @@ class Domain:
         self.inner_shape = np.array([self.Nx_rank, self.Ny_rank])
         self.inner_size = np.prod(self.inner_shape)
 
-    def details(self):
-        print("Domain decomposition details - global domain = ",
-              self.Nx_global, self.Ny_global)
-        print("(nx, ny):", self.no_of_procs_x, self.no_of_procs_y)
-        print("rank:", self.rank)
-        print("(i_proc, j_proc):", self.i_proc, self.j_proc)
-        print("(Nx, Ny):", self.Nx_rank, self.Ny_rank)
-        print("global offset:", self.offset)
-        print()
+    def set_backend(
+        self,
+        backend
+    ):
+        """
+        Configure backend attributes for domain object
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "gpu":
+            self._device_attrs = ["size", "shape"]
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)
 
 
 @numba.njit(inline="always")

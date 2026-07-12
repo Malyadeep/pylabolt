@@ -42,6 +42,9 @@ class Fields:
         Attributes (scalar = True):
             --TODO-- no scalar field solver present yet
         """
+        self.fluid = fluid
+        self.phase = phase
+        self.scalar = scalar
         dim = len(domain.shape)
         # ------- Geometry ------- #
         self.solid = self.allocate_memory(domain.size, np.bool_)
@@ -53,7 +56,7 @@ class Fields:
         self.init_ghost_nodes(domain)
         self.periodic_boundary = self.allocate_memory(domain.size, np.bool_)
         # ------- Fluid physics ------- #
-        if fluid is True:
+        if self.fluid:
             self.velocity = self.allocate_memory(
                 domain.size,
                 control.precision,
@@ -82,13 +85,8 @@ class Fields:
                 control.precision,
                 components=lattice.no_of_directions
             )
-            self.pop_fluid_eq = self.allocate_memory(
-                domain.size,
-                control.precision,
-                components=lattice.no_of_directions
-            )
         # ------- Phase physics ------- #
-        if phase is True:
+        if self.phase:
             self.phase_field = self.allocate_memory(
                 domain.size,
                 control.precision
@@ -135,13 +133,8 @@ class Fields:
                 control.precision,
                 components=lattice.no_of_directions
             )
-            self.pop_phase_eq = self.allocate_memory(
-                domain.size,
-                control.precision,
-                components=lattice.no_of_directions
-            )
         # ------- Phase physics ------- #
-        if scalar is True:
+        if self.scalar:
             # --TODO-- no scalar field solver present yet
             pass
 
@@ -179,3 +172,51 @@ class Fields:
             j = ind - i * domain.shape[1]
             if i == 0 or j == 0 or i == Nx - 1 or j == Ny - 1:
                 self.ghost_node[ind] = True
+
+    def set_backend(
+        self,
+        backend
+    ):
+        """
+        Configure backend attributes for fields object
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "gpu":
+            self._device_attrs = [
+                "solid",
+                "solid_id",
+                "solid_boundary",
+                "fluid_boundary",
+                "ghost_node",
+                "periodic_boundary"
+            ]
+            if self.fluid:
+                self._device_attrs.extend([
+                    "velocity",
+                    "density",
+                    "pressure",
+                    "force_field",
+                    "pop_fluid",
+                    "pop_fluid_new"
+                ])
+            if self.phase:
+                self._device_attrs.extend([
+                    "phase_field",
+                    "grad_phase_field",
+                    "lap_phase_field",
+                    "surface_tension_force",
+                    "pressure_corr_force",
+                    "viscous_corr_force",
+                    "curvature",
+                    "phase_field_solid",
+                    "pop_phase",
+                    "pop_phase_new"
+                ])
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)

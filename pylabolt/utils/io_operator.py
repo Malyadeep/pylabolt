@@ -24,8 +24,8 @@ class InputOutputOperator:
             print_log("-" * 80, state.domain.mpi_rank, verbose)
             print_log("Setting up I/O operator...\n",
                       state.domain.mpi_rank, verbose)
-            self.setup_write_fields(model, state)
-            self.set_backend(backend)
+            self.model = model
+            self.setup_write_fields(state)
             print_log("\nSetting up I/O operator done!",
                       state.domain.mpi_rank, verbose)
             print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -37,7 +37,6 @@ class InputOutputOperator:
 
     def setup_write_fields(
         self,
-        model,
         state,
         verbose=True
     ):
@@ -48,7 +47,7 @@ class InputOutputOperator:
         Returns:
 
         """
-        self.fields_list = model.save_fields
+        self.fields_list = self.model.save_fields
         self.fields_save = {}
         self.fields_save_metadata = {}
         for field_name in self.fields_list:
@@ -88,12 +87,11 @@ class InputOutputOperator:
             )
             self.field_save_path = "procs/proc_" +\
                 str(state.domain.mpi_rank) + "/"
-        self.dump_metadata(state, model)
+        self.dump_metadata(state)
 
     def dump_metadata(
         self,
-        state,
-        model
+        state
     ):
         """
         Dump metadata.json for the simulation
@@ -106,7 +104,7 @@ class InputOutputOperator:
         self.global_metadata = {
             "pylabolt": {
                 "version": version("pylabolt"),
-                "solver": model.solver_name
+                "solver": self.model.solver_name
             },
             "control": {
                 "end_time": state.control.end_time,
@@ -213,7 +211,9 @@ class InputOutputOperator:
 
     def set_backend(
         self,
-        backend
+        state,
+        backend,
+        verbose=True
     ):
         """
         Set backend for I/O operator
@@ -231,3 +231,6 @@ class InputOutputOperator:
         elif backend.backend_type == "gpu":
             pass
             # TODO: transfer residue fields to GPU
+
+        print_log("Backend set for I/O operator",
+                  state.domain.mpi_rank, verbose)

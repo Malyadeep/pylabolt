@@ -1,6 +1,3 @@
-import os
-import numpy as np
-
 import pylabolt.base.control as control
 import pylabolt.base.mesh as mesh
 import pylabolt.base.lattice as lattice
@@ -115,8 +112,35 @@ class State:
                 verbose=True
             )
 
+            # self.set_backend(backend)
+            # self.boundary.view_attrs(mpi_rank)
+            # var_names = vars(self.fields)
+            # for item in var_names:
+            #     print(f"{item:<30}: {var_names[item]}")
+
         except Exception as e:
             print_log("-" * 80, mpi_rank, verbose=True)
             print_log("FATAL ERROR!", mpi_rank, verbose=True)
             print_log(str(e), mpi_rank, verbose=True)
             comm.Abort()
+
+    def set_backend(
+        self,
+        backend,
+        verbose=True
+    ):
+        """
+        Configure backend attributes for state object
+        Args:
+
+        Returns:
+
+        """
+        self.control.set_backend(backend)
+        self.mesh.set_backend(backend)
+        self.lattice.set_backend(backend)
+        self.domain.set_backend(backend)
+        self.transport.set_backend(backend)
+        self.fields.set_backend(backend)
+        self.boundary.set_backend(backend)
+        print_log("Backend set for state", self.domain.mpi_rank, verbose)

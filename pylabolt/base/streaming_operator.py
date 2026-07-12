@@ -8,7 +8,6 @@ class StreamingOperator:
         self,
         model,
         state,
-        backend,
         verbose=True
     ):
         """
@@ -19,7 +18,7 @@ class StreamingOperator:
         print_log("-" * 80, state.domain.mpi_rank, verbose)
         print_log("Setting up streaming operator...",
                   state.domain.mpi_rank, verbose)
-        self.set_backend(model, state, backend)
+        self.model = model
         print_log("Setting up streaming operator done!",
                   state.domain.mpi_rank, verbose)
         print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -83,9 +82,9 @@ class StreamingOperator:
 
     def set_backend(
         self,
-        model,
         state,
-        backend
+        backend,
+        verbose=True
     ):
         """
         Set backend for streaming operator
@@ -100,8 +99,8 @@ class StreamingOperator:
             self.stream = self.stream_gpu
             # TODO: transfer streaming operator attributes to device
 
-        self.streaming_type = model.streaming_type
-        args = model.get_streaming_args()
+        self.streaming_type = self.model.streaming_type
+        args = self.model.get_streaming_args()
 
         if state.fluid:
             kernel_name = (
@@ -148,3 +147,6 @@ class StreamingOperator:
                         for item in args_list
                     )
                 self.streaming_args_phase += key_args
+
+        print_log("Backend set for streaming operator",
+                  state.domain.mpi_rank, verbose)

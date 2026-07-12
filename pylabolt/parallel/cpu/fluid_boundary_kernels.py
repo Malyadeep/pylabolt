@@ -4,12 +4,12 @@ from numba import prange
 
 @numba.njit(parallel=True, nogil=True)
 def bounce_back(
-    boundary_nodes,
-    out_list,
-    inv_list,
     solid,
     pop,
-    pop_new
+    pop_new,
+    boundary_nodes,
+    out_list,
+    inv_list
 ):
     """
     Bounce back boundary condition kernel
@@ -31,14 +31,14 @@ def fixed_velocity_density_based(
     cy,
     weights,
     inv_cs_2,
-    boundary_nodes,
-    out_list,
-    inv_list,
-    boundary_velocity,
     solid,
     density,
     pop,
-    pop_new
+    pop_new,
+    boundary_nodes,
+    out_list,
+    inv_list,
+    boundary_velocity
 ):
     """
     Fixed velocity boundary condition kernel
@@ -68,13 +68,13 @@ def fixed_velocity_no_density_based(
     cy,
     weights,
     inv_cs_2,
+    solid,
+    pop,
+    pop_new,
     boundary_nodes,
     out_list,
     inv_list,
-    boundary_velocity,
-    solid,
-    pop,
-    pop_new
+    boundary_velocity
 ):
     """
     Fixed velocity boundary condition kernel
@@ -105,15 +105,15 @@ def fixed_pressure_density_based(
     weights,
     inv_cs_2,
     inv_cs_4,
+    solid,
+    velocity,
+    pop,
+    pop_new,
     boundary_nodes,
     out_list,
     inv_list,
     boundary_density,
-    surface_normals,
-    solid,
-    velocity,
-    pop,
-    pop_new
+    surface_normals
 ):
     """
     Fixed pressure boundary condition kernel
@@ -160,15 +160,15 @@ def fixed_pressure_no_density_based(
     weights,
     inv_cs_2,
     inv_cs_4,
+    solid,
+    velocity,
+    pop,
+    pop_new,
     boundary_nodes,
     out_list,
     inv_list,
     boundary_pressure,
-    surface_normals,
-    solid,
-    velocity,
-    pop,
-    pop_new
+    surface_normals
 ):
     """
     Fixed pressure boundary condition kernel

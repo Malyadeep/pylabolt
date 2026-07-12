@@ -10,7 +10,6 @@ class ResidueOperator:
         self,
         model,
         state,
-        backend,
         mpi_operator,
         verbose=True
     ):
@@ -23,8 +22,8 @@ class ResidueOperator:
             print_log("-" * 80, state.domain.mpi_rank, verbose)
             print_log("Setting up residue computation operator...\n",
                       state.domain.mpi_rank, verbose)
-            self.setup_residue_operator(model, state)
-            self.set_backend(backend)
+            self.model = model
+            self.setup_residue_operator(state)
             print_log("\nSetting up residue computation operator done!",
                       state.domain.mpi_rank, verbose)
             print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -36,7 +35,6 @@ class ResidueOperator:
 
     def setup_residue_operator(
         self,
-        model,
         state,
         verbose=True
     ):
@@ -47,7 +45,7 @@ class ResidueOperator:
         Returns:
 
         """
-        self.fields_list = model.residue_fields
+        self.fields_list = self.model.residue_fields
         self.residues = {}
         for field_name in self.fields_list:
             if not hasattr(state.fields, field_name):
@@ -161,7 +159,9 @@ class ResidueOperator:
 
     def set_backend(
         self,
-        backend
+        state,
+        backend,
+        verbose=True
     ):
         """
         Set backend for residue operator
@@ -179,3 +179,6 @@ class ResidueOperator:
         elif backend.backend_type == "gpu":
             self.compute_residues = self.compute_residues_gpu
             # TODO: transfer residue fields to GPU
+
+        print_log("Backend set for compute residues operator",
+                  state.domain.mpi_rank, verbose)
