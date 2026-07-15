@@ -48,7 +48,7 @@ class Fields:
         dim = len(domain.shape)
         # ------- Geometry ------- #
         self.solid = self.allocate_memory(domain.size, np.bool_)
-        self.solid_id = self.allocate_memory(domain.size, np.int32)
+        self.solid_id = self.allocate_memory(domain.size, int)
         self.solid_id[:] = -1
         self.solid_boundary = self.allocate_memory(domain.size, np.bool_)
         self.fluid_boundary = self.allocate_memory(domain.size, np.bool_)
@@ -147,9 +147,9 @@ class Fields:
         """
         Allocates memory and returns numpy array
         Args;
-            size: np.int32 - domain size (Nx * Ny)
+            size: int - domain size (Nx * Ny)
             dtype: data-type
-            components: np.int32, default=None
+            components: int, default=None
         Returns:
             array (size, components), dtype=dtype
         """

@@ -22,7 +22,7 @@ class ObstacleOperator:
         """
         self.no_of_obstacles = len(state.obstacle.obstacles)
 
-        mpi_operator.halo_exchange(
+        mpi_operator.halo_exchange_cpu(
             state,
             bool_buffers=["solid"]
         )

@@ -1,5 +1,5 @@
 from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.cpu import streaming_kernels as streaming_kernels_cpu
+import pylabolt.parallel.cpu.streaming_kernels as streaming_kernels_cpu
 # from pylabolt.parallel.gpu import streaming_kernels as streaming_kernels_gpu
 
 

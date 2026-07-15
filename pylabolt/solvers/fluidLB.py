@@ -184,7 +184,7 @@ class Solver:
                   self.state.domain.mpi_rank, verbose)
 
         self.state.set_backend(self.backend)
-        # self.mpi_operator.set_backend(self.backend)
+        self.mpi_operator.set_backend(self.state, self.backend)
         # self.obstacle_operator.set_backend(self.backend)
         self.collision_operator.set_backend(self.state, self.backend)
         self.compute_fields_operator.set_backend(self.state, self.backend)
@@ -202,6 +202,7 @@ class Solver:
         print_log("JIT Compilation starts...\n",
                   self.state.domain.mpi_rank, verbose)
 
+        self.mpi_operator.compile(self.state, self.backend)
         self.collision_operator.compile(self.state, self.backend)
         self.compute_fields_operator.compile(self.state, self.backend)
         self.streaming_operator.compile(self.state, self.backend)
@@ -213,12 +214,26 @@ class Solver:
                   self.state.domain.mpi_rank, verbose)
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
 
+    def verify_kernel_signatures(self, verbose=True):
+        print_log("-" * 80, self.state.domain.mpi_rank, verbose)
+        print_log("Kernel signature verification selected, check starts...\n",
+                  self.state.domain.mpi_rank, verbose)
+
+        self.mpi_operator.verify_kernel_signatures(self.state, self.backend)
+
+        print_log("\nKernel signature verification done!",
+                  self.state.domain.mpi_rank, verbose)
+        print_log("-" * 80, self.state.domain.mpi_rank, verbose)
+
     def run(
         self,
         verbose=True
     ):
         print_log("\n" + "-" * 80, self.state.domain.mpi_rank, verbose)
-        print_log("Running simulation...\n", self.state.domain.mpi_rank, verbose)
+        print_log(
+            "Running simulation...\n", self.state.domain.mpi_rank,
+            verbose
+        )
         self.io_operator.write_fields(
             self.state,
             self.state.control.start_time
@@ -270,4 +285,5 @@ def main(backend, n_threads):
     solver.set_backend()
     solver.compile()
     solver.run()
+    solver.verify_kernel_signatures()
     MPI.Finalize()

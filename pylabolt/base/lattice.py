@@ -48,26 +48,26 @@ class Lattice:
                     "grid dimensions and lattice type are incompatible"
                 )
             self.cx = np.array([0, 1, 0, -1, 0, 1, -1, -1, 1],
-                               dtype=np.int32)
+                               dtype=int)
             self.cy = np.array([0, 0, 1, 0, -1, 1, 1, -1, -1],
-                               dtype=np.int32)
+                               dtype=int)
             self.weights = np.array(
                 [4/9, 1/9, 1/9, 1/9, 1/9, 1/36, 1/36, 1/36, 1/36],
                 dtype=control.precision
             )
             self.inv_list = np.array([0, 3, 4, 1, 2, 7, 8, 5, 6],
-                                     dtype=np.int32)
-            self.no_of_directions = np.int32(9)
+                                     dtype=int)
+            self.no_of_directions = int(9)
         elif self.lattice_type == "D1Q3":
             if mesh.dimensions != 1:
                 raise ValueError(
                     "grid dimensions and lattice type are incompatible"
                 )
-            self.cx = np.array([0, 1, -1], dtype=np.int32)
-            self.cy = np.array([0, 0, 0], dtype=np.int32)
+            self.cx = np.array([0, 1, -1], dtype=int)
+            self.cy = np.array([0, 0, 0], dtype=int)
             self.weights = np.array([2/3, 1/6, 1/6], dtype=control.precision)
-            self.inv_list = np.array([0, 2, 1], dtype=np.int32)
-            self.no_of_directions = np.int32(3)
+            self.inv_list = np.array([0, 2, 1], dtype=int)
+            self.no_of_directions = int(3)
         else:
             raise ValueError(
                 "Unsupported lattice type"

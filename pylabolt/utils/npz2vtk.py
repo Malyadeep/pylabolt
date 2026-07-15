@@ -42,7 +42,7 @@ class VTKOperator:
         try:
             self.mesh = SimpleNamespace(
                 size=self.metadata["mesh"]["size"],
-                shape=np.array(self.metadata["mesh"]["shape"], dtype=np.int64)
+                shape=np.array(self.metadata["mesh"]["shape"], dtype=int)
             )
             self.fields_metadata = self.metadata["fields_saved"]
             self.fields = {}
@@ -139,7 +139,7 @@ class VTKOperator:
             components = self.fields_metadata[field_name]["components"]
             if field_dtype == "float64" or field_dtype == "float32":
                 fields_vtk[field_name] = vtkDoubleArray()
-            if field_dtype == "int32" or field_dtype == "bool":
+            if field_dtype == "int64" or field_dtype == "bool":
                 fields_vtk[field_name] = vtkIntArray()
             fields_vtk[field_name].SetName(field_name)
             if components > 1:
@@ -189,7 +189,7 @@ class VTKOperator:
                     else:
                         if field_dtype == "bool":
                             fields_vtk[field_name].InsertNextValue(
-                                np.int32(self.fields[field_name][ind])
+                                int(self.fields[field_name][ind])
                             )
                         else:
                             fields_vtk[field_name].InsertNextValue(
@@ -233,7 +233,7 @@ class VTKOperator:
                 if matched_file:
                     save_times.append(int(matched_file.group(1)))
             save_times.sort()
-            save_times = np.array(save_times, dtype=np.int64)
+            save_times = np.array(save_times, dtype=int)
         for time_step in save_times:
             self.convert_time(time_step)
 

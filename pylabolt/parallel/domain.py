@@ -77,7 +77,7 @@ class Domain:
             offset_y = self.j_proc * int(
                 np.ceil(mesh.grid_global_shape[1] / self.no_of_procs_y)
             )
-        self.offset = np.array([offset_x, offset_y], dtype=np.int32)
+        self.offset = np.array([offset_x, offset_y], dtype=int)
         self.Nx_pad = self.Nx_rank + 2
         self.Ny_pad = self.Ny_rank + 2
         self.shape = np.array([self.Nx_pad, self.Ny_pad])

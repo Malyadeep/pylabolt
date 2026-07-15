@@ -101,7 +101,7 @@ class ReconstructOperator:
             )
             self.mesh = SimpleNamespace(
                 size=self.metadata["mesh"]["size"],
-                shape=np.array(self.metadata["mesh"]["shape"], dtype=np.int64)
+                shape=np.array(self.metadata["mesh"]["shape"], dtype=int)
             )
             self.decomposition = SimpleNamespace(
                 nx=self.metadata["decomposition"]["nx"],
@@ -164,14 +164,14 @@ class ReconstructOperator:
                 domain_data = SimpleNamespace(
                     rank=rank_metadata["rank"],
                     processor_ij=np.array(
-                        rank_metadata["processor_ij"], dtype=np.int64
+                        rank_metadata["processor_ij"], dtype=int
                     ),
                     size=rank_metadata["domain_size"],
                     shape=np.array(
-                        rank_metadata["domain_shape"], dtype=np.int64
+                        rank_metadata["domain_shape"], dtype=int
                     ),
                     offset=np.array(
-                        rank_metadata["offset"], dtype=np.int64
+                        rank_metadata["offset"], dtype=int
                     )
                 )
                 self.domains.append(domain_data)
@@ -273,7 +273,7 @@ class ReconstructOperator:
                 self.control.start_time,
                 self.control.end_time + 1,
                 self.control.save_interval,
-                dtype=np.int64
+                dtype=int
             )
         for time_step in save_times:
             self.reconstruct_time(time_step)

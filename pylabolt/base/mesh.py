@@ -27,7 +27,7 @@ class Mesh:
 
         if not isinstance(grid, list) or len(grid) != 2:
             raise ValueError("grid entry in mesh_dict must be a list [Nx, Ny]")
-        grid = np.array(grid, dtype=np.int32)
+        grid = np.array(grid, dtype=int)
 
         if np.any(grid == 0):
             raise ValueError("grid dimensions cannot be zero")

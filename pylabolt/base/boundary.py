@@ -59,20 +59,20 @@ class BoundaryElement:
                 )
         if self.location == "bottom":
             self.surface_normals = np.array([0, 1], dtype=control.precision)
-            self.out_list = np.array([4, 7, 8], dtype=np.int32)
-            self.inv_list = np.array([2, 5, 6], dtype=np.int32)
+            self.out_list = np.array([4, 7, 8], dtype=int)
+            self.inv_list = np.array([2, 5, 6], dtype=int)
         elif self.location == "top":
             self.surface_normals = np.array([0, -1], dtype=control.precision)
-            self.out_list = np.array([2, 5, 6], dtype=np.int32)
-            self.inv_list = np.array([4, 7, 8], dtype=np.int32)
+            self.out_list = np.array([2, 5, 6], dtype=int)
+            self.inv_list = np.array([4, 7, 8], dtype=int)
         elif self.location == "left":
             self.surface_normals = np.array([1, 0], dtype=control.precision)
-            self.out_list = np.array([3, 6, 7], dtype=np.int32)
-            self.inv_list = np.array([1, 8, 5], dtype=np.int32)
+            self.out_list = np.array([3, 6, 7], dtype=int)
+            self.inv_list = np.array([1, 8, 5], dtype=int)
         elif self.location == "right":
             self.surface_normals = np.array([-1, 0], dtype=control.precision)
-            self.out_list = np.array([1, 8, 5], dtype=np.int32)
-            self.inv_list = np.array([3, 6, 7], dtype=np.int32)
+            self.out_list = np.array([1, 8, 5], dtype=int)
+            self.inv_list = np.array([3, 6, 7], dtype=int)
         self.boundary_nodes = self.allocate_boundary_nodes(
             segment,
             domain
@@ -107,7 +107,7 @@ class BoundaryElement:
                 else:
                     ind = (i + 1) * domain.shape[1] + (j + 1)
                     boundary_nodes.append(ind)
-            boundary_nodes = np.array(boundary_nodes, dtype=np.int64)
+            boundary_nodes = np.array(boundary_nodes, dtype=int)
             return boundary_nodes
         if self.orientation == "vertical":
             i_global = x_min
@@ -120,7 +120,7 @@ class BoundaryElement:
                 else:
                     ind = (i + 1) * domain.shape[1] + (j + 1)
                     boundary_nodes.append(ind)
-            boundary_nodes = np.array(boundary_nodes, dtype=np.int64)
+            boundary_nodes = np.array(boundary_nodes, dtype=int)
             return boundary_nodes
 
 
