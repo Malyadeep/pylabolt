@@ -66,11 +66,20 @@ class ComputeFieldsOperator:
         Returns:
 
         """
+        self.kernel_signatures = {}
         if fluid:
             self.compute_fields_kernel_fluid(*self.compute_fields_args_fluid)
+            self.kernel_signatures.update({
+                self.compute_fields_kernel_fluid.__name__:
+                    set(self.compute_fields_kernel_fluid.signatures)
+            })
 
         if phase:
             self.compute_fields_kernel_phase(*self.compute_fields_args_phase)
+            self.kernel_signatures.update({
+                self.compute_fields_kernel_phase.__name__:
+                    set(self.compute_fields_kernel_phase.signatures)
+            })
 
     def compute_fields_gpu(
         self,
@@ -175,4 +184,30 @@ class ComputeFieldsOperator:
                 self.compute_fields_args_phase += key_args
 
         print_log("Backend set for compute fields operator",
+                  state.domain.mpi_rank, verbose)
+
+    def verify_kernel_signatures(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        Debug function: Verifies if compiled kernel signatures
+        changed or not. Detects recompilation
+        Args:
+
+        Returns:
+
+        """
+        for kernel_name in self.kernel_signatures:
+            kernel = getattr(compute_fields_kernels_cpu, kernel_name)
+            if (set(kernel.signatures) !=
+                    self.kernel_signatures[kernel_name]):
+                raise RuntimeError(
+                    f"Developer error! {kernel_name} in"
+                    f" compute fields operator compiled a new signature!"
+                )
+
+        print_log("Kernel signatures verified for compute fields operator",
                   state.domain.mpi_rank, verbose)

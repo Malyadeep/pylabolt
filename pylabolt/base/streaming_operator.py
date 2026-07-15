@@ -36,13 +36,23 @@ class StreamingOperator:
         Returns:
 
         """
+        self.kernel_signatures = {}
         if state.fluid:
             compile_args = backend.make_compile_args(self.streaming_args_fluid)
             self.streaming_kernel_fluid(*compile_args)
+            self.kernel_signatures.update({
+                self.streaming_kernel_fluid.__name__:
+                    set(self.streaming_kernel_fluid.signatures)
+            })
 
         elif state.phase:
             compile_args = backend.make_compile_args(self.streaming_args_phase)
             self.streaming_kernel_phase(*compile_args)
+            self.kernel_signatures.update({
+                self.streaming_kernel_phase.__name__:
+                    set(self.streaming_kernel_phase.signatures)
+            })
+
         print_log("Compiled streaming operator",
                   state.domain.mpi_rank, verbose)
 
@@ -149,4 +159,30 @@ class StreamingOperator:
                 self.streaming_args_phase += key_args
 
         print_log("Backend set for streaming operator",
+                  state.domain.mpi_rank, verbose)
+
+    def verify_kernel_signatures(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        Debug function: Verifies if compiled kernel signatures
+        changed or not. Detects recompilation
+        Args:
+
+        Returns:
+
+        """
+        for kernel_name in self.kernel_signatures:
+            kernel = getattr(streaming_kernels_cpu, kernel_name)
+            if (set(kernel.signatures) !=
+                    self.kernel_signatures[kernel_name]):
+                raise RuntimeError(
+                    f"Developer error! {kernel_name} in"
+                    f" streaming operator compiled a new signature!"
+                )
+
+        print_log("Kernel signatures verified for streaming operator",
                   state.domain.mpi_rank, verbose)

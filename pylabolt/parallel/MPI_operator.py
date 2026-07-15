@@ -706,11 +706,20 @@ class MPIOperator:
         backend,
         verbose=True
     ):
+        """
+        Debug function: Verifies if compiled kernel signatures
+        changed or not. Detects recompilation
+        Args:
+
+        Returns:
+
+        """
         for kernel_name in self.kernel_signatures:
             kernel = getattr(MPI_kernels_cpu, kernel_name)
             if set(kernel.signatures) != self.kernel_signatures[kernel_name]:
                 raise RuntimeError(
-                    f"Developer error! {kernel_name} compiled a new signature!"
+                    f"Developer error! {kernel_name} in"
+                    " MPI operator compiled a new signature!"
                 )
         print_log("Kernel signatures verified for MPI operator",
                   state.domain.mpi_rank, verbose)

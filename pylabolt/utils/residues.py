@@ -20,11 +20,11 @@ class ResidueOperator:
         """
         try:
             print_log("-" * 80, state.domain.mpi_rank, verbose)
-            print_log("Setting up residue computation operator...\n",
+            print_log("Setting up residue operator...\n",
                       state.domain.mpi_rank, verbose)
             self.model = model
             self.setup_residue_operator(state)
-            print_log("\nSetting up residue computation operator done!",
+            print_log("\nSetting up residue operator done!",
                       state.domain.mpi_rank, verbose)
             print_log("-" * 80, state.domain.mpi_rank, verbose)
         except Exception as e:
@@ -94,7 +94,15 @@ class ResidueOperator:
                 self.compute_residues_kernel_scalar(*compile_args)
             elif len(self.residues["res_" + item]) == 2:
                 self.compute_residues_kernel_vector(*compile_args)
-        print_log("Compiled compute residues operator",
+
+        self.kernel_signatures = {
+            self.compute_residues_kernel_scalar.__name__:
+                set(self.compute_residues_kernel_scalar.signatures),
+            self.compute_residues_kernel_vector.__name__:
+                set(self.compute_residues_kernel_vector.signatures)
+        }
+
+        print_log("Compiled residue operator",
                   state.domain.mpi_rank, verbose)
 
     def compute_residues_cpu(
@@ -180,5 +188,31 @@ class ResidueOperator:
             self.compute_residues = self.compute_residues_gpu
             # TODO: transfer residue fields to GPU
 
-        print_log("Backend set for compute residues operator",
+        print_log("Backend set for residue operator",
+                  state.domain.mpi_rank, verbose)
+
+    def verify_kernel_signatures(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        Debug function: Verifies if compiled kernel signatures
+        changed or not. Detects recompilation
+        Args:
+
+        Returns:
+
+        """
+        for kernel_name in self.kernel_signatures:
+            kernel = getattr(compute_residues_kernels_cpu, kernel_name)
+            if (set(kernel.signatures) !=
+                    self.kernel_signatures[kernel_name]):
+                raise RuntimeError(
+                    f"Developer error! {kernel_name} in"
+                    f" residue operator compiled a new signature!"
+                )
+
+        print_log("Kernel signatures verified for residue operator",
                   state.domain.mpi_rank, verbose)

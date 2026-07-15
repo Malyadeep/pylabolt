@@ -29,15 +29,19 @@ def main():
         "--to_vtk", choices=["all", "time", None], default=None,
         help="Convert output data to VTK format"
     )
+    parser.add_argument(
+        "--debug", action="store_true", default=False,
+        help="Run in debug mode"
+    )
     args = parser.parse_args()
 
     """ Run Solver to generate raw output data """
     if args.solver == "fluidLB":
         from pylabolt.solvers import fluidLB
-        fluidLB.main(args.backend, args.n_threads)
+        fluidLB.main(args.backend, args.n_threads, debug_mode=args.debug)
     if args.solver == "phaseFieldLB":
         from pylabolt.solvers import phaseFieldLB
-        phaseFieldLB.main(args.backend, args.n_threads)
+        phaseFieldLB.main(args.backend, args.n_threads, debug_mode=args.debug)
     # elif args.solver == "cgLB":
     #     from pylabolt.solvers.cgLB import cgLB
     #     cgLB.main(parallelization, n_threads=args.n_threads)

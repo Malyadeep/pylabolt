@@ -237,6 +237,7 @@ class CollisionOperator:
         Returns:
 
         """
+        self.kernel_signatures = {}
         if state.fluid:
             compile_args = backend.make_compile_args(self.collision_args_fluid)
             self.collision_kernel_fluid(*compile_args)
@@ -244,6 +245,16 @@ class CollisionOperator:
                 self.initialize_pop_args_fluid
             )
             self.initialize_pop_kernel_fluid(*compile_args)
+            self.kernel_signatures.update({
+                "collision": {
+                    self.collision_kernel_fluid.__name__:
+                        set(self.collision_kernel_fluid.signatures)
+                },
+                "initialize": {
+                    self.initialize_pop_kernel_fluid.__name__:
+                        set(self.initialize_pop_kernel_fluid.signatures)
+                }
+            })
 
         if state.phase:
             compile_args = backend.make_compile_args(self.collision_args_phase)
@@ -252,6 +263,17 @@ class CollisionOperator:
                 self.initialize_pop_args_phases
             )
             self.initialize_pop_kernel_phase(*compile_args)
+            self.kernel_signatures.update({
+                "collision": {
+                    self.collision_kernel_phase.__name__:
+                        set(self.collision_kernel_phase.signatures)
+                },
+                "initialize": {
+                    self.initialize_pop_kernel_phase.__name__:
+                        set(self.initialize_pop_kernel_phase.signatures)
+                }
+            })
+
         print_log("Compiled collision operator",
                   state.domain.mpi_rank, verbose)
 
@@ -429,4 +451,37 @@ class CollisionOperator:
                 )
 
         print_log("Backend set for collision operator",
+                  state.domain.mpi_rank, verbose)
+
+    def verify_kernel_signatures(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        Debug function: Verifies if compiled kernel signatures
+        changed or not. Detects recompilation
+        Args:
+
+        Returns:
+
+        """
+        for kernel_name in self.kernel_signatures["collision"]:
+            kernel = getattr(collision_kernels_cpu, kernel_name)
+            if (set(kernel.signatures) !=
+                    self.kernel_signatures["collision"][kernel_name]):
+                raise RuntimeError(
+                    f"Developer error! {kernel_name} in"
+                    f" collision operator compiled a new signature!"
+                )
+        for kernel_name in self.kernel_signatures["initialize"]:
+            kernel = getattr(equilibrium_kernels_cpu, kernel_name)
+            if (set(kernel.signatures) !=
+                    self.kernel_signatures["initialize"][kernel_name]):
+                raise RuntimeError(
+                    f"Developer error! {kernel_name} in"
+                    f" collision operator compiled a new signature!"
+                )
+        print_log("Kernel signatures verified for collision operator",
                   state.domain.mpi_rank, verbose)

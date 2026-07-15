@@ -38,21 +38,33 @@ class BoundaryOperator:
         Returns:
 
         """
+        self.kernel_signatures = {}
         if state.fluid:
+            self.kernel_signatures.update({"fluid": {}})
             for itr in range(len(self.boundary_kernels_fluid)):
                 if self.boundary_kernels_fluid[itr] is not None:
                     compile_args = backend.make_compile_args(
                         self.boundary_args_fluid[itr]
                     )
                     self.boundary_kernels_fluid[itr](*compile_args)
+                    self.kernel_signatures["fluid"].update({
+                        self.boundary_kernels_fluid[itr].__name__:
+                            set(self.boundary_kernels_fluid[itr].signatures)
+                    })
 
         elif state.phase:
+            self.kernel_signatures.update({"phase": {}})
             for itr in range(len(self.boundary_kernels_phase)):
                 if self.boundary_kernels_phase[itr] is not None:
                     compile_args = backend.make_compile_args(
                         self.boundary_args_phase[itr]
                     )
                     self.boundary_kernels_phase[itr](*compile_args)
+                    self.kernel_signatures["phase"].update({
+                        self.boundary_kernels_phase[itr].__name__:
+                            set(self.boundary_kernels_phase[itr].signatures)
+                    })
+
         print_log("Compiled boundary operator", state.domain.mpi_rank, verbose)
 
     def set_boundary_cpu(
@@ -159,6 +171,43 @@ class BoundaryOperator:
                     self.boundary_args_phase.append(None)
 
         print_log("Backend set for boundary operator",
+                  state.domain.mpi_rank, verbose)
+
+    def verify_kernel_signatures(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        Debug function: Verifies if compiled kernel signatures
+        changed or not. Detects recompilation
+        Args:
+
+        Returns:
+
+        """
+        if state.fluid:
+            for kernel_name in self.kernel_signatures["fluid"]:
+                kernel = getattr(fluid_kernels_cpu, kernel_name)
+                if (set(kernel.signatures) !=
+                        self.kernel_signatures["fluid"][kernel_name]):
+                    raise RuntimeError(
+                        f"Developer error! {kernel_name}: fluid in"
+                        f" boundary operator compiled a new signature!"
+                    )
+
+        if state.phase:
+            for kernel_name in self.kernel_signatures["phase"]:
+                kernel = getattr(phase_kernels_cpu, kernel_name)
+                if (set(kernel.signatures) !=
+                        self.kernel_signatures["phase"][kernel_name]):
+                    raise RuntimeError(
+                        f"Developer error! {kernel_name}: phase in"
+                        f" boundary operator compiled a new signature!"
+                    )
+
+        print_log("Kernel signatures verified for boundary operator",
                   state.domain.mpi_rank, verbose)
 
 

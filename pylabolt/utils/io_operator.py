@@ -206,6 +206,14 @@ class InputOutputOperator:
                 self.copy_inner_data_kernel_scalar(*compile_args)
             elif self.fields_save_metadata[item]["components"] == 2:
                 self.copy_inner_data_kernel_vector(*compile_args)
+
+        self.kernel_signatures = {
+            self.copy_inner_data_kernel_scalar.__name__:
+                set(self.copy_inner_data_kernel_scalar.signatures),
+            self.copy_inner_data_kernel_vector.__name__:
+                set(self.copy_inner_data_kernel_vector.signatures)
+        }
+
         print_log("Compiled I/O operator",
                   state.domain.mpi_rank, verbose)
 
@@ -233,4 +241,30 @@ class InputOutputOperator:
             # TODO: transfer residue fields to GPU
 
         print_log("Backend set for I/O operator",
+                  state.domain.mpi_rank, verbose)
+
+    def verify_kernel_signatures(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        Debug function: Verifies if compiled kernel signatures
+        changed or not. Detects recompilation
+        Args:
+
+        Returns:
+
+        """
+        for kernel_name in self.kernel_signatures:
+            kernel = getattr(io_operator_kernels_cpu, kernel_name)
+            if (set(kernel.signatures) !=
+                    self.kernel_signatures[kernel_name]):
+                raise RuntimeError(
+                    f"Developer error! {kernel_name} in"
+                    f" I/O operator compiled a new signature!"
+                )
+
+        print_log("Kernel signatures verified for I/O operator",
                   state.domain.mpi_rank, verbose)

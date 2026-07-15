@@ -219,7 +219,14 @@ class Solver:
         print_log("Kernel signature verification selected, check starts...\n",
                   self.state.domain.mpi_rank, verbose)
 
-        self.mpi_operator.verify_kernel_signatures(self.state, self.backend)
+        args = (self.state, self.backend)
+        self.mpi_operator.verify_kernel_signatures(*args)
+        self.collision_operator.verify_kernel_signatures(*args)
+        self.streaming_operator.verify_kernel_signatures(*args)
+        self.compute_fields_operator.verify_kernel_signatures(*args)
+        self.boundary_operator.verify_kernel_signatures(*args)
+        self.residue_operator.verify_kernel_signatures(*args)
+        self.io_operator.verify_kernel_signatures(*args)
 
         print_log("\nKernel signature verification done!",
                   self.state.domain.mpi_rank, verbose)
@@ -278,12 +285,13 @@ class Solver:
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
 
 
-def main(backend, n_threads):
+def main(backend, n_threads, debug_mode=False):
     MPI.Init()
     comm = MPI.COMM_WORLD
     solver = Solver(comm, backend, n_threads)
     solver.set_backend()
     solver.compile()
     solver.run()
-    solver.verify_kernel_signatures()
+    if debug_mode:
+        solver.verify_kernel_signatures()
     MPI.Finalize()
