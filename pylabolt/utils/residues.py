@@ -3,6 +3,8 @@ import numpy as np
 from pylabolt.utils.helpers import print_log
 import pylabolt.parallel.cpu.compute_residues_kernels as\
     compute_residues_kernels_cpu
+import pylabolt.parallel.gpu.compute_residues_kernels as\
+    compute_residues_kernels_gpu
 
 
 class ResidueOperator:
@@ -81,19 +83,37 @@ class ResidueOperator:
         Returns:
 
         """
-        for item in self.fields_list:
-            args = (
-                state.domain.size,
-                state.fields.solid,
-                state.fields.ghost_node,
-                getattr(state.fields, item),
-                getattr(self, item + "_old"),
-            )
-            compile_args = backend.make_compile_args(args)
-            if len(self.residues["res_" + item]) == 1:
-                self.compute_residues_kernel_scalar(*compile_args)
-            elif len(self.residues["res_" + item]) == 2:
-                self.compute_residues_kernel_vector(*compile_args)
+        if backend.backend_type == "cpu":
+            for item in self.fields_list:
+                args = (
+                    state.domain.size,
+                    state.fields.solid,
+                    state.fields.ghost_node,
+                    getattr(state.fields, item),
+                    getattr(self, item + "_old"),
+                )
+                compile_args = backend.make_compile_args(args)
+                if len(self.residues["res_" + item]) == 1:
+                    self.compute_residues_kernel_scalar(*compile_args)
+                elif len(self.residues["res_" + item]) == 2:
+                    self.compute_residues_kernel_vector(*compile_args)
+
+        # TODO: make fields_old a dict, and store arrays in dict
+        # similar to io_operator
+        elif backend.backend_type == "gpu":
+            for item in self.fields_list:
+                args = (
+                    state.domain.size_device,
+                    state.fields.solid_device,
+                    state.fields.ghost_node_device,
+                    getattr(state.fields, item + "_device"),
+                    getattr(self, item + "_old_device"),
+                )
+                compile_args = backend.make_compile_args(args)
+                if len(self.residues["res_" + item]) == 1:
+                    self.compute_residues_kernel_scalar(*compile_args)
+                elif len(self.residues["res_" + item]) == 2:
+                    self.compute_residues_kernel_vector(*compile_args)
 
         self.kernel_signatures = {
             self.compute_residues_kernel_scalar.__name__:
@@ -186,7 +206,18 @@ class ResidueOperator:
                 compute_residues_kernels_cpu.compute_residue_vector
         elif backend.backend_type == "gpu":
             self.compute_residues = self.compute_residues_gpu
-            # TODO: transfer residue fields to GPU
+            self.compute_residues_kernel_scalar =\
+                compute_residues_kernels_gpu.compute_residue_scalar
+            self.compute_residues_kernel_vector =\
+                compute_residues_kernels_gpu.compute_residue_vector
+            self._device_attrs = []
+            for field_name in self.fields_list:
+                self._device_attrs.append(field_name + "_old")
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)
 
         print_log("Backend set for residue operator",
                   state.domain.mpi_rank, verbose)

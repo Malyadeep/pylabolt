@@ -1,6 +1,6 @@
 from pylabolt.utils.helpers import print_log
 import pylabolt.parallel.cpu.streaming_kernels as streaming_kernels_cpu
-# from pylabolt.parallel.gpu import streaming_kernels as streaming_kernels_gpu
+import pylabolt.parallel.gpu.streaming_kernels as streaming_kernels_gpu
 
 
 class StreamingOperator:
@@ -105,9 +105,10 @@ class StreamingOperator:
         """
         if backend.backend_type == "cpu":
             self.stream = self.stream_cpu
+            streaming_kernels_module = streaming_kernels_cpu
         elif backend.backend_type == "gpu":
             self.stream = self.stream_gpu
-            # TODO: transfer streaming operator attributes to device
+            streaming_kernels_module = streaming_kernels_gpu
 
         self.streaming_type = self.model.streaming_type
         args = self.model.get_streaming_args()
@@ -117,7 +118,7 @@ class StreamingOperator:
                 self.streaming_type["fluid"] + "_kernel"
             )
             self.streaming_kernel_fluid = getattr(
-                streaming_kernels_cpu, kernel_name
+                streaming_kernels_module, kernel_name
             )
             args_fluid = args["fluid"]
             self.streaming_args_fluid = ()
@@ -140,7 +141,7 @@ class StreamingOperator:
                 self.streaming_type["phase"] + "_kernel"
             )
             self.streaming_kernel_phase = getattr(
-                streaming_kernels_cpu, kernel_name
+                streaming_kernels_module, kernel_name
             )
             args_phase = args["phase"]
             self.streaming_args_phase = ()

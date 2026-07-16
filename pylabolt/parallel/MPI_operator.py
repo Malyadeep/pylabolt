@@ -610,71 +610,69 @@ class MPIOperator:
         Returns:
 
         """
-        for buffer, field_name, compilation_type in [
-            (self.bool_buffer, "solid", "bool_scalar"),
-            (self.int_buffer, "solid_id", "int_scalar"),
-            (self.float_buffer, "density", "float_scalar"),
-            (self.float_buffer, "pop_fluid", "float_vector")
-        ]:
-            layout_start, layout_end = \
-                buffer.layout[field_name]
-            field_to_copy = getattr(state.fields, field_name)
-            args = (
-                buffer.send_buff_top_bottom,
-                field_to_copy,
-                layout_start,
-                layout_end,
-                state.domain.shape
-            )
-            compile_args = backend.make_compile_args(args)
-            send_copy_x = MPI_kernels_cpu.send_copy_x_scalar
-            recv_copy_x = MPI_kernels_cpu.recv_copy_x_scalar
-            if (layout_end - layout_start) > 1:
-                send_copy_x = MPI_kernels_cpu.send_copy_x_vector
-                recv_copy_x = MPI_kernels_cpu.recv_copy_x_vector
-            send_copy_x(*compile_args, y=0)
-            recv_copy_x(*compile_args, y=0)
+        if backend.backend_type == "cpu":
+            for buffer, field_name, compilation_type in [
+                (self.bool_buffer, "solid", "bool_scalar"),
+                (self.int_buffer, "solid_id", "int_scalar"),
+                (self.float_buffer, "density", "float_scalar"),
+                (self.float_buffer, "pop_fluid", "float_vector")
+            ]:
+                layout_start, layout_end = \
+                    buffer.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                args = (
+                    buffer.send_buff_top_bottom,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape
+                )
+                compile_args = backend.make_compile_args(args)
+                send_copy_x = MPI_kernels_cpu.send_copy_x_scalar
+                recv_copy_x = MPI_kernels_cpu.recv_copy_x_scalar
+                if (layout_end - layout_start) > 1:
+                    send_copy_x = MPI_kernels_cpu.send_copy_x_vector
+                    recv_copy_x = MPI_kernels_cpu.recv_copy_x_vector
+                send_copy_x(*compile_args, y=0)
+                recv_copy_x(*compile_args, y=0)
 
-            layout_start, layout_end = \
-                buffer.layout[field_name]
-            field_to_copy = getattr(state.fields, field_name)
-            args = (
-                buffer.send_buff_left_right,
-                field_to_copy,
-                layout_start,
-                layout_end,
-                state.domain.shape
-            )
-            compile_args = backend.make_compile_args(args)
-            send_copy_y = MPI_kernels_cpu.send_copy_y_scalar
-            recv_copy_y = MPI_kernels_cpu.recv_copy_y_scalar
-            if (layout_end - layout_start) > 1:
-                send_copy_y = MPI_kernels_cpu.send_copy_y_vector
-                recv_copy_y = MPI_kernels_cpu.recv_copy_y_vector
-            send_copy_y(*compile_args, x=0)
-            recv_copy_y(*compile_args, x=0)
+                layout_start, layout_end = \
+                    buffer.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name)
+                args = (
+                    buffer.send_buff_left_right,
+                    field_to_copy,
+                    layout_start,
+                    layout_end,
+                    state.domain.shape
+                )
+                compile_args = backend.make_compile_args(args)
+                send_copy_y = MPI_kernels_cpu.send_copy_y_scalar
+                recv_copy_y = MPI_kernels_cpu.recv_copy_y_scalar
+                if (layout_end - layout_start) > 1:
+                    send_copy_y = MPI_kernels_cpu.send_copy_y_vector
+                    recv_copy_y = MPI_kernels_cpu.recv_copy_y_vector
+                send_copy_y(*compile_args, x=0)
+                recv_copy_y(*compile_args, x=0)
 
-        self.kernel_signatures = {
-            MPI_kernels_cpu.send_copy_x_scalar.__name__:
-                set(MPI_kernels_cpu.send_copy_x_scalar.signatures),
-            MPI_kernels_cpu.send_copy_x_vector.__name__:
-                set(MPI_kernels_cpu.send_copy_x_vector.signatures),
-            MPI_kernels_cpu.send_copy_y_scalar.__name__:
-                set(MPI_kernels_cpu.send_copy_y_scalar.signatures),
-            MPI_kernels_cpu.send_copy_y_vector.__name__:
-                set(MPI_kernels_cpu.send_copy_y_vector.signatures),
-            MPI_kernels_cpu.recv_copy_x_scalar.__name__:
-                set(MPI_kernels_cpu.recv_copy_x_scalar.signatures),
-            MPI_kernels_cpu.recv_copy_x_vector.__name__:
-                set(MPI_kernels_cpu.recv_copy_x_vector.signatures),
-            MPI_kernels_cpu.recv_copy_y_scalar.__name__:
-                set(MPI_kernels_cpu.recv_copy_y_scalar.signatures),
-            MPI_kernels_cpu.recv_copy_y_vector.__name__:
-                set(MPI_kernels_cpu.recv_copy_y_vector.signatures),
-        }
-
-        # for item in self.kernel_signatures:
-        #     print(item, self.kernel_signatures[item])
+            self.kernel_signatures = {
+                MPI_kernels_cpu.send_copy_x_scalar.__name__:
+                    set(MPI_kernels_cpu.send_copy_x_scalar.signatures),
+                MPI_kernels_cpu.send_copy_x_vector.__name__:
+                    set(MPI_kernels_cpu.send_copy_x_vector.signatures),
+                MPI_kernels_cpu.send_copy_y_scalar.__name__:
+                    set(MPI_kernels_cpu.send_copy_y_scalar.signatures),
+                MPI_kernels_cpu.send_copy_y_vector.__name__:
+                    set(MPI_kernels_cpu.send_copy_y_vector.signatures),
+                MPI_kernels_cpu.recv_copy_x_scalar.__name__:
+                    set(MPI_kernels_cpu.recv_copy_x_scalar.signatures),
+                MPI_kernels_cpu.recv_copy_x_vector.__name__:
+                    set(MPI_kernels_cpu.recv_copy_x_vector.signatures),
+                MPI_kernels_cpu.recv_copy_y_scalar.__name__:
+                    set(MPI_kernels_cpu.recv_copy_y_scalar.signatures),
+                MPI_kernels_cpu.recv_copy_y_vector.__name__:
+                    set(MPI_kernels_cpu.recv_copy_y_vector.signatures),
+            }
 
         print_log("Compiled MPI operator",
                   state.domain.mpi_rank, verbose)

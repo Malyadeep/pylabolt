@@ -4,6 +4,7 @@ import numpy as np
 
 from pylabolt.utils.helpers import print_log
 import pylabolt.parallel.cpu.io_operator_kernels as io_operator_kernels_cpu
+import pylabolt.parallel.gpu.io_operator_kernels as io_operator_kernels_gpu
 
 
 class InputOutputOperator:
@@ -180,6 +181,20 @@ class InputOutputOperator:
             **self.fields_save
         )
 
+    def write_fields_gpu(
+        self,
+        state,
+        time_step
+    ):
+        """
+        Fetch output data from GPU and write to disk
+        Args:
+
+        Returns:
+
+        """
+        pass
+
     def compile(
         self,
         state,
@@ -193,19 +208,35 @@ class InputOutputOperator:
         Returns:
 
         """
-        for item in self.fields_save:
-            args = (
-                state.domain.inner_size,
-                state.domain.inner_shape,
-                state.domain.shape,
-                getattr(state.fields, item),
-                self.fields_save[item]
-            )
-            compile_args = backend.make_compile_args(args)
-            if self.fields_save_metadata[item]["components"] == 1:
-                self.copy_inner_data_kernel_scalar(*compile_args)
-            elif self.fields_save_metadata[item]["components"] == 2:
-                self.copy_inner_data_kernel_vector(*compile_args)
+        if backend.backend_type == "cpu":
+            for item in self.fields_save:
+                args = (
+                    state.domain.inner_size,
+                    state.domain.inner_shape,
+                    state.domain.shape,
+                    getattr(state.fields, item),
+                    self.fields_save[item]
+                )
+                compile_args = backend.make_compile_args(args)
+                if self.fields_save_metadata[item]["components"] == 1:
+                    self.copy_inner_data_kernel_scalar(*compile_args)
+                elif self.fields_save_metadata[item]["components"] == 2:
+                    self.copy_inner_data_kernel_vector(*compile_args)
+
+        elif backend.backend_type == "gpu":
+            for item in self.fields_save:
+                args = (
+                    state.domain.inner_size_device,
+                    state.domain.inner_shape_device,
+                    state.domain.shape_device,
+                    getattr(state.fields, item + "_device"),
+                    self.fields_save_device[item]
+                )
+                compile_args = backend.make_compile_args(args)
+                if self.fields_save_metadata[item]["components"] == 1:
+                    self.copy_inner_data_kernel_scalar(*compile_args)
+                elif self.fields_save_metadata[item]["components"] == 2:
+                    self.copy_inner_data_kernel_vector(*compile_args)
 
         self.kernel_signatures = {
             self.copy_inner_data_kernel_scalar.__name__:
@@ -237,8 +268,20 @@ class InputOutputOperator:
             self.copy_inner_data_kernel_vector =\
                 io_operator_kernels_cpu.copy_inner_data_vector
         elif backend.backend_type == "gpu":
-            pass
-            # TODO: transfer residue fields to GPU
+            self.write_fields = self.write_fields_gpu
+            self.copy_inner_data_kernel_scalar =\
+                io_operator_kernels_gpu.copy_inner_data_scalar
+            self.copy_inner_data_kernel_vector =\
+                io_operator_kernels_gpu.copy_inner_data_vector
+            self._device_attrs = []
+            self.fields_save_device = {}
+            for field_name in self.fields_save:
+                arg_device = backend.allocate_to_device(
+                    self.fields_save[field_name]
+                )
+                self.fields_save_device.update({
+                    field_name: arg_device
+                })
 
         print_log("Backend set for I/O operator",
                   state.domain.mpi_rank, verbose)

@@ -48,6 +48,18 @@ class Backend:
                     compile_args.append(np.copy(arg))
                 else:
                     compile_args.append(arg)
+        if self.backend_type == "gpu":
+            for arg in args:
+                if isinstance(arg, cuda.cudadrv.devicearray.DeviceNDArray):
+                    temp = cuda.device_array_like(arg)
+                    compile_args.append(temp)
+                elif isinstance(arg, np.ndarray):
+                    raise RuntimeError(
+                        "Developer Error! Unallocated device array" +
+                        " encountered during compilation"
+                    )
+                else:
+                    compile_args.append(arg)
         compile_args = tuple(compile_args)
         return compile_args
 

@@ -1,10 +1,10 @@
 import numpy as np
 
 from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.cpu import collision_kernels as collision_kernels_cpu
-from pylabolt.parallel.cpu import equilibrium_kernels as\
-    equilibrium_kernels_cpu
-# from pylabolt.parallel.gpu import collision_kernels as collision_kernels_gpu
+import pylabolt.parallel.cpu.collision_kernels as collision_kernels_cpu
+import pylabolt.parallel.cpu.equilibrium_kernels as equilibrium_kernels_cpu
+import pylabolt.parallel.gpu.collision_kernels as collision_kernels_gpu
+import pylabolt.parallel.gpu.equilibrium_kernels as equilibrium_kernels_gpu
 
 
 class CollisionOperator:
@@ -335,7 +335,15 @@ class CollisionOperator:
         elif backend.backend_type == "gpu":
             pass
 
-    def set_kernel_args(self, state, backend, module, kernel_name, args_dict):
+    def set_kernel_args(
+        self,
+        state,
+        backend,
+        module,
+        kernel_name,
+        args_dict,
+        collision=False
+    ):
         kernel = getattr(module, kernel_name)
         args = ()
         for key in args_dict:
@@ -351,6 +359,11 @@ class CollisionOperator:
                     for item in args_list
                 )
             args += key_args
+        if collision:
+            if backend.backend_type == "cpu":
+                args += self.collision_params
+            elif backend.backend_type == "gpu":
+                args += self.collision_params_device
         return kernel, args
 
     def set_backend(
@@ -368,9 +381,22 @@ class CollisionOperator:
         """
         if backend.backend_type == "cpu":
             self.collide = self.collide_cpu
+            collision_kernels_module = collision_kernels_cpu
+            equilibrium_kernels_module = equilibrium_kernels_cpu
         elif backend.backend_type == "gpu":
             self.collide = self.collide_gpu
-            # TODO: transfer collision operator attributes to device
+            collision_kernels_module = collision_kernels_gpu
+            equilibrium_kernels_module = equilibrium_kernels_gpu
+            self._device_attrs = ["gravity", "omega_fluid"]
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)
+            self.collision_params_device = (
+                self.gravity_device,
+                self.omega_fluid_device
+            )
 
         args = self.model.get_collision_args()
 
@@ -384,18 +410,18 @@ class CollisionOperator:
                 self.set_kernel_args(
                     state,
                     backend,
-                    collision_kernels_cpu,
+                    collision_kernels_module,
                     kernel_name,
-                    args["collision"]["fluid"]
+                    args["collision"]["fluid"],
+                    collision=True
                 )
-            self.collision_args_fluid += self.collision_params
 
             kernel_name = (
                 "equilibrium_" +
                 self.equilibrium_fluid
             )
             self.equilibrium_kernel_fluid = getattr(
-                equilibrium_kernels_cpu,
+                equilibrium_kernels_module,
                 kernel_name
             )
 
@@ -407,7 +433,7 @@ class CollisionOperator:
                 self.set_kernel_args(
                     state,
                     backend,
-                    equilibrium_kernels_cpu,
+                    equilibrium_kernels_module,
                     kernel_name,
                     args["initialization"]["fluid"]
                 )
@@ -422,7 +448,7 @@ class CollisionOperator:
                 self.set_kernel_args(
                     state,
                     backend,
-                    collision_kernels_cpu,
+                    collision_kernels_module,
                     kernel_name,
                     args["collision"]["phase"]
                 )
@@ -433,7 +459,7 @@ class CollisionOperator:
                 self.equilibrium_phase
             )
             self.equilibrium_kernel_fluid = getattr(
-                equilibrium_kernels_cpu,
+                equilibrium_kernels_module,
                 kernel_name
             )
 
@@ -445,7 +471,7 @@ class CollisionOperator:
                 self.set_kernel_args(
                     state,
                     backend,
-                    equilibrium_kernels_cpu,
+                    equilibrium_kernels_module,
                     kernel_name,
                     args["initialization"]["phase"]
                 )

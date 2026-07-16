@@ -1,7 +1,8 @@
 from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.cpu import compute_fields_kernels as\
+import pylabolt.parallel.cpu.compute_fields_kernels as\
     compute_fields_kernels_cpu
-# from pylabolt.parallel.gpu import streaming_kernels as streaming_kernels_gpu
+import pylabolt.parallel.gpu.compute_fields_kernels as\
+    compute_fields_kernels_gpu
 
 
 class ComputeFieldsOperator:
@@ -39,17 +40,27 @@ class ComputeFieldsOperator:
         Returns:
 
         """
+        self.kernel_signatures = {}
         if state.fluid:
             compile_args = backend.make_compile_args(
                 self.compute_fields_args_fluid
             )
             self.compute_fields_kernel_fluid(*compile_args)
+            self.kernel_signatures.update({
+                self.compute_fields_kernel_fluid.__name__:
+                    set(self.compute_fields_kernel_fluid.signatures)
+            })
 
         elif state.phase:
             compile_args = backend.make_compile_args(
                 self.compute_fields_args_phase
             )
             self.compute_fields_kernel_phase(*compile_args)
+            self.kernel_signatures.update({
+                self.compute_fields_kernel_fluid.__name__:
+                    set(self.compute_fields_kernel_fluid.signatures)
+            })
+
         print_log("Compiled compute fields operator",
                   state.domain.mpi_rank, verbose)
 
@@ -111,9 +122,10 @@ class ComputeFieldsOperator:
         """
         if backend.backend_type == "cpu":
             self.compute_fields = self.compute_fields_cpu
+            compute_fields_kernels_module = compute_fields_kernels_cpu
         elif backend.backend_type == "gpu":
             self.compute_fields = self.compute_fields_gpu
-            # TODO: transfer streaming operator attributes to device
+            compute_fields_kernels_module = compute_fields_kernels_gpu
 
         self.compute_fields_type = self.model.compute_fields_type
         args = self.model.get_compute_fields_args()
@@ -128,7 +140,7 @@ class ComputeFieldsOperator:
                     self.compute_fields_type["fluid"] + "_no_force"
                 )
             self.compute_fields_kernel_fluid = getattr(
-                compute_fields_kernels_cpu, kernel_name
+                compute_fields_kernels_module, kernel_name
             )
             args_fluid = args["fluid"]
             if backend.backend_type == "cpu":
@@ -158,7 +170,7 @@ class ComputeFieldsOperator:
                 self.compute_fields_type["phase"]
             )
             self.streaming_kernel_phase = getattr(
-                compute_fields_kernels_cpu, kernel_name
+                compute_fields_kernels_module, kernel_name
             )
             args_phase = args["phase"]
             if backend.backend_type == "cpu":

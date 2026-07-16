@@ -1,8 +1,8 @@
 from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.cpu import fluid_boundary_kernels as fluid_kernels_cpu
-from pylabolt.parallel.cpu import phase_boundary_kernels as phase_kernels_cpu
-# from pylabolt.parallel.gpu import fluid_boundary_kernels as fluid_kernels_gpu
-# from pylabolt.parallel.gpu import phase_boundary_kernels as phase_kernels_gpu
+import pylabolt.parallel.cpu.fluid_boundary_kernels as fluid_kernels_cpu
+import pylabolt.parallel.cpu.phase_boundary_kernels as phase_kernels_cpu
+import pylabolt.parallel.gpu.fluid_boundary_kernels as fluid_kernels_gpu
+import pylabolt.parallel.gpu.phase_boundary_kernels as phase_kernels_gpu
 
 
 class BoundaryOperator:

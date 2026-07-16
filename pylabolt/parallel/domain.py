@@ -97,7 +97,12 @@ class Domain:
 
         """
         if backend.backend_type == "gpu":
-            self._device_attrs = ["size", "shape"]
+            self._device_attrs = [
+                "size",
+                "shape",
+                "inner_size",
+                "inner_shape",
+            ]
             for arg_name in self._device_attrs:
                 arg_device = backend.allocate_to_device(
                     getattr(self, arg_name)
