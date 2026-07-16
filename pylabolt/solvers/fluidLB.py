@@ -114,7 +114,7 @@ class Solver:
         mpi_rank = comm.Get_rank()
         from importlib.metadata import version
         print_log(
-            f"\n{'PyLaBolt':<10}: {version("pylabolt")}",
+            f"\n{'PyLaBolt':<10}: {version('pylabolt')}",
             mpi_rank, verbose=True
         )
         print_log(f"{'Solver':<10}: fluidLB", mpi_rank, verbose=True)

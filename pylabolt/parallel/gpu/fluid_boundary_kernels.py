@@ -1,8 +1,7 @@
-import numba
-from numba import prange
+from numba import cuda
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def bounce_back(
     solid,
     pop,
@@ -18,14 +17,15 @@ def bounce_back(
     Returns:
 
     """
-    for itr in prange(boundary_nodes.shape[0]):
+    itr = cuda.grid(1)
+    if itr < boundary_nodes.shape[0]:
         ind = boundary_nodes[itr]
         if not solid[ind]:
             for k in range(out_list.shape[0]):
                 pop_new[ind, inv_list[k]] = pop[ind, out_list[k]]
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def fixed_velocity_density_based(
     cx,
     cy,
@@ -48,7 +48,8 @@ def fixed_velocity_density_based(
     Returns:
 
     """
-    for itr in prange(boundary_nodes.shape[0]):
+    itr = cuda.grid(1)
+    if itr < boundary_nodes.shape[0]:
         ind = boundary_nodes[itr]
         if not solid[ind]:
             density_local = density[ind]
@@ -62,7 +63,7 @@ def fixed_velocity_density_based(
                 pop_new[ind, inv_dir] = pop[ind, out_dir] - temp
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def fixed_velocity_no_density_based(
     cx,
     cy,
@@ -84,7 +85,8 @@ def fixed_velocity_no_density_based(
     Returns:
 
     """
-    for itr in prange(boundary_nodes.shape[0]):
+    itr = cuda.grid(1)
+    if itr < boundary_nodes.shape[0]:
         ind = boundary_nodes[itr]
         if not solid[ind]:
             for k in range(out_list.shape[0]):
@@ -97,7 +99,7 @@ def fixed_velocity_no_density_based(
                 pop_new[ind, inv_dir] = pop[ind, out_dir] - temp
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def fixed_pressure_density_based(
     shape,
     cx,
@@ -123,7 +125,8 @@ def fixed_pressure_density_based(
     Returns:
 
     """
-    for itr in prange(boundary_nodes.shape[0]):
+    itr = cuda.grid(1)
+    if itr < boundary_nodes.shape[0]:
         ind = boundary_nodes[itr]
         if not solid[ind]:
             i = ind // shape[1]
@@ -152,7 +155,7 @@ def fixed_pressure_density_based(
                 pop_new[ind, inv_dir] = - pop[ind, out_dir] + temp
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def fixed_pressure_no_density_based(
     shape,
     cx,
@@ -178,7 +181,8 @@ def fixed_pressure_no_density_based(
     Returns:
 
     """
-    for itr in prange(boundary_nodes.shape[0]):
+    itr = cuda.grid(1)
+    if itr < boundary_nodes.shape[0]:
         ind = boundary_nodes[itr]
         if not solid[ind]:
             i = ind // shape[1]

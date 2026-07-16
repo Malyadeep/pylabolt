@@ -1,9 +1,7 @@
-import numpy as np
-import numba
-from numba import prange
+from numba import cuda
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def BGK_density_based_second_order_None(
     size,
     cx,
@@ -30,7 +28,8 @@ def BGK_density_based_second_order_None(
     Returns:
 
     """
-    for ind in prange(size):
+    ind = cuda.grid(1)
+    if ind < size:
         if not solid[ind] and not ghost_node[ind]:
             density_local = density[ind]
             velocity_local_x = velocity[ind, 0]
@@ -46,7 +45,7 @@ def BGK_density_based_second_order_None(
                 pop[ind, k] = (1 - omega) * pop_new[ind, k] + omega * pop_eq
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def BGK_density_based_second_order_guo_linear(
     size,
     cx,
@@ -73,7 +72,8 @@ def BGK_density_based_second_order_guo_linear(
     Returns:
 
     """
-    for ind in prange(size):
+    ind = cuda.grid(1)
+    if ind < size:
         if not solid[ind] and not ghost_node[ind]:
             density_local = density[ind]
             velocity_local_x = velocity[ind, 0]
@@ -98,7 +98,7 @@ def BGK_density_based_second_order_guo_linear(
                 )
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def BGK_density_based_second_order_guo_second_order(
     size,
     cx,
@@ -125,7 +125,8 @@ def BGK_density_based_second_order_guo_second_order(
     Returns:
 
     """
-    for ind in prange(size):
+    ind = cuda.grid(1)
+    if ind < size:
         if not solid[ind] and not ghost_node[ind]:
             density_local = density[ind]
             velocity_local_x = velocity[ind, 0]

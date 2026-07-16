@@ -1,119 +1,69 @@
-import numpy as np
-import numba
-from numba import prange
+from numba import cuda
 
 
-@numba.njit(parallel=True, nogil=True)
-def send_copy_y_vector(
-    send_buff,
+@cuda.jit
+def exchange_x_scalar(
     field,
-    layout_start,
-    layout_end,
-    shape,
-    x=0
+    shape
 ):
-    for y in prange(0, shape[1]):
-        ind = x * shape[1] + y
-        for itr in range(layout_start, layout_end):
-            send_buff[y, itr] = field[ind, itr - layout_start]
+    y = cuda.grid(1)
+    if y < shape[1]:
+        Nx = shape[0]
+        Ny = shape[1]
+        ind_left_ghost = y
+        ind_right_ghost = (Nx - 1) * Ny + y
+        ind_left_inner = Ny + y
+        ind_right_inner = (Nx - 2) * Ny + y
+        field[ind_left_ghost] = field[ind_right_inner]
+        field[ind_right_ghost] = field[ind_left_inner]
 
 
-@numba.njit(parallel=True, nogil=True)
-def send_copy_y_scalar(
-    send_buff,
+@cuda.jit
+def exchange_x_vector(
     field,
-    layout_start,
-    layout_end,
-    shape,
-    x=0
+    shape
 ):
-    for y in prange(0, shape[1]):
-        ind = x * shape[1] + y
-        send_buff[y, layout_start] = field[ind]
+    y = cuda.grid(1)
+    if y < shape[1]:
+        Nx = shape[0]
+        Ny = shape[1]
+        ind_left_ghost = y
+        ind_right_ghost = (Nx - 1) * Ny + y
+        ind_left_inner = Ny + y
+        ind_right_inner = (Nx - 2) * Ny + y
+        for k in range(field.shape[1]):
+            field[ind_left_ghost, k] = field[ind_right_inner, k]
+            field[ind_right_ghost, k] = field[ind_left_inner, k]
 
 
-@numba.njit(parallel=True, nogil=True)
-def recv_copy_y_vector(
-    recv_buff,
+@cuda.jit
+def exchange_y_scalar(
     field,
-    layout_start,
-    layout_end,
-    shape,
-    x=0
+    shape
 ):
-    for y in prange(0, shape[1]):
-        ind = x * shape[1] + y
-        for itr in range(layout_start, layout_end):
-            field[ind, itr - layout_start] = recv_buff[y, itr]
+    x = cuda.grid(1)
+    if x < shape[0]:
+        Ny = shape[1]
+        ind_bottom_ghost = x * Ny
+        ind_top_ghost = x * Ny + Ny - 1
+        ind_bottom_inner = x * Ny + 1
+        ind_top_inner = x * Ny + Ny - 2
+        field[ind_bottom_ghost] = field[ind_top_inner]
+        field[ind_top_ghost] = field[ind_bottom_inner]
 
 
-@numba.njit(parallel=True, nogil=True)
-def recv_copy_y_scalar(
-    recv_buff,
+@cuda.jit
+def exchange_y_vector(
     field,
-    layout_start,
-    layout_end,
-    shape,
-    x=0
+    shape
 ):
-    for y in prange(0, shape[1]):
-        ind = x * shape[1] + y
-        field[ind] = recv_buff[y, layout_start]
-
-
-@numba.njit(parallel=True, nogil=True)
-def send_copy_x_vector(
-    send_buff,
-    field,
-    layout_start,
-    layout_end,
-    shape,
-    y=0
-):
-    for x in prange(0, shape[0]):
-        ind = x * shape[1] + y
-        for itr in range(layout_start, layout_end):
-            send_buff[x, itr] = field[ind, itr - layout_start]
-
-
-@numba.njit(parallel=True, nogil=True)
-def send_copy_x_scalar(
-    send_buff,
-    field,
-    layout_start,
-    layout_end,
-    shape,
-    y=0
-):
-    for x in prange(0, shape[0]):
-        ind = x * shape[1] + y
-        send_buff[x, layout_start] = field[ind]
-
-
-@numba.njit(parallel=True, nogil=True)
-def recv_copy_x_vector(
-    recv_buff,
-    field,
-    layout_start,
-    layout_end,
-    shape,
-    y=0
-):
-    for x in prange(0, shape[0]):
-        ind = x * shape[1] + y
-        for itr in range(layout_start, layout_end):
-            field[ind, itr - layout_start] = recv_buff[x, itr]
-
-
-@numba.njit(parallel=True, nogil=True)
-def recv_copy_x_scalar(
-    recv_buff,
-    field,
-    layout_start,
-    layout_end,
-    shape,
-    y=0
-):
-    for x in prange(0, shape[0]):
-        ind = x * shape[1] + y
-        field[ind] = recv_buff[x, layout_start]
+    x = cuda.grid(1)
+    if x < shape[0]:
+        Ny = shape[1]
+        ind_bottom_ghost = x * Ny
+        ind_top_ghost = x * Ny + Ny - 1
+        ind_bottom_inner = x * Ny + 1
+        ind_top_inner = x * Ny + Ny - 2
+        for k in range(field.shape[1]):
+            field[ind_bottom_ghost, k] = field[ind_top_inner, k]
+            field[ind_top_ghost, k] = field[ind_bottom_inner, k]

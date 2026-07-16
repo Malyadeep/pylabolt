@@ -1,8 +1,7 @@
-import numba
-from numba import prange
+from numba import cuda
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def bounce_back(
     solid,
     pop,
@@ -18,7 +17,8 @@ def bounce_back(
     Returns:
 
     """
-    for itr in prange(boundary_nodes.shape[0]):
+    itr = cuda.grid(1)
+    if itr < boundary_nodes.shape[0]:
         ind = boundary_nodes[itr]
         if not solid[ind]:
             for k in range(out_list.shape[0]):

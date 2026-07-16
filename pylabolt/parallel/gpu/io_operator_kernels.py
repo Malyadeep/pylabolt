@@ -1,9 +1,7 @@
-import numpy as np
-import numba
-from numba import prange
+from numba import cuda
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def copy_inner_data_scalar(
     inner_size,
     inner_shape,
@@ -18,16 +16,17 @@ def copy_inner_data_scalar(
     Returns:
 
     """
-    Ny_inner = inner_shape[1]
-    Ny_outer = shape[1]
-    for ind in prange(inner_size):
+    ind = cuda.grid(1)
+    if ind < inner_size:
+        Ny_inner = inner_shape[1]
+        Ny_outer = shape[1]
         i = ind // Ny_inner
         j = ind - i * Ny_inner
         ind_outer = (i + 1) * Ny_outer + j + 1
         field_save[ind] = field[ind_outer]
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def copy_inner_data_vector(
     inner_size,
     inner_shape,
@@ -43,9 +42,10 @@ def copy_inner_data_vector(
     Returns:
 
     """
-    Ny_inner = inner_shape[1]
-    Ny_outer = shape[1]
-    for ind in prange(inner_size):
+    ind = cuda.grid(1)
+    if ind < inner_size:
+        Ny_inner = inner_shape[1]
+        Ny_outer = shape[1]
         i = ind // Ny_inner
         j = ind - i * Ny_inner
         ind_outer = (i + 1) * Ny_outer + j + 1

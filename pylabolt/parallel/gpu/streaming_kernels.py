@@ -1,9 +1,7 @@
-import numpy as np
-import numba
-from numba import prange
+from numba import cuda
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def scalar_based_kernel(
     size,
     shape,
@@ -27,16 +25,17 @@ def scalar_based_kernel(
     Returns:
 
     """
-    for ind in prange(size):
+    ind = cuda.grid(1)
+    if ind < size:
         if not solid[ind] and not ghost_node[ind]:
-            i = ind // shape[1]
-            j = ind - i * shape[1]
+            x = ind // shape[1]
+            y = ind - x * shape[1]
             density_local = density[ind]
             pop_new[ind, 0] = pop[ind, 0]
             for k in range(1, no_of_directions):
-                i_nb = i - cx[k]
-                j_nb = j - cy[k]
-                ind_nb = i_nb * shape[1] + j_nb
+                x_nb = x - cx[k]
+                y_nb = y - cy[k]
+                ind_nb = x_nb * shape[1] + y_nb
                 if not solid[ind_nb]:
                     pop_new[ind, k] = pop[ind_nb, k]
                 else:
@@ -48,7 +47,7 @@ def scalar_based_kernel(
                     pop_new[ind, k] = pop[ind, k_inv] - temp
 
 
-@numba.njit(parallel=True, nogil=True)
+@cuda.jit
 def no_scalar_based_kernel(
     size,
     shape,
@@ -71,15 +70,16 @@ def no_scalar_based_kernel(
     Returns:
 
     """
-    for ind in prange(size):
+    ind = cuda.grid(1)
+    if ind < size:
         if not solid[ind] and not ghost_node[ind]:
-            i = ind // shape[1]
-            j = ind - i * shape[1]
+            x = ind // shape[1]
+            y = ind - x * shape[1]
             pop_new[ind, 0] = pop[ind, 0]
             for k in range(1, no_of_directions):
-                i_nb = i - cx[k]
-                j_nb = j - cy[k]
-                ind_nb = i_nb * shape[1] + j_nb
+                x_nb = x - cx[k]
+                y_nb = y - cy[k]
+                ind_nb = x_nb * shape[1] + y_nb
                 if not solid[ind_nb]:
                     pop_new[ind, k] = pop[ind, k]
                 else:
