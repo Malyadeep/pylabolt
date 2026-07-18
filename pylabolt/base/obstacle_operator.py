@@ -24,6 +24,7 @@ class ObstacleOperator:
 
         mpi_operator.halo_exchange_cpu(
             state,
+            backend,
             bool_buffers=["solid"]
         )
         # ------- Find solid-fluid boundary nodes ------- #

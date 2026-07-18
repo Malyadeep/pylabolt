@@ -39,14 +39,22 @@ class BoundaryOperator:
 
         """
         self.kernel_signatures = {}
+
         if state.fluid:
             self.kernel_signatures.update({"fluid": {}})
             for itr in range(len(self.boundary_kernels_fluid)):
-                if self.boundary_kernels_fluid[itr] is not None:
+                kernel_fluid = self.boundary_kernels_fluid[itr]
+                if kernel_fluid is not None:
                     compile_args = backend.make_compile_args(
                         self.boundary_args_fluid[itr]
                     )
-                    self.boundary_kernels_fluid[itr](*compile_args)
+                    if backend.backend_type == "cpu":
+                        kernel_fluid(*compile_args)
+                    elif backend.backend_type == "gpu":
+                        kernel_fluid[
+                            backend.blocks, backend.threads_per_block
+                        ](*compile_args)
+
                     self.kernel_signatures["fluid"].update({
                         self.boundary_kernels_fluid[itr].__name__:
                             set(self.boundary_kernels_fluid[itr].signatures)
@@ -55,11 +63,18 @@ class BoundaryOperator:
         elif state.phase:
             self.kernel_signatures.update({"phase": {}})
             for itr in range(len(self.boundary_kernels_phase)):
-                if self.boundary_kernels_phase[itr] is not None:
+                kernel_phase = self.boundary_kernels_phase[itr]
+                if kernel_phase is not None:
                     compile_args = backend.make_compile_args(
                         self.boundary_args_phase[itr]
                     )
-                    self.boundary_kernels_phase[itr](*compile_args)
+                    if backend.backend_type == "cpu":
+                        kernel_phase(*compile_args)
+                    elif backend.backend_type == "gpu":
+                        kernel_phase[
+                            backend.blocks, backend.threads_per_block
+                        ](*compile_args)
+
                     self.kernel_signatures["phase"].update({
                         self.boundary_kernels_phase[itr].__name__:
                             set(self.boundary_kernels_phase[itr].signatures)
@@ -70,6 +85,7 @@ class BoundaryOperator:
     def set_boundary_cpu(
         self,
         state,
+        backend,
         fluid=False,
         phase=False
     ):
@@ -97,6 +113,7 @@ class BoundaryOperator:
     def set_boundary_gpu(
         self,
         state,
+        backend,
         fluid=False,
         phase=False
     ):
@@ -107,7 +124,21 @@ class BoundaryOperator:
         Returns:
 
         """
-        pass
+        if fluid:
+            for itr in range(len(self.boundary_kernels_fluid)):
+                kernel_fluid = self.boundary_kernels_fluid[itr]
+                if kernel_fluid is not None:
+                    kernel_fluid[backend.blocks, backend.threads_per_block](
+                        *self.boundary_args_fluid[itr]
+                    )
+
+        if phase:
+            for itr in range(len(self.boundary_kernels_phase)):
+                kernel_phase = self.boundary_kernels_phase[itr]
+                if kernel_phase is not None:
+                    kernel_phase[backend.blocks, backend.threads_per_block](
+                        *self.boundary_args_phase[itr]
+                    )
 
     def set_backend(
         self,
@@ -188,8 +219,12 @@ class BoundaryOperator:
 
         """
         if state.fluid:
+            if backend.backend_type == "cpu":
+                fluid_kernels_module = fluid_kernels_cpu
+            elif backend.backend_type == "gpu":
+                fluid_kernels_module = fluid_kernels_gpu
             for kernel_name in self.kernel_signatures["fluid"]:
-                kernel = getattr(fluid_kernels_cpu, kernel_name)
+                kernel = getattr(fluid_kernels_module, kernel_name)
                 if (set(kernel.signatures) !=
                         self.kernel_signatures["fluid"][kernel_name]):
                     raise RuntimeError(
@@ -198,8 +233,12 @@ class BoundaryOperator:
                     )
 
         if state.phase:
+            if backend.backend_type == "cpu":
+                phase_kernels_module = phase_kernels_cpu
+            elif backend.backend_type == "gpu":
+                phase_kernels_module = phase_kernels_gpu
             for kernel_name in self.kernel_signatures["phase"]:
-                kernel = getattr(phase_kernels_cpu, kernel_name)
+                kernel = getattr(phase_kernels_module, kernel_name)
                 if (set(kernel.signatures) !=
                         self.kernel_signatures["phase"][kernel_name]):
                     raise RuntimeError(

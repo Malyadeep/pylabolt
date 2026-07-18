@@ -238,13 +238,26 @@ class CollisionOperator:
 
         """
         self.kernel_signatures = {}
+
         if state.fluid:
             compile_args = backend.make_compile_args(self.collision_args_fluid)
-            self.collision_kernel_fluid(*compile_args)
+            if backend.backend_type == "cpu":
+                self.collision_kernel_fluid(*compile_args)
+            elif backend.backend_type == "gpu":
+                self.collision_kernel_fluid[
+                    backend.blocks, backend.threads_per_block
+                ](*compile_args)
+
             compile_args = backend.make_compile_args(
                 self.initialize_pop_args_fluid
             )
-            self.initialize_pop_kernel_fluid(*compile_args)
+            if backend.backend_type == "cpu":
+                self.initialize_pop_kernel_fluid(*compile_args)
+            elif backend.backend_type == "gpu":
+                self.initialize_pop_kernel_fluid[
+                    backend.blocks, backend.threads_per_block
+                ](*compile_args)
+
             self.kernel_signatures.update({
                 "collision": {
                     self.collision_kernel_fluid.__name__:
@@ -258,11 +271,23 @@ class CollisionOperator:
 
         if state.phase:
             compile_args = backend.make_compile_args(self.collision_args_phase)
-            self.collision_kernel_phase(*compile_args)
+            if backend.backend_type == "cpu":
+                self.collision_kernel_phase(*compile_args)
+            elif backend.backend_type == "gpu":
+                self.collision_kernel_phase[
+                    backend.blocks, backend.threads_per_block
+                ](*compile_args)
+
             compile_args = backend.make_compile_args(
-                self.initialize_pop_args_phases
+                self.initialize_pop_args_phase
             )
-            self.initialize_pop_kernel_phase(*compile_args)
+            if backend.backend_type == "cpu":
+                self.initialize_pop_kernel_phase(*compile_args)
+            elif backend.backend_type == "gpu":
+                self.initialize_pop_kernel_phase[
+                    backend.blocks, backend.threads_per_block
+                ](*compile_args)
+
             self.kernel_signatures.update({
                 "collision": {
                     self.collision_kernel_phase.__name__:
@@ -280,6 +305,7 @@ class CollisionOperator:
     def collide_cpu(
         self,
         state,
+        backend,
         fluid=False,
         phase=False
     ):
@@ -299,6 +325,7 @@ class CollisionOperator:
     def collide_gpu(
         self,
         state,
+        backend,
         fluid=False,
         phase=False
     ):
@@ -309,12 +336,20 @@ class CollisionOperator:
         Returns:
 
         """
-        pass
+        if fluid:
+            self.collision_kernel_fluid[
+                backend.blocks, backend.threads_per_block
+            ](*self.collision_args_fluid)
+
+        if phase:
+            self.collision_kernel_phase[
+                backend.blocks, backend.threads_per_block
+            ](*self.collision_args_phase)
 
     def initialize_pop(
         self,
         state,
-        backend,
+        backend
     ):
         """
         Initialize populations to their equilibrium values
@@ -333,7 +368,18 @@ class CollisionOperator:
                     *self.initialize_pop_args_phase
                 )
         elif backend.backend_type == "gpu":
-            pass
+            if state.fluid:
+                self.initialize_pop_kernel_fluid[
+                    backend.blocks, backend.threads_per_block
+                ](
+                    *self.initialize_pop_args_fluid
+                )
+            if state.phase:
+                self.initialize_pop_kernel_phase[
+                    backend.blocks, backend.threads_per_block
+                ](
+                    *self.initialize_pop_args_phase
+                )
 
     def set_kernel_args(
         self,
@@ -493,8 +539,14 @@ class CollisionOperator:
         Returns:
 
         """
+        if backend.backend_type == "cpu":
+            collision_kernels_module = collision_kernels_cpu
+            equilibrium_kernels_module = equilibrium_kernels_cpu
+        elif backend.backend_type == "gpu":
+            collision_kernels_module = collision_kernels_gpu
+            equilibrium_kernels_module = equilibrium_kernels_gpu
         for kernel_name in self.kernel_signatures["collision"]:
-            kernel = getattr(collision_kernels_cpu, kernel_name)
+            kernel = getattr(collision_kernels_module, kernel_name)
             if (set(kernel.signatures) !=
                     self.kernel_signatures["collision"][kernel_name]):
                 raise RuntimeError(
@@ -502,7 +554,7 @@ class CollisionOperator:
                     f" collision operator compiled a new signature!"
                 )
         for kernel_name in self.kernel_signatures["initialize"]:
-            kernel = getattr(equilibrium_kernels_cpu, kernel_name)
+            kernel = getattr(equilibrium_kernels_module, kernel_name)
             if (set(kernel.signatures) !=
                     self.kernel_signatures["initialize"][kernel_name]):
                 raise RuntimeError(

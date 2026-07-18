@@ -3,7 +3,7 @@ from mpi4py import MPI
 
 from pylabolt.utils.helpers import print_log
 import pylabolt.parallel.cpu.MPI_kernels as MPI_kernels_cpu
-# import pylabolt.parallel.gpu.MPI_kernels as MPI_kernels_gpu
+import pylabolt.parallel.gpu.MPI_kernels as MPI_kernels_gpu
 
 
 class HaloBuffer:
@@ -155,6 +155,7 @@ class MPIOperator:
     def halo_exchange_cpu(
         self,
         state,
+        backend,
         bool_buffers=None,
         int_buffers=None,
         float_buffers=None
@@ -480,6 +481,7 @@ class MPIOperator:
     def halo_exchange_gpu(
         self,
         state,
+        backend,
         bool_buffers=None,
         int_buffers=None,
         float_buffers=None
@@ -487,7 +489,7 @@ class MPIOperator:
         """
         Supports only single GPU execution
         Thus, only performs periodic wrapping of ghost node data
-        No MPI communitation involved, only copying kernels
+        No MPI communication involved, only copying kernels
         Args:
 
         Returns:
@@ -496,39 +498,42 @@ class MPIOperator:
         if state.boundary.x_periodic:
             if bool_buffers is not None:
                 buffer_object = self.bool_buffer
-                args = (bool_buffers, buffer_object, state)
-                self._exchange_horizontal_gpu(*args)
+                args = (bool_buffers, buffer_object, state, backend)
+                self._exchange_y_gpu(*args)
             if int_buffers is not None:
                 buffer_object = self.int_buffer
-                args = (int_buffers, buffer_object, state)
-                self._exchange_horizontal_gpu(*args)
+                args = (int_buffers, buffer_object, state, backend)
+                self._exchange_y_gpu(*args)
             if float_buffers is not None:
                 buffer_object = self.float_buffer
-                args = (float_buffers, buffer_object, state)
-                self._exchange_horizontal_gpu(*args)
+                args = (float_buffers, buffer_object, state, backend)
+                self._exchange_y_gpu(*args)
 
         if state.boundary.y_periodic:
             if bool_buffers is not None:
                 buffer_object = self.bool_buffer
-                args = (bool_buffers, buffer_object, state)
-                self._exchange_vertical_gpu(*args)
+                args = (bool_buffers, buffer_object, state, backend)
+                self._exchange_x_gpu(*args)
             if int_buffers is not None:
                 buffer_object = self.int_buffer
-                args = (int_buffers, buffer_object, state)
-                self._exchange_vertical_gpu(*args)
+                args = (int_buffers, buffer_object, state, backend)
+                self._exchange_x_gpu(*args)
             if float_buffers is not None:
                 buffer_object = self.float_buffer
-                args = (float_buffers, buffer_object, state)
-                self._exchange_vertical_gpu(*args)
+                args = (float_buffers, buffer_object, state, backend)
+                self._exchange_x_gpu(*args)
 
-    def _exchange_horizontal_gpu(
+    def _exchange_y_gpu(
         self,
         buffer_names,
         buffer_object,
-        state
+        state,
+        backend
     ):
         """
         Periodic boundary copying in horizontal direction on GPU
+        Then, the loop runs across y-direction to exchange vertical
+        boundaries
         Args:
 
         Returns:
@@ -537,27 +542,26 @@ class MPIOperator:
         for field_name in buffer_names:
             layout_start, layout_end = \
                 buffer_object.layout[field_name]
-            field_to_copy = getattr(state.fields, field_name)
-            copy_y = MPI_kernels_gpu.copy_y_scalar
+            field_to_copy = getattr(state.fields, field_name + "_device")
+            exchange_y = MPI_kernels_gpu.exchange_y_scalar
             if (layout_end - layout_start) > 1:
-                copy_y = MPI_kernels_gpu.copy_y_vector
-            copy_y(
-                buffer_object.send_buff_left_right,
+                exchange_y = MPI_kernels_gpu.exchange_y_vector
+            exchange_y[backend.blocks, backend.threads_per_block](
                 field_to_copy,
-                layout_start,
-                layout_end,
-                state.domain.shape,
-                x=1
+                state.domain.shape_device
             )
 
-    def _exchange_vertical_gpu(
+    def _exchange_x_gpu(
         self,
         buffer_names,
         buffer_object,
-        state
+        state,
+        backend
     ):
         """
         Periodic boundary copying in vertical direction on GPU
+        Then, the loop runs across y-direction to exchange horizontal
+        boundaries
         Args:
 
         Returns:
@@ -566,17 +570,13 @@ class MPIOperator:
         for field_name in buffer_names:
             layout_start, layout_end = \
                 buffer_object.layout[field_name]
-            field_to_copy = getattr(state.fields, field_name)
-            copy_y = MPI_kernels_gpu.copy_x_scalar
+            field_to_copy = getattr(state.fields, field_name + "_device")
+            exchange_x = MPI_kernels_gpu.exchange_x_scalar
             if (layout_end - layout_start) > 1:
-                copy_y = MPI_kernels_gpu.copy_x_vector
-            copy_y(
-                buffer_object.send_buff_left_right,
+                exchange_x = MPI_kernels_gpu.exchange_x_vector
+            exchange_x[backend.blocks, backend.threads_per_block](
                 field_to_copy,
-                layout_start,
-                layout_end,
-                state.domain.shape,
-                x=1
+                state.domain.shape_device
             )
 
     def reduce(
@@ -671,7 +671,45 @@ class MPIOperator:
                 MPI_kernels_cpu.recv_copy_y_scalar.__name__:
                     set(MPI_kernels_cpu.recv_copy_y_scalar.signatures),
                 MPI_kernels_cpu.recv_copy_y_vector.__name__:
-                    set(MPI_kernels_cpu.recv_copy_y_vector.signatures),
+                    set(MPI_kernels_cpu.recv_copy_y_vector.signatures)
+            }
+
+        elif backend.backend_type == "gpu":
+            for buffer, field_name, compilation_type in [
+                (self.bool_buffer, "solid", "bool_scalar"),
+                (self.int_buffer, "solid_id", "int_scalar"),
+                (self.float_buffer, "density", "float_scalar"),
+                (self.float_buffer, "pop_fluid", "float_vector")
+            ]:
+                layout_start, layout_end = \
+                    buffer.layout[field_name]
+                field_to_copy = getattr(state.fields, field_name + "_device")
+                args = (
+                    field_to_copy,
+                    state.domain.shape_device
+                )
+                compile_args = backend.make_compile_args(args)
+                exchange_x = MPI_kernels_gpu.exchange_x_scalar
+                exchange_y = MPI_kernels_gpu.exchange_y_scalar
+                if (layout_end - layout_start) > 1:
+                    exchange_x = MPI_kernels_gpu.exchange_x_vector
+                    exchange_y = MPI_kernels_gpu.exchange_y_vector
+                exchange_x[backend.blocks, backend.threads_per_block](
+                    *compile_args
+                )
+                exchange_y[backend.blocks, backend.threads_per_block](
+                    *compile_args
+                )
+
+            self.kernel_signatures = {
+                MPI_kernels_gpu.exchange_x_scalar.__name__:
+                    set(MPI_kernels_gpu.exchange_x_scalar.signatures),
+                MPI_kernels_gpu.exchange_x_vector.__name__:
+                    set(MPI_kernels_gpu.exchange_x_vector.signatures),
+                MPI_kernels_gpu.exchange_y_scalar.__name__:
+                    set(MPI_kernels_gpu.exchange_y_scalar.signatures),
+                MPI_kernels_gpu.exchange_y_vector.__name__:
+                    set(MPI_kernels_gpu.exchange_y_vector.signatures)
             }
 
         print_log("Compiled MPI operator",
@@ -712,8 +750,12 @@ class MPIOperator:
         Returns:
 
         """
+        if backend.backend_type == "cpu":
+            MPI_kernels_module = MPI_kernels_cpu
+        elif backend.backend_type == "gpu":
+            MPI_kernels_module = MPI_kernels_gpu
         for kernel_name in self.kernel_signatures:
-            kernel = getattr(MPI_kernels_cpu, kernel_name)
+            kernel = getattr(MPI_kernels_module, kernel_name)
             if set(kernel.signatures) != self.kernel_signatures[kernel_name]:
                 raise RuntimeError(
                     f"Developer error! {kernel_name} in"

@@ -2,7 +2,7 @@ from numba import cuda
 
 
 @cuda.jit
-def exchange_x_scalar(
+def exchange_y_scalar(
     field,
     shape
 ):
@@ -19,7 +19,7 @@ def exchange_x_scalar(
 
 
 @cuda.jit
-def exchange_x_vector(
+def exchange_y_vector(
     field,
     shape
 ):
@@ -37,7 +37,7 @@ def exchange_x_vector(
 
 
 @cuda.jit
-def exchange_y_scalar(
+def exchange_x_scalar(
     field,
     shape
 ):
@@ -53,7 +53,7 @@ def exchange_y_scalar(
 
 
 @cuda.jit
-def exchange_y_vector(
+def exchange_x_vector(
     field,
     shape
 ):

@@ -37,9 +37,16 @@ class StreamingOperator:
 
         """
         self.kernel_signatures = {}
+
         if state.fluid:
             compile_args = backend.make_compile_args(self.streaming_args_fluid)
-            self.streaming_kernel_fluid(*compile_args)
+            if backend.backend_type == "cpu":
+                self.streaming_kernel_fluid(*compile_args)
+            elif backend.backend_type == "gpu":
+                self.streaming_kernel_fluid[
+                    backend.blocks, backend.threads_per_block
+                ](*compile_args)
+
             self.kernel_signatures.update({
                 self.streaming_kernel_fluid.__name__:
                     set(self.streaming_kernel_fluid.signatures)
@@ -47,7 +54,13 @@ class StreamingOperator:
 
         elif state.phase:
             compile_args = backend.make_compile_args(self.streaming_args_phase)
-            self.streaming_kernel_phase(*compile_args)
+            if backend.backend_type == "cpu":
+                self.streaming_kernel_phase(*compile_args)
+            elif backend.backend_type == "gpu":
+                self.streaming_kernel_phase[
+                    backend.blocks, backend.threads_per_block
+                ](*compile_args)
+
             self.kernel_signatures.update({
                 self.streaming_kernel_phase.__name__:
                     set(self.streaming_kernel_phase.signatures)
@@ -59,6 +72,7 @@ class StreamingOperator:
     def stream_cpu(
         self,
         state,
+        backend,
         fluid=False,
         phase=False
     ):
@@ -78,6 +92,7 @@ class StreamingOperator:
     def stream_gpu(
         self,
         state,
+        backend,
         fluid=False,
         phase=False
     ):
@@ -88,7 +103,15 @@ class StreamingOperator:
         Returns:
 
         """
-        pass
+        if fluid:
+            self.streaming_kernel_fluid[
+                backend.blocks, backend.threads_per_block
+            ](*self.streaming_args_fluid)
+
+        if phase:
+            self.streaming_kernel_phase[
+                backend.blocks, backend.threads_per_block
+            ](*self.streaming_args_phase)
 
     def set_backend(
         self,
@@ -176,8 +199,12 @@ class StreamingOperator:
         Returns:
 
         """
+        if backend.backend_type == "cpu":
+            streaming_kernels_module = streaming_kernels_cpu
+        elif backend.backend_type == "gpu":
+            streaming_kernels_module = streaming_kernels_gpu
         for kernel_name in self.kernel_signatures:
-            kernel = getattr(streaming_kernels_cpu, kernel_name)
+            kernel = getattr(streaming_kernels_module, kernel_name)
             if (set(kernel.signatures) !=
                     self.kernel_signatures[kernel_name]):
                 raise RuntimeError(

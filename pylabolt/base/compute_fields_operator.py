@@ -41,11 +41,18 @@ class ComputeFieldsOperator:
 
         """
         self.kernel_signatures = {}
+
         if state.fluid:
             compile_args = backend.make_compile_args(
                 self.compute_fields_args_fluid
             )
-            self.compute_fields_kernel_fluid(*compile_args)
+            if backend.backend_type == "cpu":
+                self.compute_fields_kernel_fluid(*compile_args)
+            elif backend.backend_type == "gpu":
+                self.compute_fields_kernel_fluid[
+                    backend.blocks, backend.threads_per_block
+                ](*compile_args)
+
             self.kernel_signatures.update({
                 self.compute_fields_kernel_fluid.__name__:
                     set(self.compute_fields_kernel_fluid.signatures)
@@ -55,7 +62,13 @@ class ComputeFieldsOperator:
             compile_args = backend.make_compile_args(
                 self.compute_fields_args_phase
             )
-            self.compute_fields_kernel_phase(*compile_args)
+            if backend.backend_type == "cpu":
+                self.compute_fields_kernel_phase(*compile_args)
+            elif backend.backend_type == "gpu":
+                self.compute_fields_kernel_phase[
+                    backend.blocks, backend.threads_per_block
+                ](*compile_args)
+
             self.kernel_signatures.update({
                 self.compute_fields_kernel_fluid.__name__:
                     set(self.compute_fields_kernel_fluid.signatures)
@@ -67,6 +80,7 @@ class ComputeFieldsOperator:
     def compute_fields_cpu(
         self,
         state,
+        backend,
         fluid=False,
         phase=False
     ):
@@ -77,24 +91,16 @@ class ComputeFieldsOperator:
         Returns:
 
         """
-        self.kernel_signatures = {}
         if fluid:
             self.compute_fields_kernel_fluid(*self.compute_fields_args_fluid)
-            self.kernel_signatures.update({
-                self.compute_fields_kernel_fluid.__name__:
-                    set(self.compute_fields_kernel_fluid.signatures)
-            })
 
         if phase:
             self.compute_fields_kernel_phase(*self.compute_fields_args_phase)
-            self.kernel_signatures.update({
-                self.compute_fields_kernel_phase.__name__:
-                    set(self.compute_fields_kernel_phase.signatures)
-            })
 
     def compute_fields_gpu(
         self,
         state,
+        backend,
         fluid=False,
         phase=False
     ):
@@ -105,7 +111,15 @@ class ComputeFieldsOperator:
         Returns:
 
         """
-        pass
+        if fluid:
+            self.compute_fields_kernel_fluid[
+                backend.blocks, backend.threads_per_block
+            ](*self.compute_fields_args_fluid)
+
+        if phase:
+            self.compute_fields_kernel_phase[
+                backend.blocks, backend.threads_per_block
+            ](*self.compute_fields_args_phase)
 
     def set_backend(
         self,
@@ -212,8 +226,12 @@ class ComputeFieldsOperator:
         Returns:
 
         """
+        if backend.backend_type == "cpu":
+            compute_fields_kernels_module = compute_fields_kernels_cpu
+        elif backend.backend_type == "gpu":
+            compute_fields_kernels_module = compute_fields_kernels_gpu
         for kernel_name in self.kernel_signatures:
-            kernel = getattr(compute_fields_kernels_cpu, kernel_name)
+            kernel = getattr(compute_fields_kernels_module, kernel_name)
             if (set(kernel.signatures) !=
                     self.kernel_signatures[kernel_name]):
                 raise RuntimeError(

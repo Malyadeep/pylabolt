@@ -120,16 +120,17 @@ class Solver:
         print_log(f"{'Solver':<10}: fluidLB", mpi_rank, verbose=True)
         self.model = FluidLB()
         simulation = load_simulation(comm, mpi_rank)
-        self.backend = Backend(
-            backend,
-            n_threads,
-            mpi_rank
-        )
         self.state = State(
             simulation,
             comm,
             mpi_rank,
             fluid=True
+        )
+        self.backend = Backend(
+            self.state,
+            backend,
+            n_threads,
+            mpi_rank
         )
         self.mpi_operator = MPIOperator(
             comm,
@@ -243,9 +244,13 @@ class Solver:
         )
         self.io_operator.write_fields(
             self.state,
+            self.backend,
             self.state.control.start_time
         )
-        self.collision_operator.initialize_pop(self.state, self.backend)
+        self.collision_operator.initialize_pop(
+            self.state,
+            self.backend
+        )
 
         run_time_start = time.perf_counter()
 
@@ -253,17 +258,35 @@ class Solver:
             self.state.control.start_time + 1,
             self.state.control.end_time + 1,
         ):
-            self.collision_operator.collide(self.state, fluid=True)
+            self.collision_operator.collide(
+                self.state,
+                self.backend,
+                fluid=True
+            )
             self.mpi_operator.halo_exchange(
                 self.state,
+                self.backend,
                 float_buffers=["pop_fluid"]
             )
-            self.streaming_operator.stream(self.state, fluid=True)
-            self.boundary_operator.set_boundary(self.state, fluid=True)
-            self.compute_fields_operator.compute_fields(self.state, fluid=True)
+            self.streaming_operator.stream(
+                self.state,
+                self.backend,
+                fluid=True
+            )
+            self.boundary_operator.set_boundary(
+                self.state,
+                self.backend,
+                fluid=True
+            )
+            self.compute_fields_operator.compute_fields(
+                self.state,
+                self.backend,
+                fluid=True
+            )
             if time_step % self.state.control.std_out_interval == 0:
                 self.residue_operator.compute_residues(
                     self.state,
+                    self.backend,
                     self.mpi_operator
                 )
                 self.logger.log_data(
@@ -272,7 +295,11 @@ class Solver:
                     res_velocity=self.residue_operator.residues["res_velocity"]
                 )
             if time_step % self.state.control.save_interval == 0:
-                self.io_operator.write_fields(self.state, time_step)
+                self.io_operator.write_fields(
+                    self.state,
+                    self.backend,
+                    time_step
+                )
 
         run_time = time.perf_counter() - run_time_start
         print_log("\n" + "-" * 80, self.state.domain.mpi_rank, verbose)

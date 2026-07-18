@@ -155,6 +155,7 @@ class InputOutputOperator:
     def write_fields_cpu(
         self,
         state,
+        backend,
         time_step
     ):
         """
@@ -184,6 +185,7 @@ class InputOutputOperator:
     def write_fields_gpu(
         self,
         state,
+        backend,
         time_step
     ):
         """
@@ -193,7 +195,28 @@ class InputOutputOperator:
         Returns:
 
         """
-        pass
+        for item in self.fields_save_device:
+            args = (
+                state.domain.inner_size_device,
+                state.domain.inner_shape_device,
+                state.domain.shape_device,
+                getattr(state.fields, item + "_device"),
+                self.fields_save_device[item]
+            )
+            if self.fields_save_metadata[item]["components"] == 1:
+                self.copy_inner_data_kernel_scalar[
+                    backend.blocks, backend.threads_per_block
+                ](*args)
+            elif self.fields_save_metadata[item]["components"] == 2:
+                self.copy_inner_data_kernel_vector[
+                    backend.blocks, backend.threads_per_block
+                ](*args)
+            self.fields_save[item] = self.fields_save_device[item].\
+                copy_to_host()
+        np.savez(
+            self.field_save_path + "t_" + str(time_step) + ".npz",
+            **self.fields_save
+        )
 
     def compile(
         self,
@@ -234,9 +257,13 @@ class InputOutputOperator:
                 )
                 compile_args = backend.make_compile_args(args)
                 if self.fields_save_metadata[item]["components"] == 1:
-                    self.copy_inner_data_kernel_scalar(*compile_args)
+                    self.copy_inner_data_kernel_scalar[
+                        backend.blocks, backend.threads_per_block
+                    ](*compile_args)
                 elif self.fields_save_metadata[item]["components"] == 2:
-                    self.copy_inner_data_kernel_vector(*compile_args)
+                    self.copy_inner_data_kernel_vector[
+                        backend.blocks, backend.threads_per_block
+                    ](*compile_args)
 
         self.kernel_signatures = {
             self.copy_inner_data_kernel_scalar.__name__:
@@ -300,8 +327,12 @@ class InputOutputOperator:
         Returns:
 
         """
+        if backend.backend_type == "cpu":
+            io_operator_kernels_module = io_operator_kernels_cpu
+        elif backend.backend_type == "gpu":
+            io_operator_kernels_module = io_operator_kernels_gpu
         for kernel_name in self.kernel_signatures:
-            kernel = getattr(io_operator_kernels_cpu, kernel_name)
+            kernel = getattr(io_operator_kernels_module, kernel_name)
             if (set(kernel.signatures) !=
                     self.kernel_signatures[kernel_name]):
                 raise RuntimeError(
