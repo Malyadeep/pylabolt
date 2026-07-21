@@ -13,6 +13,7 @@ from pylabolt.parallel.MPI_operator import MPIOperator
 from pylabolt.base.state import State
 from pylabolt.base.obstacle_operator import ObstacleOperator
 from pylabolt.base.collision_operator import CollisionOperator
+from pylabolt.base.force_operator import ForceOperator
 from pylabolt.base.compute_fields_operator import ComputeFieldsOperator
 from pylabolt.base.streaming_operator import StreamingOperator
 from pylabolt.base.boundary_operator import BoundaryOperator
@@ -60,7 +61,7 @@ class FluidLB:
                     ],
                     "fields": [
                         "solid", "ghost_node", "density", "velocity",
-                        "pop_fluid", "pop_fluid_new"
+                        "force_field", "pop_fluid", "pop_fluid_new"
                     ]
                 }
             },
@@ -103,7 +104,7 @@ class FluidLB:
                 ],
                 "fields": [
                     "solid", "ghost_node", "density", "velocity",
-                    "pop_fluid_new"
+                    "force_field", "pop_fluid_new"
                 ]
             }
         }
@@ -127,6 +128,7 @@ class Solver:
             fluid=True
         )
         self.backend = Backend(
+            comm,
             self.state,
             backend,
             n_threads,
@@ -136,6 +138,9 @@ class Solver:
             comm,
             self.state,
         )
+        # TODO: only initialize obstacle operator here.
+        # inside solver loop have obstacle_operator.initialize()
+        # so that fluid/solid boundary everything gets initialized
         self.obstacle_operator = ObstacleOperator(
             self.state,
             self.backend,
@@ -145,7 +150,14 @@ class Solver:
             simulation,
             self.model,
             self.state,
-            self.mpi_operator
+            comm
+        )
+        self.force_operator = ForceOperator(
+            simulation,
+            self.model,
+            self.state,
+            comm,
+            collision_operator=self.collision_operator
         )
         self.compute_fields_operator = ComputeFieldsOperator(
             self.model,
@@ -166,13 +178,13 @@ class Solver:
             self.model,
             self.state,
             self.backend,
-            self.mpi_operator
+            comm
         )
         self.io_operator = InputOutputOperator(
             self.model,
             self.state,
             self.backend,
-            self.mpi_operator
+            comm
         )
         self.logger = SimulationStatusLogger(
             self.state.domain.mpi_rank,
@@ -188,6 +200,7 @@ class Solver:
         self.mpi_operator.set_backend(self.state, self.backend)
         # self.obstacle_operator.set_backend(self.backend)
         self.collision_operator.set_backend(self.state, self.backend)
+        self.force_operator.set_backend(self.state, self.backend)
         self.compute_fields_operator.set_backend(self.state, self.backend)
         self.streaming_operator.set_backend(self.state, self.backend)
         self.boundary_operator.set_backend(self.state, self.backend)
@@ -205,6 +218,7 @@ class Solver:
 
         self.mpi_operator.compile(self.state, self.backend)
         self.collision_operator.compile(self.state, self.backend)
+        self.force_operator.compile(self.state, self.backend)
         self.compute_fields_operator.compile(self.state, self.backend)
         self.streaming_operator.compile(self.state, self.backend)
         self.boundary_operator.compile(self.state, self.backend)
@@ -223,6 +237,7 @@ class Solver:
         args = (self.state, self.backend)
         self.mpi_operator.verify_kernel_signatures(*args)
         self.collision_operator.verify_kernel_signatures(*args)
+        self.force_operator.verify_kernel_signatures(*args)
         self.streaming_operator.verify_kernel_signatures(*args)
         self.compute_fields_operator.verify_kernel_signatures(*args)
         self.boundary_operator.verify_kernel_signatures(*args)
@@ -258,6 +273,10 @@ class Solver:
             self.state.control.start_time + 1,
             self.state.control.end_time + 1,
         ):
+            self.force_operator.compute_force_field(
+                self.state,
+                self.backend
+            )
             self.collision_operator.collide(
                 self.state,
                 self.backend,

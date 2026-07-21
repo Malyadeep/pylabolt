@@ -22,7 +22,6 @@ class ComputeFieldsOperator:
         print_log("Setting up compute fields operator...",
                   state.domain.mpi_rank, verbose)
         self.model = model
-        self.forcing_fluid = collision_operator.forcing_fluid
         print_log("Setting up compute fields operator done!",
                   state.domain.mpi_rank, verbose)
         print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -145,18 +144,6 @@ class ComputeFieldsOperator:
         args = self.model.get_compute_fields_args()
 
         if state.fluid:
-            if self.forcing_fluid is not None:
-                kernel_name = (
-                    self.compute_fields_type["fluid"] + "_force"
-                )
-            else:
-                kernel_name = (
-                    self.compute_fields_type["fluid"] + "_no_force"
-                )
-            self.compute_fields_kernel_fluid = getattr(
-                compute_fields_kernels_module, kernel_name
-            )
-            args_fluid = args["fluid"]
             if backend.backend_type == "cpu":
                 self.compute_fields_args_fluid = tuple(
                     [state.control.float_min]
@@ -165,6 +152,14 @@ class ComputeFieldsOperator:
                 self.compute_fields_args_fluid = tuple(
                     [state.control.float_min_device]
                 )
+
+            kernel_name = (
+                self.compute_fields_type["fluid"]
+            )
+            self.compute_fields_kernel_fluid = getattr(
+                compute_fields_kernels_module, kernel_name
+            )
+            args_fluid = args["fluid"]
             for key_no, key in enumerate(args_fluid):
                 args_list = args_fluid[key]
                 attribute = getattr(state, key)

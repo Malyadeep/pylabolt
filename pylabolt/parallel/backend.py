@@ -11,10 +11,10 @@ REDUCE_BLOCK_SIZE = 256
 class Backend:
     def __init__(
         self,
+        comm,
         state,
         backend,
         n_threads,
-        mpi_rank,
         verbose=True
     ):
         """
@@ -25,13 +25,21 @@ class Backend:
         self.backend_type = backend
         self.no_of_threads = n_threads
         print_log(f"{'Backend':<25}: {self.backend_type}",
-                  mpi_rank, verbose=verbose)
+                  state.domain.mpi_rank, verbose=verbose)
         if self.backend_type == "cpu":
             numba.set_num_threads(self.no_of_threads)
             print_log(f"{'Threads-per-rank':<25}: {self.no_of_threads}",
-                      mpi_rank, verbose=verbose)
+                      state.domain.mpi_rank, verbose=verbose)
         if self.backend_type == "gpu":
-            print_log("GPU info:", mpi_rank, verbose=verbose)
+            if state.domain.mpi_size > 1:
+                print_log("-" * 80, state.domain.mpi_rank, verbose=True)
+                print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
+                print_log("Multi-GPU execution is not supported yet!",
+                          state.domain.mpi_rank, verbose=True)
+                print_log("nx: 1 and ny: 1 is required for GPU backend",
+                          state.domain.mpi_rank, verbose=True)
+                comm.Abort()
+            print_log("GPU info:", state.domain.mpi_rank, verbose=verbose)
             cuda.detect()
             if n_threads != 1:
                 self.threads_per_block = n_threads
@@ -46,9 +54,9 @@ class Backend:
                     np.ceil(state.domain.size / self.reduce_threads_per_block)
                 )
             print_log(f"{'Threads-per-block':<25}: {self.threads_per_block}",
-                      mpi_rank, verbose=verbose)
+                      state.domain.mpi_rank, verbose=verbose)
             print_log(f"{'No-of-blocks':<25}: {self.blocks}",
-                      mpi_rank, verbose=verbose)
+                      state.domain.mpi_rank, verbose=verbose)
 
     def make_compile_args(
         self,

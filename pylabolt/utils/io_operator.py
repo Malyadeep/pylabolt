@@ -13,7 +13,7 @@ class InputOutputOperator:
         model,
         state,
         backend,
-        mpi_operator,
+        comm,
         verbose=True
     ):
         """
@@ -34,7 +34,7 @@ class InputOutputOperator:
             print_log("-" * 80, state.domain.mpi_rank, verbose=True)
             print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
             print_log(str(e), state.domain.mpi_rank, verbose=True)
-            mpi_operator.comm.Abort()
+            comm.Abort()
 
     def setup_write_fields(
         self,

@@ -1,4 +1,3 @@
-import numpy as np
 import numba
 from numba import prange
 
@@ -16,9 +15,9 @@ def BGK_density_based_second_order_None(
     ghost_node,
     density,
     velocity,
+    force_field,
     pop,
     pop_new,
-    gravity,
     omega
 ):
     """
@@ -59,9 +58,9 @@ def BGK_density_based_second_order_guo_linear(
     ghost_node,
     density,
     velocity,
+    force_field,
     pop,
     pop_new,
-    gravity,
     omega
 ):
     """
@@ -78,13 +77,13 @@ def BGK_density_based_second_order_guo_linear(
             density_local = density[ind]
             velocity_local_x = velocity[ind, 0]
             velocity_local_y = velocity[ind, 1]
-            force_local_x = density_local * gravity[0]
-            force_local_y = density_local * gravity[1]
+            force_local_x = force_field[ind, 0]
+            force_local_y = force_field[ind, 1]
             u2 = (velocity_local_x * velocity_local_x +
                   velocity_local_y * velocity_local_y)
             for k in range(no_of_directions):
                 cu = cx[k] * velocity_local_x + cy[k] * velocity_local_y
-                pop_eq = weights * density * (
+                pop_eq = weights[k] * density_local * (
                     1 + inv_cs_2 * cu + 0.5 * inv_cs_4 * cu * cu -
                     0.5 * inv_cs_2 * u2
                 )
@@ -111,9 +110,9 @@ def BGK_density_based_second_order_guo_second_order(
     ghost_node,
     density,
     velocity,
+    force_field,
     pop,
     pop_new,
-    gravity,
     omega
 ):
     """
@@ -130,13 +129,13 @@ def BGK_density_based_second_order_guo_second_order(
             density_local = density[ind]
             velocity_local_x = velocity[ind, 0]
             velocity_local_y = velocity[ind, 1]
-            force_local_x = density_local * gravity[0]
-            force_local_y = density_local * gravity[1]
+            force_local_x = force_field[ind, 0]
+            force_local_y = force_field[ind, 1]
             u2 = (velocity_local_x * velocity_local_x +
                   velocity_local_y * velocity_local_y)
             for k in range(no_of_directions):
                 cu = cx[k] * velocity_local_x + cy[k] * velocity_local_y
-                pop_eq = weights * density * (
+                pop_eq = weights[k] * density_local * (
                     1 + inv_cs_2 * cu + 0.5 * inv_cs_4 * cu * cu -
                     0.5 * inv_cs_2 * u2
                 )

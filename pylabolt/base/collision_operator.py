@@ -13,7 +13,7 @@ class CollisionOperator:
         simulation,
         model,
         state,
-        mpi_operator,
+        comm,
         verbose=True
     ):
         """
@@ -39,7 +39,7 @@ class CollisionOperator:
             print_log("-" * 80, state.domain.mpi_rank, verbose=True)
             print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
             print_log(str(e), state.domain.mpi_rank, verbose=True)
-            mpi_operator.comm.Abort()
+            comm.Abort()
 
     def read_collision_dict(
         self,
@@ -63,14 +63,16 @@ class CollisionOperator:
             self.collision_fluid = fluid_dict["model"]
             self.equilibrium_fluid = fluid_dict["equilibrium"]
             self.forcing_fluid = fluid_dict["forcing_model"]
-            if self.collision_fluid not in self.model.collision_models["fluid"]:
+            if (self.collision_fluid not in
+                    self.model.collision_models["fluid"]):
                 raise ValueError(
                     "Unsupported fluid collision model: " +
                     self.collision_fluid +
                     "\nAvailable models: " +
                     str(self.model.collision_models["fluid"])
                 )
-            if self.equilibrium_fluid not in self.model.equilibrium_models["fluid"]:
+            if (self.equilibrium_fluid not in
+                    self.model.equilibrium_models["fluid"]):
                 raise ValueError(
                     "Unsupported fluid equilibrium model: " +
                     self.equilibrium_fluid +
@@ -80,29 +82,8 @@ class CollisionOperator:
             if self.forcing_fluid not in self.model.forcing_models["fluid"]:
                 raise ValueError(
                     "Unsupported fluid forcing model: " + self.forcing_fluid +
-                    "\nAvailable models: " + str(self.model.forcing_models["fluid"])
-                )
-            if self.forcing_fluid is None:
-                self.gravity = np.zeros(2, dtype=state.control.precision)
-                if "gravity" in fluid_dict:
-                    print_log(
-                        "WARNING! gravity ignored in fluid collision dict" +
-                        " as forcing is set to None\n",
-                        state.domain.mpi_rank,
-                        verbose=verbose
-                    )
-            else:
-                if "gravity" not in fluid_dict:
-                    raise ValueError("gravity missing in fluid collision dict")
-                self.gravity = fluid_dict["gravity"]
-                if (not isinstance(self.gravity, list) and
-                        len(self.gravity) == 2):
-                    raise ValueError(
-                        "gravity must be a list (gx, gy) in fluid" +
-                        " collision dict"
-                    )
-                self.gravity = np.array(
-                    self.gravity, dtype=state.control.precision
+                    "\nAvailable models: " +
+                    str(self.model.forcing_models["fluid"])
                 )
 
             self.tau_fluid = state.transport.kin_visc *\
@@ -111,7 +92,6 @@ class CollisionOperator:
             if self.collision_fluid == "MRT":
                 self.setup_MRT_params()
                 self.collision_params = (
-                    self.gravity,
                     self.M,
                     self.inv_M,
                     self.S,
@@ -119,10 +99,9 @@ class CollisionOperator:
                     self.inv_pre_factor_mat
                 )
             elif self.collision_fluid == "BGK":
-                self.collision_params = (
-                    self.gravity,
+                self.collision_params = tuple([
                     self.omega_fluid
-                )
+                ])
 
         if state.phase:
             if "phase" not in self.collision_dict:
@@ -134,7 +113,8 @@ class CollisionOperator:
             if self.model_phase not in self.model.collision_models["phase"]:
                 raise ValueError(
                     "Unsupported phase collision model: " + self.model_phase +
-                    "\nAvailable models: " + self.model.collision_models["phase"]
+                    "\nAvailable models: " +
+                    self.model.collision_models["phase"]
                 )
             if self.model_phase == "segregation":
                 self.equilibrium_phase = None
@@ -207,10 +187,6 @@ class CollisionOperator:
             )
             print_log(
                 f"{'Fluid forcing model':<30}: {str(self.forcing_fluid)}",
-                state.domain.mpi_rank, verbose=verbose
-            )
-            print_log(
-                f"{'Gravity':<30}: {self.gravity}",
                 state.domain.mpi_rank, verbose=verbose
             )
 
@@ -433,16 +409,15 @@ class CollisionOperator:
             self.collide = self.collide_gpu
             collision_kernels_module = collision_kernels_gpu
             equilibrium_kernels_module = equilibrium_kernels_gpu
-            self._device_attrs = ["gravity", "omega_fluid"]
+            self._device_attrs = ["omega_fluid"]
             for arg_name in self._device_attrs:
                 arg_device = backend.allocate_to_device(
                     getattr(self, arg_name)
                 )
                 setattr(self, arg_name + "_device", arg_device)
-            self.collision_params_device = (
-                self.gravity_device,
+            self.collision_params_device = tuple([
                 self.omega_fluid_device
-            )
+            ])
 
         args = self.model.get_collision_args()
 
