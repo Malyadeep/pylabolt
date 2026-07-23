@@ -48,7 +48,10 @@ class FluidLB:
             "fluid": "density_based"
         }
         self.residue_fields = ["density", "velocity"]
-        self.save_fields = ["density", "velocity", "solid", "solid_id"]
+        self.save_fields = [
+            "density", "velocity", "solid", "solid_id",
+            "fluid_boundary", "solid_boundary"
+        ]
 
     def get_collision_args(self):
         return {
@@ -138,9 +141,6 @@ class Solver:
             comm,
             self.state,
         )
-        # TODO: only initialize obstacle operator here.
-        # inside solver loop have obstacle_operator.initialize()
-        # so that fluid/solid boundary everything gets initialized
         self.obstacle_operator = ObstacleOperator(
             self.state,
             self.backend,
@@ -257,14 +257,16 @@ class Solver:
             "Running simulation...\n", self.state.domain.mpi_rank,
             verbose
         )
+
+        self.collision_operator.initialize_pop(
+            self.state,
+            self.backend
+        )
+
         self.io_operator.write_fields(
             self.state,
             self.backend,
             self.state.control.start_time
-        )
-        self.collision_operator.initialize_pop(
-            self.state,
-            self.backend
         )
 
         run_time_start = time.perf_counter()

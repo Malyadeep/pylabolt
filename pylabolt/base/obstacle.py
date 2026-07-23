@@ -344,7 +344,7 @@ class Circle:
                 "density must be float or int for obstacle type circle: " +
                 user_obstacle_name
             )
-        self.density = control.precision(density)
+        self.solid_density = control.precision(density)
 
         if "static" not in user_obstacle_dict:
             raise ValueError(
@@ -421,51 +421,25 @@ class Circle:
             self.radius
         )
 
-        self.set_solid_nodes(
-            fields,
-            boundary,
-            domain,
-            mesh
+        construct_circle(
+            domain.size,
+            domain.shape,
+            domain.offset,
+            mesh.grid_global_shape,
+            boundary.x_periodic,
+            boundary.y_periodic,
+            fields.solid,
+            fields.solid_id,
+            fields.ghost_node,
+            fields.density,
+            fields.velocity,
+            self.linear_velocity,
+            self.angular_velocity,
+            self.solid_density,
+            self.center,
+            self.radius,
+            self.id
         )
-
-    def set_solid_nodes(
-        self,
-        fields,
-        boundary,
-        domain,
-        mesh,
-    ):
-        """
-        Sets solid node values for obstacle type circle
-        Args:
-
-        Returns:
-
-        """
-        offset = domain.offset
-        for ind in range(domain.size):
-            if not fields.ghost_node[ind]:
-                i = ind // domain.shape[1]
-                j = ind - i * domain.shape[1]
-                i_global, j_global = local_to_global(
-                    i - 1, j - 1, offset
-                )
-                inside_solid, rx, ry = construct_circle(
-                    i_global,
-                    j_global,
-                    mesh.grid_global_shape,
-                    boundary.x_periodic,
-                    boundary.y_periodic,
-                    *self.reconstruct_args
-                )
-                if inside_solid:
-                    fields.solid[ind] = True
-                    fields.solid_id[ind] = self.id
-                    fields.velocity[ind, 0] = self.linear_velocity[0] -\
-                        self.angular_velocity * ry
-                    fields.velocity[ind, 1] = self.linear_velocity[1] +\
-                        self.angular_velocity * rx
-                    fields.density[ind] = self.density
 
     @property
     def properties(self):
@@ -473,7 +447,7 @@ class Circle:
             "obstacle id": self.id,
             "obstacle name": self.name,
             "obstacle type": self.type,
-            "density": self.density,
+            "density": self.solid_density,
             "center": [float(item) for item in self.center],
             "radius": self.radius,
             "static obstacle": self.static
@@ -578,7 +552,7 @@ class Ellipse:
                 "density must be float or int for obstacle type ellipse: " +
                 user_obstacle_name
             )
-        self.density = control.precision(density)
+        self.solid_density = control.precision(density)
 
         if "static" not in user_obstacle_dict:
             raise ValueError(
@@ -654,55 +628,30 @@ class Ellipse:
             self.center,
             self.semi_major_axis,
             self.semi_minor_axis,
-            self.cos_alpha,
-            self.sin_alpha
+            self.inclination_angle
         )
 
-        self.set_solid_nodes(
-            fields,
-            boundary,
-            domain,
-            mesh,
+        construct_ellipse(
+            domain.size,
+            domain.shape,
+            domain.offset,
+            mesh.grid_global_shape,
+            boundary.x_periodic,
+            boundary.y_periodic,
+            fields.solid,
+            fields.solid_id,
+            fields.ghost_node,
+            fields.density,
+            fields.velocity,
+            self.linear_velocity,
+            self.angular_velocity,
+            self.solid_density,
+            self.center,
+            self.semi_major_axis,
+            self.semi_minor_axis,
+            self.inclination_angle,
+            self.id
         )
-
-    def set_solid_nodes(
-        self,
-        fields,
-        boundary,
-        domain,
-        mesh,
-    ):
-        """
-        Sets solid node values for obstacle type circle
-        Args:
-
-        Returns:
-
-        """
-        offset = domain.offset
-        for ind in range(domain.size):
-            if not fields.ghost_node[ind]:
-                i = ind // domain.shape[1]
-                j = ind - i * domain.shape[1]
-                i_global, j_global = local_to_global(
-                    i - 1, j - 1, offset
-                )
-                inside_solid, rx, ry = construct_ellipse(
-                    i_global,
-                    j_global,
-                    mesh.grid_global_shape,
-                    boundary.x_periodic,
-                    boundary.y_periodic,
-                    *self.reconstruct_args
-                )
-                if inside_solid:
-                    fields.solid[ind] = True
-                    fields.solid_id[ind] = self.id
-                    fields.velocity[ind, 0] = self.linear_velocity[0] -\
-                        self.angular_velocity * ry
-                    fields.velocity[ind, 1] = self.linear_velocity[1] +\
-                        self.angular_velocity * rx
-                    fields.density[ind] = self.density
 
     @property
     def properties(self):
@@ -710,7 +659,7 @@ class Ellipse:
             "obstacle id": self.id,
             "obstacle name": self.name,
             "obstacle type": self.type,
-            "density": self.density,
+            "density": self.solid_density,
             "center": [float(item) for item in self.center],
             "semi-major axis": self.semi_major_axis,
             "semi-minor axis": self.semi_minor_axis,

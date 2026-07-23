@@ -52,6 +52,11 @@ class Fields:
         self.solid_id[:] = -1
         self.solid_boundary = self.allocate_memory(domain.size, np.bool_)
         self.fluid_boundary = self.allocate_memory(domain.size, np.bool_)
+        self.surface_normals = self.allocate_memory(
+            domain.size,
+            control.precision,
+            components=dim
+        )
         self.ghost_node = self.allocate_memory(domain.size, np.bool_)
         self.init_ghost_nodes(domain)
         self.periodic_boundary = self.allocate_memory(domain.size, np.bool_)

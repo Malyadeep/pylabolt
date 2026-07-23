@@ -90,7 +90,7 @@ def BGK_density_based_second_order_guo_linear(
                 )
                 force_term = weights[k] * (
                     cx[k] * force_local_x + cy[k] * force_local_y
-                )
+                ) * inv_cs_2
                 pop[ind, k] = (
                     (1 - omega) * pop_new[ind, k] +
                     omega * pop_eq +
