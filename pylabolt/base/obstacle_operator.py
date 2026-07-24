@@ -7,6 +7,7 @@ from pylabolt.parallel.cpu.obstacle_kernels import (
     compute_normals_circle,
     compute_normals_ellipse
 )
+import pylabolt.parallel.cpu.obstacle_kernels as obstacle_kernels_cpu
 
 
 class ObstacleOperator:
@@ -23,6 +24,7 @@ class ObstacleOperator:
 
         """
         self.no_of_obstacles = len(state.obstacle.obstacles)
+        self.all_obstacles_static = True
         for obstacle in state.obstacle.obstacles:
             if not obstacle.static:
                 self.all_obstacles_static = False
@@ -33,30 +35,54 @@ class ObstacleOperator:
             bool_buffers=["solid"]
         )
         # ------- Find solid-fluid boundary nodes ------- #
-        self.fluid_boundary_overlap = np.zeros(
-            state.domain.size, dtype=bool
-        )
         self.find_obstacle_boundary_nodes_cpu(state, mpi_operator)
         # ------- Find solid-fluid normals ------- #
         self.find_obstacle_normals_cpu(state)
 
-    def reconstruct_obstacle_cpu(
+    def compute_forces_cpu(
         self,
-        state
+        state,
+        mpi_operator
     ):
         """
-        Reconstruct moving obstacles
+        Compute forces and torque acting on obstacles
         Args:
 
         Returns:
 
         """
         for obstacle in state.obstacle.obstacles:
-            print(
-                obstacle.id,
-                obstacle.name,
-                obstacle.type
+            if obstacle.type in ["circle", "ellipse"]:
+                ref_point = obstacle.center
+            else:
+                ref_point = state.obstacle.ref_point_torque
+            local_force_torque = obstacle_kernels_cpu.compute_forces_torque(
+                state.domain.size,
+                state.domain.shape,
+                state.domain.offset,
+                state.mesh.grid_global_shape,
+                state.lattice.cx,
+                state.lattice.cy,
+                state.lattice.inv_list,
+                state.lattice.no_of_directions,
+                state.boundary.x_periodic,
+                state.boundary.y_periodic,
+                state.fields.solid,
+                state.fields.solid_id,
+                state.fields.fluid_boundary,
+                state.fields.ghost_node,
+                state.fields.pop_fluid,
+                state.fields.pop_fluid_new,
+                ref_point,
+                obstacle.id
             )
+            global_force_torque = mpi_operator.reduce(
+                local_force_torque,
+                operation="sum"
+            )
+            obstacle.forces[0] = global_force_torque[0]
+            obstacle.forces[1] = global_force_torque[1]
+            obstacle.torque = global_force_torque[2]
 
     def find_obstacle_boundary_nodes_cpu(
         self,
@@ -83,7 +109,7 @@ class ObstacleOperator:
                 state.fields.fluid_boundary,
                 state.fields.ghost_node
             )
-            check_fluid_boundary_overlap(
+            local_sum_overlap = check_fluid_boundary_overlap(
                 state.domain.size,
                 state.domain.shape,
                 state.lattice.cx,
@@ -91,15 +117,18 @@ class ObstacleOperator:
                 state.lattice.no_of_directions,
                 state.fields.solid_id,
                 state.fields.fluid_boundary,
-                state.fields.ghost_node,
-                self.fluid_boundary_overlap
+                state.fields.ghost_node
             )
-            max_value = np.max(self.fluid_boundary_overlap)
-            if max_value:
+            global_sum_overlap = mpi_operator.reduce(
+                np.array([local_sum_overlap]),
+                operation="sum"
+            )
+            if global_sum_overlap > 0:
                 raise RuntimeError
         except RuntimeError:
             print_log(
-                "Fluid Boundary node overlap detected!",
+                f"Fluid Boundary node overlap detected for"
+                f" {global_sum_overlap[0]} nodes!",
                 state.domain.mpi_rank, verbose=True
             )
             print_log(

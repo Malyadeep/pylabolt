@@ -50,7 +50,8 @@ class FluidLB:
         self.residue_fields = ["density", "velocity"]
         self.save_fields = [
             "density", "velocity", "solid", "solid_id",
-            "fluid_boundary", "solid_boundary"
+            "fluid_boundary", "solid_boundary",
+            "surface_normals"
         ]
 
     def get_collision_args(self):
@@ -257,6 +258,8 @@ class Solver:
             "Running simulation...\n", self.state.domain.mpi_rank,
             verbose
         )
+
+        self.obstacle_operator.compute_forces_cpu(self.state)
 
         self.collision_operator.initialize_pop(
             self.state,

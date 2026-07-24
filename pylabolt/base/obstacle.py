@@ -35,8 +35,7 @@ class Obstacle:
                 "obstacle_dict not found in simulation.py file"
             )
         self.obstacle_dict = simulation.obstacle_dict
-        self.compute_forces = False
-        self.compute_torque = False
+        self.compute_forces_torque = False
         self.ref_point_torque = np.zeros(2, dtype=control.precision)
         self.write_obstacle_data = False
         self.write_interval = 1
@@ -122,35 +121,23 @@ class Obstacle:
 
         """
         print_log("Setting obstacle options", domain.mpi_rank, verbose)
-        if "compute_forces" in options_dict:
-            self.compute_forces = options_dict["compute_forces"]
-            if not isinstance(self.compute_forces, (bool, np.bool_)):
+        if "compute_forces_torque" in options_dict:
+            self.compute_forces_torque = options_dict["compute_forces_torque"]
+            if not isinstance(self.compute_forces_torque, (bool, np.bool_)):
                 raise ValueError(
-                    "compute_forces must be bool:" +
+                    "compute_forces_torque must be bool:" +
                     " True/False (default: False)"
                 )
         print_log(
-            "compute_forces: " + str(self.compute_forces),
-            domain.mpi_rank,
-            verbose=verbose
-        )
-        if "compute_torque" in options_dict:
-            self.compute_torque = options_dict["compute_torque"]
-            if not isinstance(self.compute_torque, (bool, np.bool_)):
-                raise ValueError(
-                    "compute_torque must be bool:" +
-                    " True/False (default: False)"
-                )
-        print_log(
-            "compute_torque: " + str(self.compute_torque),
+            "compute_forces_torque: " + str(self.compute_forces_torque),
             domain.mpi_rank,
             verbose=verbose
         )
         if "ref_point_torque" in options_dict:
-            if self.compute_torque is False:
+            if self.compute_forces_torque is False:
                 print_log(
                     "WARNING! ref_point_torque ignored in "
-                    "obstacle_dict options as compute_torque is False",
+                    "obstacle_dict options as compute_forces_torque is False",
                     domain.mpi_rank,
                     verbose=verbose
                 )
