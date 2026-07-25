@@ -1,6 +1,7 @@
 from pylabolt.utils.helpers import print_log
 import pylabolt.parallel.cpu.fluid_boundary_kernels as fluid_kernels_cpu
 import pylabolt.parallel.cpu.phase_boundary_kernels as phase_kernels_cpu
+import pylabolt.parallel.cpu.force_torque_kernels as force_torque_kernels_cpu
 import pylabolt.parallel.gpu.fluid_boundary_kernels as fluid_kernels_gpu
 import pylabolt.parallel.gpu.phase_boundary_kernels as phase_kernels_gpu
 
@@ -155,9 +156,12 @@ class BoundaryOperator:
         """
         if backend.backend_type == "cpu":
             self.set_boundary = self.set_boundary_cpu
+            force_torque_kernels_module = force_torque_kernels_cpu
+            arg_suffix = ""
         elif backend.backend_type == "gpu":
             self.set_boundary = self.set_boundary_gpu
-            # TODO: transfer collision operator attributes to device
+            # force_torque_kernels_module = force_torque_kernels_gpu
+            arg_suffix = "_device"
 
         self.boundary_condition_type = self.model.boundary_condition_type
 
@@ -200,6 +204,35 @@ class BoundaryOperator:
                 else:
                     self.boundary_kernels_phase.append(None)
                     self.boundary_args_phase.append(None)
+
+        if state.boundary.compute_forces:
+            self.boundary_force_args = []
+            self.boundary_force_type = self.model.obstacle_kernels_type
+            self.compute_forces_kernel = getattr(
+                force_torque_kernels_module,
+                "compute_boundary_force_" + self.boundary_force_type
+            )
+            common_args_dict = {
+                "lattice": ["cx", "cy"],
+                "fields": ["solid", "pop_fluid", "pop_fluid_new"]
+            }
+            boundary_element_args_list = [
+                "boundary_nodes", "out_list", "inv_list"
+            ]
+            for boundary_element in state.boundary.boundary_elements:
+                args = ()
+                for arg_item in common_args_dict:
+                    args_list = common_args_dict[arg_item]
+                    arg_obj = getattr(state, arg_item)
+                    for arg_name in args_list:
+                        arg = getattr(arg_obj, arg_name + arg_suffix)
+                        args += tuple([arg])
+                for arg_name in boundary_element_args_list:
+                    arg = getattr(boundary_element, arg_name + arg_suffix)
+                    args += tuple([arg])
+                self.boundary_force_args.append(args)
+            print(self.compute_forces_kernel)
+            print(self.boundary_force_args)
 
         print_log("Backend set for boundary operator",
                   state.domain.mpi_rank, verbose)

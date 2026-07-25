@@ -318,6 +318,7 @@ class Circle:
                 user_obstacle_name
             )
         self.center = np.array(center, dtype=control.precision)
+        self.ref_point = self.center
 
         self.inclination_angle = control.precision(0)
 
@@ -528,6 +529,7 @@ class Ellipse:
                 user_obstacle_name
             )
         self.center = np.array(center, dtype=control.precision)
+        self.ref_point = self.center
 
         if "density" not in user_obstacle_dict:
             raise ValueError(

@@ -47,6 +47,7 @@ class FluidLB:
         self.compute_fields_type = {
             "fluid": "density_based"
         }
+        self.obstacle_kernels_type = "single_phase"
         self.residue_fields = ["density", "velocity"]
         self.save_fields = [
             "density", "velocity", "solid", "solid_id",
@@ -143,6 +144,7 @@ class Solver:
             self.state,
         )
         self.obstacle_operator = ObstacleOperator(
+            self.model,
             self.state,
             self.backend,
             self.mpi_operator
@@ -199,7 +201,7 @@ class Solver:
 
         self.state.set_backend(self.backend)
         self.mpi_operator.set_backend(self.state, self.backend)
-        # self.obstacle_operator.set_backend(self.backend)
+        self.obstacle_operator.set_backend(self.state, self.backend)
         self.collision_operator.set_backend(self.state, self.backend)
         self.force_operator.set_backend(self.state, self.backend)
         self.compute_fields_operator.set_backend(self.state, self.backend)
@@ -259,7 +261,11 @@ class Solver:
             verbose
         )
 
-        self.obstacle_operator.compute_forces_cpu(self.state)
+        self.obstacle_operator.compute_forces_torque(
+            self.state,
+            self.backend,
+            self.mpi_operator
+        )
 
         self.collision_operator.initialize_pop(
             self.state,

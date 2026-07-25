@@ -359,7 +359,7 @@ def check_fluid_boundary_overlap(
 
 
 @numba.njit(parallel=True, nogil=True)
-def compute_forces_torque(
+def compute_forces_torque_single_phase(
     size,
     shape,
     offset,
