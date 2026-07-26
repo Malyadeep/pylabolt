@@ -15,6 +15,7 @@ class BoundaryElement:
         domain,
         control,
         fields,
+        wall=False,
         fluid_config=None,
         phase_config=None
     ):
@@ -29,6 +30,8 @@ class BoundaryElement:
         self.location = location
         self.segment = np.array(segment)
         self.periodic = False
+        self.wall = wall
+        self.forces = np.zeros(2, dtype=control.precision)
         if fluid_config is not None:
             self.type_fluid = fluid_config["type"]
             if self.type_fluid == "periodic":
@@ -154,6 +157,8 @@ class Boundary:
         self.scalar = scalar
         self.boundary_dict = simulation.boundary_dict
         self.compute_forces = False
+        self.write_boundary_data = False
+        self.write_interval = 1
         self.x_periodic = False
         self.y_periodic = False
         self.boundary_elements = []
@@ -244,6 +249,28 @@ class Boundary:
             domain.mpi_rank,
             verbose=verbose
         )
+        if "write_boundary_data" in options_dict:
+            self.write_boundary_data = True
+            temp_dict = options_dict["write_boundary_data"]
+            if "interval" not in temp_dict:
+                raise ValueError("interval missing boundary_dict options!")
+            self.write_interval = temp_dict["interval"]
+            if not (isinstance(self.write_interval, int) and
+                    self.write_interval > 0):
+                raise ValueError(
+                    "interval must be int and > 0 in boundary_dict options"
+                )
+        print_log(
+            "write_boundary_data: " + str(self.write_boundary_data),
+            domain.mpi_rank,
+            verbose=verbose
+        )
+        if self.write_boundary_data:
+            print_log(
+                "write_interval: " + str(self.write_interval),
+                domain.mpi_rank,
+                verbose=verbose
+            )
         print_log("Boundary options set\n", domain.mpi_rank, verbose)
 
     def read_user_boundary_dict(
@@ -277,12 +304,15 @@ class Boundary:
             "scalar_value": None,
             "vector_value": None
         }
-        if "entity" not in user_boundary_dict:
-            # TODO: add something like entity later
-            # raise ValueError(
-            #     "entity missing in boundary: " + user_boundary_name
-            # )
-            pass
+        if "wall" not in user_boundary_dict:
+            raise ValueError(
+                "wall missing in boundary: " + user_boundary_name
+            )
+        wall = user_boundary_dict["wall"]
+        if not isinstance(wall, (bool, np.bool_)):
+            raise ValueError(
+                "wall entry must be True/False: " + user_boundary_name
+            )
         # ------- Validate segments entry ------- #
         if "segments" not in user_boundary_dict:
             raise ValueError(
@@ -464,6 +494,7 @@ class Boundary:
                 domain,
                 control,
                 fields,
+                wall=wall,
                 fluid_config=fluid_config,
                 phase_config=phase_config
             )

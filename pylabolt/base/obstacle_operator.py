@@ -61,6 +61,8 @@ class ObstacleOperator:
         Returns:
 
         """
+        if not state.obstacle.compute_forces_torque:
+            return
         for itr in range(self.no_of_obstacles):
             obstacle = state.obstacle.obstacles[itr]
             self.local_forces_torque[itr, :] =\
@@ -69,15 +71,15 @@ class ObstacleOperator:
                     obstacle.ref_point,
                     obstacle.id
                 )
-        global_force_torque = mpi_operator.reduce(
+        global_forces_torque = mpi_operator.reduce(
             self.local_forces_torque,
             operation="sum"
         )
         for itr in range(self.no_of_obstacles):
             obstacle = state.obstacle.obstacles[itr]
-            obstacle.forces[0] = global_force_torque[itr, 0]
-            obstacle.forces[1] = global_force_torque[itr, 1]
-            obstacle.torque = global_force_torque[itr, 2]
+            obstacle.forces[0] = global_forces_torque[itr, 0]
+            obstacle.forces[1] = global_forces_torque[itr, 1]
+            obstacle.torque = global_forces_torque[itr, 2]
 
     def find_obstacle_boundary_nodes_cpu(
         self,

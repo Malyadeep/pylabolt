@@ -27,6 +27,7 @@ class InputOutputOperator:
                       state.domain.mpi_rank, verbose)
             self.model = model
             self.setup_write_fields(state)
+            self.setup_write_histories(state)
             print_log("\nSetting up I/O operator done!",
                       state.domain.mpi_rank, verbose)
             print_log("-" * 80, state.domain.mpi_rank, verbose)
@@ -217,6 +218,110 @@ class InputOutputOperator:
             self.field_save_path + "t_" + str(time_step) + ".npz",
             **self.fields_save
         )
+
+    def setup_write_histories(
+        self,
+        state
+    ):
+        """
+        Setup write histories pipeline
+        Args:
+
+        Returns:
+
+        """
+        if not (state.obstacle.write_obstacle_data or
+                state.boundary.write_boundary_data):
+            return
+        os.makedirs("histories", exist_ok=True)
+        self.history_save_path = "histories/"
+        if state.obstacle.write_obstacle_data:
+            for obstacle in state.obstacle.obstacles:
+                with open(
+                    self.history_save_path + obstacle.name + ".dat", "w"
+                ) as current_file:
+                    current_file.write(
+                        f"{'#':5} {'PyLaBolt obstacle history'}\n"
+                        f"{'#':5} {'ID':6}: {obstacle.id}\n"
+                        f"{'#':5} {'Name':6}: {obstacle.name}\n"
+                        f"{'#':5} {'Type':6}: {obstacle.type}\n"
+                        f"{'#':5} {'Columns':6}:\n"
+                    )
+                    current_file.write(
+                        f"{'#':5}"
+                        f"{'time':10}"
+                        f"{'pos_x':10}"
+                        f"{'pos_y':10}"
+                        f"{'alpha':10}"
+                        f"{'vel_x':10}"
+                        f"{'vel_y':10}"
+                        f"{'omega':10}"
+                        f"{'force_x':10}"
+                        f"{'force_y':10}"
+                        f"{'torque':10}\n"
+                    )
+        if state.boundary.write_boundary_data:
+            for boundary_element in state.boundary.boundary_elements:
+                if not boundary_element.wall:
+                    continue
+                with open(
+                    self.history_save_path + boundary_element.name +
+                    ".dat", "w"
+                ) as current_file:
+                    current_file.write(
+                        f"{'#':5} {'PyLaBolt boundary history'}\n"
+                        f"{'#':5} {'Name':6}: {boundary_element.name}\n"
+                        f"{'#':5} {'Columns':6}:\n"
+                    )
+                    current_file.write(
+                        f"{'#':5} {'time':10} {'force_x':10} {'force_y':10}\n"
+                    )
+
+    def write_histories(
+        self,
+        state,
+        time_step
+    ):
+        """
+        Write to disk obstacle and boundary data including
+        forces, torque, velocity, position
+        Args:
+
+        Returns:
+
+        """
+        if state.obstacle.write_obstacle_data:
+            if time_step % state.obstacle.write_interval == 0:
+                for obstacle in state.obstacle.obstacles:
+                    with open(
+                        self.history_save_path + obstacle.name + ".dat", "a"
+                    ) as current_file:
+                        current_file.write(
+                            f"{time_step:<24}"
+                            f"{obstacle.center[0]:24.16e}"
+                            f"{obstacle.center[1]:24.16e}"
+                            f"{obstacle.inclination_angle:24.16e}"
+                            f"{obstacle.linear_velocity[0]:24.16e}"
+                            f"{obstacle.linear_velocity[1]:24.16e}"
+                            f"{obstacle.angular_velocity:24.16e}"
+                            f"{obstacle.forces[0]:24.16e}"
+                            f"{obstacle.forces[1]:24.16e}"
+                            f"{obstacle.torque:24.16e}\n"
+                        )
+        if state.boundary.write_boundary_data:
+            if time_step % state.boundary.write_interval == 0:
+                for boundary_element in state.boundary.boundary_elements:
+                    if not boundary_element.wall:
+                        continue
+                    with open(
+                        self.history_save_path + boundary_element.name +
+                        ".dat", "a"
+                    ) as current_file:
+                        current_file.write(
+                            f"{time_step:<24}"
+                            f"{boundary_element.forces[0]:24.16e}"
+                            f"{boundary_element.forces[1]:24.16e}\n"
+                        )
 
     def compile(
         self,

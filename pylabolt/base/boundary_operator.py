@@ -1,3 +1,5 @@
+import numpy as np
+
 from pylabolt.utils.helpers import print_log
 import pylabolt.parallel.cpu.fluid_boundary_kernels as fluid_kernels_cpu
 import pylabolt.parallel.cpu.phase_boundary_kernels as phase_kernels_cpu
@@ -21,6 +23,7 @@ class BoundaryOperator:
         print_log("-" * 80, state.domain.mpi_rank, verbose)
         print_log("Setting up boundary condition operator...",
                   state.domain.mpi_rank, verbose)
+        self.no_of_boundaries = len(state.boundary.boundary_elements)
         self.model = model
         print_log("Setting up boundary condition operator done!",
                   state.domain.mpi_rank, verbose)
@@ -43,7 +46,7 @@ class BoundaryOperator:
 
         if state.fluid:
             self.kernel_signatures.update({"fluid": {}})
-            for itr in range(len(self.boundary_kernels_fluid)):
+            for itr in range(self.no_of_boundaries):
                 kernel_fluid = self.boundary_kernels_fluid[itr]
                 if kernel_fluid is not None:
                     compile_args = backend.make_compile_args(
@@ -63,7 +66,7 @@ class BoundaryOperator:
 
         elif state.phase:
             self.kernel_signatures.update({"phase": {}})
-            for itr in range(len(self.boundary_kernels_phase)):
+            for itr in range(self.no_of_boundaries):
                 kernel_phase = self.boundary_kernels_phase[itr]
                 if kernel_phase is not None:
                     compile_args = backend.make_compile_args(
@@ -98,14 +101,14 @@ class BoundaryOperator:
 
         """
         if fluid:
-            for itr in range(len(self.boundary_kernels_fluid)):
+            for itr in range(self.no_of_boundaries):
                 if self.boundary_kernels_fluid[itr] is not None:
                     self.boundary_kernels_fluid[itr](
                         *self.boundary_args_fluid[itr]
                     )
 
         if phase:
-            for itr in range(len(self.boundary_kernels_phase)):
+            for itr in range(self.no_of_boundaries):
                 if self.boundary_kernels_phase[itr] is not None:
                     self.boundary_kernels_phase[itr](
                         *self.boundary_args_phase[itr]
@@ -119,27 +122,55 @@ class BoundaryOperator:
         phase=False
     ):
         """
-        Apply boundary condition on GPU kernels
+        Apply boundary condition on CPU kernels
         Args:
 
         Returns:
 
         """
         if fluid:
-            for itr in range(len(self.boundary_kernels_fluid)):
-                kernel_fluid = self.boundary_kernels_fluid[itr]
-                if kernel_fluid is not None:
-                    kernel_fluid[backend.blocks, backend.threads_per_block](
+            for itr in range(self.no_of_boundaries):
+                if self.boundary_kernels_fluid[itr] is not None:
+                    self.boundary_kernels_fluid[itr](
                         *self.boundary_args_fluid[itr]
                     )
 
         if phase:
-            for itr in range(len(self.boundary_kernels_phase)):
-                kernel_phase = self.boundary_kernels_phase[itr]
-                if kernel_phase is not None:
-                    kernel_phase[backend.blocks, backend.threads_per_block](
+            for itr in range(self.no_of_boundaries):
+                if self.boundary_kernels_phase[itr] is not None:
+                    self.boundary_kernels_phase[itr](
                         *self.boundary_args_phase[itr]
                     )
+
+    def compute_forces_cpu(
+        self,
+        state,
+        backend,
+        mpi_operator
+    ):
+        """
+        Compute forces on boundary with CPU kernel
+        Args:
+
+        Returns:
+
+        """
+        if not state.boundary.compute_forces:
+            return
+        for itr in range(self.no_of_boundaries):
+            boundary_element = state.boundary.boundary_elements[itr]
+            if not boundary_element.wall:
+                self.local_forces[itr, :] =\
+                    self.compute_forces_kernel(
+                        *self.boundary_force_args[itr]
+                    )
+        global_forces = mpi_operator.reduce(
+            self.local_forces, operation="sum"
+        )
+        for itr in range(self.no_of_boundaries):
+            boundary_element = state.boundary.boundary_elements[itr]
+            boundary_element.forces[0] = global_forces[itr, 0]
+            boundary_element.forces[1] = global_forces[itr, 1]
 
     def set_backend(
         self,
@@ -156,10 +187,12 @@ class BoundaryOperator:
         """
         if backend.backend_type == "cpu":
             self.set_boundary = self.set_boundary_cpu
+            self.compute_forces = self.compute_forces_cpu
             force_torque_kernels_module = force_torque_kernels_cpu
             arg_suffix = ""
         elif backend.backend_type == "gpu":
             self.set_boundary = self.set_boundary_gpu
+            self.compute_forces = self.compute_forces_gpu
             # force_torque_kernels_module = force_torque_kernels_gpu
             arg_suffix = "_device"
 
@@ -206,6 +239,10 @@ class BoundaryOperator:
                     self.boundary_args_phase.append(None)
 
         if state.boundary.compute_forces:
+            self.local_forces = np.zeros(
+                (self.no_of_boundaries, 2),
+                dtype=state.control.precision
+            )
             self.boundary_force_args = []
             self.boundary_force_type = self.model.obstacle_kernels_type
             self.compute_forces_kernel = getattr(
@@ -231,8 +268,6 @@ class BoundaryOperator:
                     arg = getattr(boundary_element, arg_name + arg_suffix)
                     args += tuple([arg])
                 self.boundary_force_args.append(args)
-            print(self.compute_forces_kernel)
-            print(self.boundary_force_args)
 
         print_log("Backend set for boundary operator",
                   state.domain.mpi_rank, verbose)

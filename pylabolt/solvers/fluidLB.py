@@ -261,16 +261,22 @@ class Solver:
             verbose
         )
 
+        self.collision_operator.initialize_pop(
+            self.state,
+            self.backend
+        )
+
+        self.boundary_operator.compute_forces(
+            self.state,
+            self.backend,
+            self.mpi_operator
+        )
         self.obstacle_operator.compute_forces_torque(
             self.state,
             self.backend,
             self.mpi_operator
         )
-
-        self.collision_operator.initialize_pop(
-            self.state,
-            self.backend
-        )
+        self.io_operator.write_histories(self.state, 0)
 
         self.io_operator.write_fields(
             self.state,
