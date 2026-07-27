@@ -166,6 +166,8 @@ class InputOutputOperator:
         Returns:
 
         """
+        if time_step % state.control.save_interval != 0:
+            return
         for item in self.fields_save:
             args = (
                 state.domain.inner_size,
@@ -196,6 +198,8 @@ class InputOutputOperator:
         Returns:
 
         """
+        if time_step % state.control.save_interval != 0:
+            return
         for item in self.fields_save_device:
             args = (
                 state.domain.inner_size_device,

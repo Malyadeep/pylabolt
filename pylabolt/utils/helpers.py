@@ -32,14 +32,16 @@ class SimulationStatusLogger:
         mpi_rank,
         verbose=True
     ):
-        self.mpi_rank = mpi_rank
         self.verbose = verbose
 
     def log_data(
         self,
+        state,
         time_step,
         **values
     ):
+        if time_step % state.control.std_out_interval != 0:
+            return
         log_string = [f"{'time:':<5} {time_step:<10}"]
         for key, value in values.items():
             if np.isscalar(value):
@@ -49,4 +51,4 @@ class SimulationStatusLogger:
             else:
                 value_str = "(" + ", ".join(f"{v:.5e}" for v in value) + ")"
             log_string.append(f"{key:<5}: {value_str}")
-        print_log(" | ".join(log_string), self.mpi_rank, self.verbose)
+        print_log(" | ".join(log_string), state.domain.mpi_rank, self.verbose)

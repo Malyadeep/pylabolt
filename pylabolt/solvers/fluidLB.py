@@ -271,7 +271,7 @@ class Solver:
             self.backend,
             self.mpi_operator
         )
-        self.obstacle_operator.compute_forces_torque(
+        self.obstacle_operator.modify_obstacles(
             self.state,
             self.backend,
             self.mpi_operator
@@ -319,23 +319,22 @@ class Solver:
                 self.backend,
                 fluid=True
             )
-            if time_step % self.state.control.std_out_interval == 0:
-                self.residue_operator.compute_residues(
-                    self.state,
-                    self.backend,
-                    self.mpi_operator
-                )
-                self.logger.log_data(
-                    time_step,
-                    res_density=self.residue_operator.residues["res_density"],
-                    res_velocity=self.residue_operator.residues["res_velocity"]
-                )
-            if time_step % self.state.control.save_interval == 0:
-                self.io_operator.write_fields(
-                    self.state,
-                    self.backend,
-                    time_step
-                )
+            self.residue_operator.compute_residues(
+                self.state,
+                self.backend,
+                self.mpi_operator,
+                time_step
+            )
+            self.logger.log_data(
+                time_step,
+                res_density=self.residue_operator.residues["res_density"],
+                res_velocity=self.residue_operator.residues["res_velocity"]
+            )
+            self.io_operator.write_fields(
+                self.state,
+                self.backend,
+                time_step
+            )
 
         run_time = time.perf_counter() - run_time_start
         print_log("\n" + "-" * 80, self.state.domain.mpi_rank, verbose)

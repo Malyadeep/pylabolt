@@ -48,6 +48,27 @@ class ObstacleOperator:
         # ------- Find solid-fluid normals ------- #
         self.find_obstacle_normals_cpu(state)
 
+    def modify_obstacles(
+        self,
+        state,
+        backend,
+        mpi_operator
+    ):
+        """
+        Modify obstacles in the grid
+        Compute forces, update solid position-velocities,
+        reconstruct solid bodies, recompute solid-fluid properties
+        Args:
+
+        Returns:
+
+        """
+        self.compute_forces_torque(
+            state,
+            backend,
+            mpi_operator
+        )
+
     def compute_forces_torque_cpu(
         self,
         state,

@@ -164,7 +164,8 @@ class ResidueOperator:
         self,
         state,
         backend,
-        mpi_operator
+        mpi_operator,
+        time_step
     ):
         """
         Compute residuals on CPU kernels
@@ -173,6 +174,8 @@ class ResidueOperator:
         Returns:
 
         """
+        if time_step % state.control.std_out_interval != 0:
+            return
         for item in self.fields_list:
             args = (
                 state.domain.size,
@@ -212,7 +215,8 @@ class ResidueOperator:
         self,
         state,
         backend,
-        mpi_operator
+        mpi_operator,
+        time_step
     ):
         """
         Compute residuals on GPU kernels
@@ -221,6 +225,8 @@ class ResidueOperator:
         Returns:
 
         """
+        if time_step % state.control.std_out_interval != 0:
+            return
         for item in self.fields_list:
             args = (
                 state.domain.size_device,
