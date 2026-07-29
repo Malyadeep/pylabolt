@@ -31,7 +31,7 @@ class BoundaryElement:
         self.segment = np.array(segment)
         self.periodic = False
         self.wall = wall
-        self.forces = np.zeros(2, dtype=control.precision)
+        self.force = np.zeros(2, dtype=control.precision)
         if fluid_config is not None:
             self.type_fluid = fluid_config["type"]
             if self.type_fluid == "periodic":
@@ -156,7 +156,7 @@ class Boundary:
         self.phase = phase
         self.scalar = scalar
         self.boundary_dict = simulation.boundary_dict
-        self.compute_forces = False
+        self.compute_force = False
         self.write_boundary_data = False
         self.write_interval = 1
         self.x_periodic = False
@@ -237,15 +237,15 @@ class Boundary:
 
         """
         print_log("Setting boundary options", domain.mpi_rank, verbose)
-        if "compute_forces" in options_dict:
-            self.compute_forces = options_dict["compute_forces"]
-            if not isinstance(self.compute_forces, (bool, np.bool_)):
+        if "compute_force" in options_dict:
+            self.compute_force = options_dict["compute_force"]
+            if not isinstance(self.compute_force, (bool, np.bool_)):
                 raise ValueError(
-                    "compute_forces must be a bool:" +
+                    "compute_force must be a bool:" +
                     " True/False (default: False)"
                 )
         print_log(
-            "compute_forces: " + str(self.compute_forces),
+            "compute_force: " + str(self.compute_force),
             domain.mpi_rank,
             verbose=verbose
         )

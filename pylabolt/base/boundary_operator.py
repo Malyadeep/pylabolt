@@ -142,35 +142,35 @@ class BoundaryOperator:
                         *self.boundary_args_phase[itr]
                     )
 
-    def compute_forces_cpu(
+    def compute_force_cpu(
         self,
         state,
         backend,
         mpi_operator
     ):
         """
-        Compute forces on boundary with CPU kernel
+        Compute force on boundary with CPU kernel
         Args:
 
         Returns:
 
         """
-        if not state.boundary.compute_forces:
+        if not state.boundary.compute_force:
             return
         for itr in range(self.no_of_boundaries):
             boundary_element = state.boundary.boundary_elements[itr]
-            if not boundary_element.wall:
-                self.local_forces[itr, :] =\
-                    self.compute_forces_kernel(
+            if boundary_element.wall:
+                self.local_force[itr, :] =\
+                    self.compute_force_kernel(
                         *self.boundary_force_args[itr]
                     )
-        global_forces = mpi_operator.reduce(
-            self.local_forces, operation="sum"
+        global_force = mpi_operator.reduce(
+            self.local_force, operation="sum"
         )
         for itr in range(self.no_of_boundaries):
             boundary_element = state.boundary.boundary_elements[itr]
-            boundary_element.forces[0] = global_forces[itr, 0]
-            boundary_element.forces[1] = global_forces[itr, 1]
+            boundary_element.force[0] = global_force[itr, 0]
+            boundary_element.force[1] = global_force[itr, 1]
 
     def set_backend(
         self,
@@ -187,12 +187,12 @@ class BoundaryOperator:
         """
         if backend.backend_type == "cpu":
             self.set_boundary = self.set_boundary_cpu
-            self.compute_forces = self.compute_forces_cpu
+            self.compute_force = self.compute_force_cpu
             force_torque_kernels_module = force_torque_kernels_cpu
             arg_suffix = ""
         elif backend.backend_type == "gpu":
             self.set_boundary = self.set_boundary_gpu
-            self.compute_forces = self.compute_forces_gpu
+            self.compute_force = self.compute_force_gpu
             # force_torque_kernels_module = force_torque_kernels_gpu
             arg_suffix = "_device"
 
@@ -238,14 +238,14 @@ class BoundaryOperator:
                     self.boundary_kernels_phase.append(None)
                     self.boundary_args_phase.append(None)
 
-        if state.boundary.compute_forces:
-            self.local_forces = np.zeros(
+        if state.boundary.compute_force:
+            self.local_force = np.zeros(
                 (self.no_of_boundaries, 2),
                 dtype=state.control.precision
             )
             self.boundary_force_args = []
             self.boundary_force_type = self.model.obstacle_kernels_type
-            self.compute_forces_kernel = getattr(
+            self.compute_force_kernel = getattr(
                 force_torque_kernels_module,
                 "compute_boundary_force_" + self.boundary_force_type
             )

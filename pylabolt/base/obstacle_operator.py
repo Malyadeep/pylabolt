@@ -33,8 +33,8 @@ class ObstacleOperator:
             if not obstacle.static:
                 self.all_obstacles_static = False
                 break
-        if state.obstacle.compute_forces_torque:
-            self.local_forces_torque = np.zeros(
+        if state.obstacle.compute_force_torque:
+            self.local_force_torque = np.zeros(
                 (self.no_of_obstacles, 3),
                 dtype=state.control.precision
             )
@@ -48,7 +48,7 @@ class ObstacleOperator:
         # ------- Find solid-fluid normals ------- #
         self.find_obstacle_normals_cpu(state)
 
-    def modify_obstacles(
+    def move_obstacles(
         self,
         state,
         backend,
@@ -56,51 +56,47 @@ class ObstacleOperator:
     ):
         """
         Modify obstacles in the grid
-        Compute forces, update solid position-velocities,
+        Compute force, update solid position-velocities,
         reconstruct solid bodies, recompute solid-fluid properties
         Args:
 
         Returns:
 
         """
-        self.compute_forces_torque(
-            state,
-            backend,
-            mpi_operator
-        )
+        pass
 
-    def compute_forces_torque_cpu(
+    def compute_force_torque_cpu(
         self,
         state,
         backend,
         mpi_operator
     ):
         """
-        Compute forces and torque acting on obstacles
+        Compute force and torque acting on obstacles
         Args:
 
         Returns:
 
         """
-        if not state.obstacle.compute_forces_torque:
+        if not state.obstacle.compute_force_torque:
             return
         for itr in range(self.no_of_obstacles):
             obstacle = state.obstacle.obstacles[itr]
-            self.local_forces_torque[itr, :] =\
-                self.compute_forces_torque_kernel(
-                    *self.compute_forces_torque_args,
+            self.local_force_torque[itr, :] =\
+                self.compute_force_torque_kernel(
+                    *self.compute_force_torque_args,
                     obstacle.ref_point,
                     obstacle.id
                 )
-        global_forces_torque = mpi_operator.reduce(
-            self.local_forces_torque,
+        global_force_torque = mpi_operator.reduce(
+            self.local_force_torque,
             operation="sum"
         )
         for itr in range(self.no_of_obstacles):
             obstacle = state.obstacle.obstacles[itr]
-            obstacle.forces[0] = global_forces_torque[itr, 0]
-            obstacle.forces[1] = global_forces_torque[itr, 1]
-            obstacle.torque = global_forces_torque[itr, 2]
+            obstacle.force[0] = global_force_torque[itr, 0]
+            obstacle.force[1] = global_force_torque[itr, 1]
+            obstacle.torque = global_force_torque[itr, 2]
 
     def find_obstacle_boundary_nodes_cpu(
         self,
@@ -198,14 +194,14 @@ class ObstacleOperator:
                     obstacle.id
                 )
 
-    def compute_forces_torque_gpu(
+    def compute_force_torque_gpu(
         self,
         state,
         backend,
         mpi_operator
     ):
         """
-        Compute forces and torque acting on obstacles
+        Compute force and torque acting on obstacles
         Args:
 
         Returns:
@@ -256,8 +252,8 @@ class ObstacleOperator:
                 self.find_obstacle_boundary_nodes_cpu
             self.find_obstacle_normals =\
                 self.find_obstacle_normals_cpu
-            self.compute_forces_torque =\
-                self.compute_forces_torque_cpu
+            self.compute_force_torque =\
+                self.compute_force_torque_cpu
             obstacle_kernels_module = obstacle_kernels_cpu
             force_torque_kernels_module = force_torque_kernels_cpu
             arg_suffix = ""
@@ -266,17 +262,17 @@ class ObstacleOperator:
                 self.find_obstacle_boundary_nodes_gpu
             self.find_obstacle_normals =\
                 self.find_obstacle_normals_gpu
-            self.compute_forces_torque =\
-                self.compute_forces_torque_gpu
+            self.compute_force_torque =\
+                self.compute_force_torque_gpu
             # obstacle_kernels_module = obstacle_kernels_gpu
             # force_torque_kernels_module = force_torque_kernels_gpu
             arg_suffix = "_device"
 
         self.obstacle_kernels_type = self.model.obstacle_kernels_type
 
-        self.compute_forces_torque_kernel = getattr(
+        self.compute_force_torque_kernel = getattr(
             force_torque_kernels_module,
-            "compute_forces_torque_" + self.obstacle_kernels_type
+            "compute_force_torque_" + self.obstacle_kernels_type
         )
         if self.obstacle_kernels_type == "single_phase":
             args_dict = {
@@ -287,10 +283,10 @@ class ObstacleOperator:
                 "fields": ["solid", "solid_id", "fluid_boundary",
                            "ghost_node", "pop_fluid", "pop_fluid_new"]
             }
-        self.compute_forces_torque_args = ()
+        self.compute_force_torque_args = ()
         for arg_item in args_dict:
             args_list = args_dict[arg_item]
             arg_obj = getattr(state, arg_item)
             for arg_name in args_list:
                 arg = getattr(arg_obj, arg_name + arg_suffix)
-                self.compute_forces_torque_args += tuple([arg])
+                self.compute_force_torque_args += tuple([arg])

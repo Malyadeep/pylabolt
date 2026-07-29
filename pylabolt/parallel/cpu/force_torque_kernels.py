@@ -5,11 +5,11 @@ from numba import prange
 from pylabolt.parallel.domain import local_to_global
 
 # --------------------------------------------------------------------------#
-""" Kernels to compute forces on obstacles """
+""" Kernels to compute force on obstacles """
 
 
 @numba.njit(parallel=True, nogil=True)
-def compute_forces_torque_single_phase(
+def compute_force_torque_single_phase(
     size,
     shape,
     offset,
@@ -30,7 +30,7 @@ def compute_forces_torque_single_phase(
     current_solid_id
 ):
     """
-    Compute forces acting on solid for density based
+    Compute force acting on solid for density based
     distributions, typical of single-phase flows
     Args:
 
@@ -108,7 +108,7 @@ def compute_boundary_force_single_phase(
     inv_list
 ):
     """
-    Compute forces acting on domain boundary for density based
+    Compute force acting on domain boundary for density based
     distributions, typical of single-phase flows
     Args:
 

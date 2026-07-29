@@ -44,8 +44,12 @@ class FluidLB:
         self.boundary_condition_type = {
             "fluid": "density_based"
         }
-        self.compute_fields_type = {
-            "fluid": "density_based"
+        self.compute_fields_config = {
+            "type": "density_based",
+            "moment_fields": [
+                "density",
+                "velocity"
+            ]
         }
         self.obstacle_kernels_type = "single_phase"
         self.residue_fields = ["density", "velocity"]
@@ -100,20 +104,6 @@ class FluidLB:
             }
         }
 
-    def get_compute_fields_args(self):
-        return {
-            "fluid": {
-                "domain": ["size"],
-                "lattice": [
-                    "cx", "cy", "no_of_directions"
-                ],
-                "fields": [
-                    "solid", "ghost_node", "density", "velocity",
-                    "force_field", "pop_fluid_new"
-                ]
-            }
-        }
-
 
 class Solver:
     def __init__(self, comm, backend, n_threads):
@@ -164,8 +154,7 @@ class Solver:
         )
         self.compute_fields_operator = ComputeFieldsOperator(
             self.model,
-            self.state,
-            self.collision_operator
+            self.state
         )
         self.streaming_operator = StreamingOperator(
             self.model,
@@ -261,38 +250,52 @@ class Solver:
             verbose
         )
 
+        """ Initialization """
         self.collision_operator.initialize_pop(
             self.state,
             self.backend
         )
 
-        self.boundary_operator.compute_forces(
+        """ Compute initial forces """
+        self.boundary_operator.compute_force(
             self.state,
             self.backend,
             self.mpi_operator
         )
-        self.obstacle_operator.modify_obstacles(
+        self.obstacle_operator.compute_force_torque(
             self.state,
             self.backend,
             self.mpi_operator
         )
-        self.io_operator.write_histories(self.state, 0)
 
+        """ Write initial data """
         self.io_operator.write_fields(
             self.state,
             self.backend,
             self.state.control.start_time
         )
+        self.io_operator.write_histories(self.state, time_step=0)
 
         run_time_start = time.perf_counter()
 
+        """ Start time-loop """
         for time_step in range(
             self.state.control.start_time + 1,
             self.state.control.end_time + 1,
         ):
+            self.compute_fields_operator.compute_fields(
+                self.state,
+                self.backend,
+                field=["density"]
+            )
             self.force_operator.compute_force_field(
                 self.state,
                 self.backend
+            )
+            self.compute_fields_operator.compute_fields(
+                self.state,
+                self.backend,
+                field=["velocity"]
             )
             self.collision_operator.collide(
                 self.state,
@@ -314,10 +317,15 @@ class Solver:
                 self.backend,
                 fluid=True
             )
-            self.compute_fields_operator.compute_fields(
+            self.boundary_operator.compute_force(
                 self.state,
                 self.backend,
-                fluid=True
+                self.mpi_operator
+            )
+            self.obstacle_operator.compute_force_torque(
+                self.state,
+                self.backend,
+                self.mpi_operator
             )
             self.residue_operator.compute_residues(
                 self.state,
@@ -326,6 +334,7 @@ class Solver:
                 time_step
             )
             self.logger.log_data(
+                self.state,
                 time_step,
                 res_density=self.residue_operator.residues["res_density"],
                 res_velocity=self.residue_operator.residues["res_velocity"]
@@ -335,6 +344,11 @@ class Solver:
                 self.backend,
                 time_step
             )
+            self.io_operator.write_histories(
+                self.state,
+                time_step
+            )
+        """ End time-loop """
 
         run_time = time.perf_counter() - run_time_start
         print_log("\n" + "-" * 80, self.state.domain.mpi_rank, verbose)

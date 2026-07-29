@@ -366,6 +366,13 @@ class CollisionOperator:
         args_dict,
         collision=False
     ):
+        """
+        Sets collision kernel and args based on configuration specified
+        Args:
+
+        Returns:
+
+        """
         kernel = getattr(module, kernel_name)
         args = ()
         for key in args_dict:

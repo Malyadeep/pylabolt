@@ -239,7 +239,7 @@ class InputOutputOperator:
             return
         os.makedirs("histories", exist_ok=True)
         self.history_save_path = "histories/"
-        if state.obstacle.write_obstacle_data:
+        if state.obstacle.write_obstacle_data and state.domain.mpi_rank == 0:
             for obstacle in state.obstacle.obstacles:
                 with open(
                     self.history_save_path + obstacle.name + ".dat", "w"
@@ -264,7 +264,7 @@ class InputOutputOperator:
                         f"{'force_y':10}"
                         f"{'torque':10}\n"
                     )
-        if state.boundary.write_boundary_data:
+        if state.boundary.write_boundary_data and state.domain.mpi_rank == 0:
             for boundary_element in state.boundary.boundary_elements:
                 if not boundary_element.wall:
                     continue
@@ -288,13 +288,13 @@ class InputOutputOperator:
     ):
         """
         Write to disk obstacle and boundary data including
-        forces, torque, velocity, position
+        force, torque, velocity, position
         Args:
 
         Returns:
 
         """
-        if state.obstacle.write_obstacle_data:
+        if state.obstacle.write_obstacle_data and state.domain.mpi_rank == 0:
             if time_step % state.obstacle.write_interval == 0:
                 for obstacle in state.obstacle.obstacles:
                     with open(
@@ -308,11 +308,11 @@ class InputOutputOperator:
                             f"{obstacle.linear_velocity[0]:24.16e}"
                             f"{obstacle.linear_velocity[1]:24.16e}"
                             f"{obstacle.angular_velocity:24.16e}"
-                            f"{obstacle.forces[0]:24.16e}"
-                            f"{obstacle.forces[1]:24.16e}"
+                            f"{obstacle.force[0]:24.16e}"
+                            f"{obstacle.force[1]:24.16e}"
                             f"{obstacle.torque:24.16e}\n"
                         )
-        if state.boundary.write_boundary_data:
+        if state.boundary.write_boundary_data and state.domain.mpi_rank == 0:
             if time_step % state.boundary.write_interval == 0:
                 for boundary_element in state.boundary.boundary_elements:
                     if not boundary_element.wall:
@@ -323,8 +323,8 @@ class InputOutputOperator:
                     ) as current_file:
                         current_file.write(
                             f"{time_step:<24}"
-                            f"{boundary_element.forces[0]:24.16e}"
-                            f"{boundary_element.forces[1]:24.16e}\n"
+                            f"{boundary_element.force[0]:24.16e}"
+                            f"{boundary_element.force[1]:24.16e}\n"
                         )
 
     def compile(

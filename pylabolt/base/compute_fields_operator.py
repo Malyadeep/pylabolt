@@ -10,7 +10,6 @@ class ComputeFieldsOperator:
         self,
         model,
         state,
-        collision_operator,
         verbose=True
     ):
         """
@@ -41,36 +40,18 @@ class ComputeFieldsOperator:
         """
         self.kernel_signatures = {}
 
-        if state.fluid:
-            compile_args = backend.make_compile_args(
-                self.compute_fields_args_fluid
-            )
+        for moment_field in self.moment_fields:
+            kernel = self.compute_fields_kernels[moment_field]
+            args = self.compute_fields_args[moment_field]
+            compile_args = backend.make_compile_args(args)
             if backend.backend_type == "cpu":
-                self.compute_fields_kernel_fluid(*compile_args)
+                kernel(*compile_args)
             elif backend.backend_type == "gpu":
-                self.compute_fields_kernel_fluid[
+                kernel[
                     backend.blocks, backend.threads_per_block
                 ](*compile_args)
-
             self.kernel_signatures.update({
-                self.compute_fields_kernel_fluid.__name__:
-                    set(self.compute_fields_kernel_fluid.signatures)
-            })
-
-        elif state.phase:
-            compile_args = backend.make_compile_args(
-                self.compute_fields_args_phase
-            )
-            if backend.backend_type == "cpu":
-                self.compute_fields_kernel_phase(*compile_args)
-            elif backend.backend_type == "gpu":
-                self.compute_fields_kernel_phase[
-                    backend.blocks, backend.threads_per_block
-                ](*compile_args)
-
-            self.kernel_signatures.update({
-                self.compute_fields_kernel_fluid.__name__:
-                    set(self.compute_fields_kernel_fluid.signatures)
+                kernel.__name__: set(kernel.signatures)
             })
 
         print_log("Compiled compute fields operator",
@@ -80,8 +61,7 @@ class ComputeFieldsOperator:
         self,
         state,
         backend,
-        fluid=False,
-        phase=False
+        field=[]
     ):
         """
         Perform fields update on CPU kernels
@@ -90,18 +70,16 @@ class ComputeFieldsOperator:
         Returns:
 
         """
-        if fluid:
-            self.compute_fields_kernel_fluid(*self.compute_fields_args_fluid)
-
-        if phase:
-            self.compute_fields_kernel_phase(*self.compute_fields_args_phase)
+        for current_field in field:
+            kernel = self.compute_fields_kernels[current_field]
+            args = self.compute_fields_args[current_field]
+            kernel(*args)
 
     def compute_fields_gpu(
         self,
         state,
         backend,
-        fluid=False,
-        phase=False
+        field=[]
     ):
         """
         Perform fields update on GPU kernels
@@ -110,15 +88,44 @@ class ComputeFieldsOperator:
         Returns:
 
         """
-        if fluid:
-            self.compute_fields_kernel_fluid[
+        for current_field in field:
+            kernel = self.compute_fields_kernels[current_field]
+            args = self.compute_fields_args[current_field]
+            kernel[
                 backend.blocks, backend.threads_per_block
-            ](*self.compute_fields_args_fluid)
+            ](*args)
 
-        if phase:
-            self.compute_fields_kernel_phase[
-                backend.blocks, backend.threads_per_block
-            ](*self.compute_fields_args_phase)
+    def set_kernel_args(
+        self,
+        state,
+        backend,
+        module,
+        kernel_name,
+        args_dict
+    ):
+        """
+        Sets collision kernel and args based on configuration specified
+        Args:
+
+        Returns:
+
+        """
+        kernel = getattr(module, kernel_name)
+        args = ()
+        for key in args_dict:
+            args_list = args_dict[key]
+            attribute = getattr(state, key)
+            if backend.backend_type == "cpu":
+                key_args = tuple(
+                    getattr(attribute, item) for item in args_list
+                )
+            elif backend.backend_type == "gpu":
+                key_args = tuple(
+                    getattr(attribute, item + "_device")
+                    for item in args_list
+                )
+            args += key_args
+        return kernel, args
 
     def set_backend(
         self,
@@ -140,69 +147,30 @@ class ComputeFieldsOperator:
             self.compute_fields = self.compute_fields_gpu
             compute_fields_kernels_module = compute_fields_kernels_gpu
 
-        self.compute_fields_type = self.model.compute_fields_type
-        args = self.model.get_compute_fields_args()
+        self.compute_fields_config = self.model.compute_fields_config
+        # args = self.model.get_compute_fields_args()
+        self.compute_fields_type = self.compute_fields_config["type"]
+        self.moment_fields = self.compute_fields_config["moment_fields"]
 
-        if state.fluid:
-            if backend.backend_type == "cpu":
-                self.compute_fields_args_fluid = tuple(
-                    [state.control.float_min]
-                )
-            elif backend.backend_type == "gpu":
-                self.compute_fields_args_fluid = tuple(
-                    [state.control.float_min_device]
-                )
-
-            kernel_name = (
-                self.compute_fields_type["fluid"]
+        self.compute_fields_kernels = {}
+        self.compute_fields_args = {}
+        args_container = ArgsContainer()
+        for moment_field in self.moment_fields:
+            args_dict = getattr(args_container, moment_field + "_args")
+            kernel_name = moment_field + "_compute_" + self.compute_fields_type
+            kernel, args = self.set_kernel_args(
+                state,
+                backend,
+                compute_fields_kernels_module,
+                kernel_name,
+                args_dict
             )
-            self.compute_fields_kernel_fluid = getattr(
-                compute_fields_kernels_module, kernel_name
-            )
-            args_fluid = args["fluid"]
-            for key_no, key in enumerate(args_fluid):
-                args_list = args_fluid[key]
-                attribute = getattr(state, key)
-                if backend.backend_type == "cpu":
-                    key_args = tuple(
-                        getattr(attribute, item) for item in args_list
-                    )
-                elif backend.backend_type == "gpu":
-                    key_args = tuple(
-                        getattr(attribute, item + "_device")
-                        for item in args_list
-                    )
-                self.compute_fields_args_fluid += key_args
-
-        if state.phase:
-            kernel_name = (
-                self.compute_fields_type["phase"]
-            )
-            self.streaming_kernel_phase = getattr(
-                compute_fields_kernels_module, kernel_name
-            )
-            args_phase = args["phase"]
-            if backend.backend_type == "cpu":
-                self.compute_fields_args_phase = tuple(
-                    [state.control.float_min]
-                )
-            elif backend.backend_type == "gpu":
-                self.compute_fields_args_phase = tuple(
-                    [state.control.float_min_device]
-                )
-            for key_no, key in enumerate(args_phase):
-                args_list = args_phase[key]
-                attribute = getattr(state, key)
-                if backend.backend_type == "cpu":
-                    key_args = tuple(
-                        getattr(attribute, item) for item in args_list
-                    )
-                elif backend.backend_type == "gpu":
-                    key_args = tuple(
-                        getattr(attribute, item + "_device")
-                        for item in args_list
-                    )
-                self.compute_fields_args_phase += key_args
+            self.compute_fields_kernels.update({
+                moment_field: kernel
+            })
+            self.compute_fields_args.update({
+                moment_field: args
+            })
 
         print_log("Backend set for compute fields operator",
                   state.domain.mpi_rank, verbose)
@@ -236,3 +204,21 @@ class ComputeFieldsOperator:
 
         print_log("Kernel signatures verified for compute fields operator",
                   state.domain.mpi_rank, verbose)
+
+
+class ArgsContainer:
+    def __init__(self):
+        self.density_args = {
+            "domain": ["size"],
+            "lattice": ["no_of_directions"],
+            "fields": ["solid", "ghost_node", "density", "pop_fluid_new"]
+        }
+        self.velocity_args = {
+            "control": ["float_min"],
+            "domain": ["size"],
+            "lattice": ["cx", "cy", "no_of_directions"],
+            "fields": [
+                "solid", "ghost_node", "density", "velocity",
+                "force_field", "pop_fluid_new"
+            ]
+        }
