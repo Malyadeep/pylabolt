@@ -10,6 +10,9 @@ from pylabolt.parallel.cpu.obstacle_kernels import (
 import pylabolt.parallel.cpu.obstacle_kernels as obstacle_kernels_cpu
 import pylabolt.parallel.cpu.force_torque_kernels as\
     force_torque_kernels_cpu
+import pylabolt.parallel.gpu.obstacle_kernels as obstacle_kernels_gpu
+import pylabolt.parallel.gpu.force_torque_kernels as\
+    force_torque_kernels_gpu
 
 
 class ObstacleOperator:
@@ -264,8 +267,8 @@ class ObstacleOperator:
                 self.find_obstacle_normals_gpu
             self.compute_force_torque =\
                 self.compute_force_torque_gpu
-            # obstacle_kernels_module = obstacle_kernels_gpu
-            # force_torque_kernels_module = force_torque_kernels_gpu
+            obstacle_kernels_module = obstacle_kernels_gpu
+            force_torque_kernels_module = force_torque_kernels_gpu
             arg_suffix = "_device"
 
         self.obstacle_kernels_type = self.model.obstacle_kernels_type

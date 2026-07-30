@@ -80,7 +80,8 @@ class InputOutputOperator:
             })
         if state.domain.mpi_size == 1:
             os.makedirs("output", exist_ok=True)
-            self.field_save_path = "output/"
+            os.makedirs("output/fields", exist_ok=True)
+            self.field_save_path = "output/fields/"
         elif state.domain.mpi_size > 1:
             os.makedirs("procs", exist_ok=True)
             os.makedirs(
@@ -237,8 +238,8 @@ class InputOutputOperator:
         if not (state.obstacle.write_obstacle_data or
                 state.boundary.write_boundary_data):
             return
-        os.makedirs("histories", exist_ok=True)
-        self.history_save_path = "histories/"
+        os.makedirs("output/histories", exist_ok=True)
+        self.history_save_path = "output/histories/"
         if state.obstacle.write_obstacle_data and state.domain.mpi_rank == 0:
             for obstacle in state.obstacle.obstacles:
                 with open(

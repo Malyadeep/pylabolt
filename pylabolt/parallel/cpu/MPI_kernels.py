@@ -1,6 +1,35 @@
-import numpy as np
 import numba
 from numba import prange
+
+
+@numba.njit(inline="always")
+def local_to_global(i, j, offset):
+    """
+    convert local sub-domain index to global index
+    Args:
+        i: int
+        j: int
+        offset: (mesh.dimensions,) int array
+    Returns:
+        i_global: int
+        j_global: int
+    """
+    return i + offset[0], j + offset[1]
+
+
+@numba.njit(inline="always")
+def global_to_local(i_global, j_global, offset):
+    """
+    convert global index to local sub-domain index
+    Args:
+        i_global: int
+        j_global: int
+        offset: (mesh.dimensions,) int array
+    Returns:
+        i: int
+        j: int
+    """
+    return i_global - offset[0], j_global - offset[1]
 
 
 @numba.njit(parallel=True, nogil=True)

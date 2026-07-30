@@ -2,7 +2,7 @@ import numpy as np
 import numba
 from numba import prange
 
-from pylabolt.parallel.domain import local_to_global
+from pylabolt.parallel.gpu.MPI_kernels import local_to_global
 
 
 @numba.njit(nogil=True)

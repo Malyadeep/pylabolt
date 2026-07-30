@@ -25,8 +25,8 @@ class VTKOperator:
         """
         self.metadata = metadata
         self.validate_metadata(verbose=verbose)
-        self.raw_data_path = "output/"
-        self.vtk_save_path = "vtk/"
+        self.raw_data_path = "output/fields/"
+        self.vtk_save_path = "output/vtk/"
 
     def validate_metadata(
         self,
@@ -131,8 +131,8 @@ class VTKOperator:
         """
         print_log(40 * "-", 0, verbose)
         print_log("Time: " + str(time_step), 0, verbose)
-        if not os.path.isdir("vtk"):
-            os.makedirs("vtk")
+        if not os.path.isdir("output/vtk"):
+            os.makedirs("output/vtk")
         fields_vtk = {}
         for field_name in self.fields_metadata:
             field_dtype = self.fields_metadata[field_name]["dtype"]
@@ -226,7 +226,9 @@ class VTKOperator:
         """
         if all:
             folder = Path(self.raw_data_path)
-            pattern = re.compile(r"^output/t_(\d+)\.npz$")
+            pattern = re.compile(
+                r"^" + self.raw_data_path + r"t_(\d+)\.npz$"
+            )
             save_times = []
             for file_item in folder.iterdir():
                 matched_file = pattern.match(str(file_item))

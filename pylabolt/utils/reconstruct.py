@@ -6,7 +6,7 @@ import os
 from types import SimpleNamespace
 
 from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.domain import local_to_global
+from pylabolt.parallel.cpu.MPI_kernels import local_to_global
 
 
 @numba.njit(parallel=True, nogil=True)
@@ -78,7 +78,7 @@ class ReconstructOperator:
         self.metadata = metadata
         self.validate_metadata(verbose=verbose)
         self.validate_rank_metadata(verbose=verbose)
-        self.field_save_path = "output/"
+        self.field_save_path = "output/fields/"
 
     def validate_metadata(
         self,
@@ -126,7 +126,7 @@ class ReconstructOperator:
                     )
                 self.fields[field_name] = field
                 print_log(
-                    f"{field_name:<10}: {str(field.dtype):>5}", 0, verbose
+                    f"{field_name:<10}: {str(field.dtype):<5}", 0, verbose
                 )
             print_log("\n", 0, verbose)
         except KeyError as e:
@@ -235,8 +235,8 @@ class ReconstructOperator:
         self.save_reconstructed_fields(time_step)
 
         print_log(
-            f"{'Reconstruction done, time':<25}:"
-            f"{time_step:>5}", 0, verbose
+            f"{'Reconstruction done, time':<25}: "
+            f"{time_step:<5}", 0, verbose
         )
 
     def save_reconstructed_fields(
@@ -252,6 +252,8 @@ class ReconstructOperator:
         """
         if not os.path.isdir("output"):
             os.makedirs("output")
+        if not os.path.isdir("output/fields"):
+            os.makedirs("output/fields")
         np.savez(
             self.field_save_path + "t_" + str(time_step) + ".npz",
             **self.fields

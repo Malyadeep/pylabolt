@@ -2,7 +2,7 @@ import numpy as np
 import numba
 from numba import prange
 
-from pylabolt.parallel.domain import local_to_global
+from pylabolt.parallel.cpu.MPI_kernels import local_to_global
 
 # --------------------------------------------------------------------------#
 """ Kernels to compute force on obstacles """

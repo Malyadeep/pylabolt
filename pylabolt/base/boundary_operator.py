@@ -1,4 +1,5 @@
 import numpy as np
+from numba import cuda
 
 from pylabolt.utils.helpers import print_log
 import pylabolt.parallel.cpu.fluid_boundary_kernels as fluid_kernels_cpu
@@ -6,6 +7,7 @@ import pylabolt.parallel.cpu.phase_boundary_kernels as phase_kernels_cpu
 import pylabolt.parallel.cpu.force_torque_kernels as force_torque_kernels_cpu
 import pylabolt.parallel.gpu.fluid_boundary_kernels as fluid_kernels_gpu
 import pylabolt.parallel.gpu.phase_boundary_kernels as phase_kernels_gpu
+import pylabolt.parallel.gpu.force_torque_kernels as force_torque_kernels_gpu
 
 
 class BoundaryOperator:
@@ -64,7 +66,7 @@ class BoundaryOperator:
                             set(self.boundary_kernels_fluid[itr].signatures)
                     })
 
-        elif state.phase:
+        if state.phase:
             self.kernel_signatures.update({"phase": {}})
             for itr in range(self.no_of_boundaries):
                 kernel_phase = self.boundary_kernels_phase[itr]
@@ -83,6 +85,47 @@ class BoundaryOperator:
                         self.boundary_kernels_phase[itr].__name__:
                             set(self.boundary_kernels_phase[itr].signatures)
                     })
+
+        if state.boundary.compute_force:
+            self.kernel_signatures.update({"force": {}})
+            for itr in range(self.no_of_boundaries):
+                boundary_element = state.boundary.boundary_elements[itr]
+                if boundary_element.wall:
+                    compile_args = backend.make_compile_args(
+                        self.boundary_force_args[itr]
+                    )
+                    if backend.backend_type == "cpu":
+                        self.compute_force_kernel(
+                            *compile_args
+                        )
+                    elif backend.backend_type == "gpu":
+                        self.compute_force_kernel[
+                            backend.reduce_blocks,
+                            backend.reduce_threads_per_block
+                        ](
+                            *compile_args,
+                            self.partial_force_device
+                        )
+                        self.reduce_force_kernel[
+                            backend.reduce_blocks,
+                            backend.reduce_threads_per_block
+                        ](
+                            backend.reduce_blocks,
+                            self.partial_force_device
+                        )
+                    # TODO: Repeating calls will overwrite the
+                    # kernel signature. Here, not a problem
+                    # as only one compiled signature is expected
+                    self.kernel_signatures["force"].update({
+                        self.compute_force_kernel.__name__:
+                            set(self.compute_force_kernel.signatures),
+                    })
+                    if backend.backend_type == "gpu":
+                        self.kernel_signatures["force"].update({
+                            self.reduce_force_kernel.__name__:
+                                set(self.reduce_force_kernel.signatures)
+                        })
+            print(self.kernel_signatures["force"])
 
         print_log("Compiled boundary operator", state.domain.mpi_rank, verbose)
 
@@ -122,23 +165,25 @@ class BoundaryOperator:
         phase=False
     ):
         """
-        Apply boundary condition on CPU kernels
+        Apply boundary condition on GPU kernels
         Args:
 
         Returns:
 
         """
         if fluid:
-            for itr in range(self.no_of_boundaries):
-                if self.boundary_kernels_fluid[itr] is not None:
-                    self.boundary_kernels_fluid[itr](
+            for itr in range(len(self.boundary_kernels_fluid)):
+                kernel_fluid = self.boundary_kernels_fluid[itr]
+                if kernel_fluid is not None:
+                    kernel_fluid[backend.blocks, backend.threads_per_block](
                         *self.boundary_args_fluid[itr]
                     )
 
         if phase:
-            for itr in range(self.no_of_boundaries):
-                if self.boundary_kernels_phase[itr] is not None:
-                    self.boundary_kernels_phase[itr](
+            for itr in range(len(self.boundary_kernels_phase)):
+                kernel_phase = self.boundary_kernels_phase[itr]
+                if kernel_phase is not None:
+                    kernel_phase[backend.blocks, backend.threads_per_block](
                         *self.boundary_args_phase[itr]
                     )
 
@@ -172,6 +217,55 @@ class BoundaryOperator:
             boundary_element.force[0] = global_force[itr, 0]
             boundary_element.force[1] = global_force[itr, 1]
 
+    def compute_force_gpu(
+        self,
+        state,
+        backend,
+        mpi_operator
+    ):
+        """
+        Compute force on boundary with GPU kernel
+        Args:
+
+        Returns:
+
+        """
+        if not state.boundary.compute_force:
+            return
+        for itr in range(self.no_of_boundaries):
+            boundary_element = state.boundary.boundary_elements[itr]
+            if boundary_element.wall:
+                self.compute_force_kernel[
+                    backend.reduce_blocks, backend.reduce_threads_per_block
+                ](
+                    *self.boundary_force_args[itr],
+                    self.partial_force_device
+                )
+                partial_size = backend.reduce_blocks
+                while partial_size > 1:
+                    blocks = int(np.ceil(
+                        partial_size / backend.reduce_threads_per_block
+                    ))
+                    self.reduce_force_kernel[
+                        blocks, backend.reduce_threads_per_block
+                    ](
+                        partial_size,
+                        self.partial_force_device
+                    )
+                    partial_size = blocks
+                self.local_force[itr, 0] = self.partial_force_device[:1, 0].\
+                    copy_to_host()[0]
+                self.local_force[itr, 1] = self.partial_force_device[:1, 1].\
+                    copy_to_host()[0]
+
+        # global_force = mpi_operator.reduce(
+        #     self.local_force, operation="sum"
+        # )
+        for itr in range(self.no_of_boundaries):
+            boundary_element = state.boundary.boundary_elements[itr]
+            boundary_element.force[0] = self.local_force[itr, 0]
+            boundary_element.force[1] = self.local_force[itr, 1]
+
     def set_backend(
         self,
         state,
@@ -193,7 +287,7 @@ class BoundaryOperator:
         elif backend.backend_type == "gpu":
             self.set_boundary = self.set_boundary_gpu
             self.compute_force = self.compute_force_gpu
-            # force_torque_kernels_module = force_torque_kernels_gpu
+            force_torque_kernels_module = force_torque_kernels_gpu
             arg_suffix = "_device"
 
         self.boundary_condition_type = self.model.boundary_condition_type
@@ -243,12 +337,21 @@ class BoundaryOperator:
                 (self.no_of_boundaries, 2),
                 dtype=state.control.precision
             )
+            if backend.backend_type == "gpu":
+                self.partial_force_device = cuda.device_array(
+                    (backend.reduce_blocks, 2), dtype=float
+                )
             self.boundary_force_args = []
             self.boundary_force_type = self.model.obstacle_kernels_type
             self.compute_force_kernel = getattr(
                 force_torque_kernels_module,
                 "compute_boundary_force_" + self.boundary_force_type
             )
+            if backend.backend_type == "gpu":
+                self.reduce_force_kernel = getattr(
+                    force_torque_kernels_module,
+                    "reduce_boundary_force"
+                )
             common_args_dict = {
                 "lattice": ["cx", "cy"],
                 "fields": ["solid", "pop_fluid", "pop_fluid_new"]
@@ -311,6 +414,20 @@ class BoundaryOperator:
                         self.kernel_signatures["phase"][kernel_name]):
                     raise RuntimeError(
                         f"Developer error! {kernel_name}: phase in"
+                        f" boundary operator compiled a new signature!"
+                    )
+
+        if state.boundary.compute_force:
+            if backend.backend_type == "cpu":
+                force_torque_kernels_module = force_torque_kernels_cpu
+            elif backend.backend_type == "gpu":
+                force_torque_kernels_module = force_torque_kernels_gpu
+            for kernel_name in self.kernel_signatures["force"]:
+                kernel = getattr(force_torque_kernels_module, kernel_name)
+                if (set(kernel.signatures) !=
+                        self.kernel_signatures["force"][kernel_name]):
+                    raise RuntimeError(
+                        f"Developer error! {kernel_name}: force in"
                         f" boundary operator compiled a new signature!"
                     )
 

@@ -1,7 +1,6 @@
 import numpy as np
 
 from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.domain import local_to_global
 from pylabolt.parallel.cpu.obstacle_kernels import (
     construct_circle,
     construct_ellipse

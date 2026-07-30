@@ -1,7 +1,7 @@
 import numpy as np
 
 from pylabolt.utils.helpers import print_log
-from pylabolt.parallel.domain import global_to_local
+from pylabolt.parallel.cpu.MPI_kernels import global_to_local
 
 
 class BoundaryElement:
@@ -657,28 +657,37 @@ class Boundary:
 
         """
         if backend.backend_type == "gpu":
-            self._device_attrs = [
+            self._device_attrs_element = [
                 "boundary_nodes",
                 "out_list",
                 "inv_list",
                 "surface_normals"
             ]
             if self.fluid:
-                self._device_attrs.extend([
+                self._device_attrs_element.extend([
                     "scalar_fluid",
                     "vector_fluid",
                 ])
             if self.phase:
-                self._device_attrs.extend([
+                self._device_attrs_element.extend([
                     "scalar_phase",
                     "vector_phase",
                 ])
             for boundary_element in self.boundary_elements:
-                for arg_name in self._device_attrs:
+                for arg_name in self._device_attrs_element:
                     arg_device = backend.allocate_to_device(
                         getattr(boundary_element, arg_name)
                     )
                     setattr(boundary_element, arg_name + "_device", arg_device)
+            self._device_attrs = [
+                "x_periodic",
+                "y_periodic"
+            ]
+            for arg_name in self._device_attrs:
+                arg_device = backend.allocate_to_device(
+                    getattr(self, arg_name)
+                )
+                setattr(self, arg_name + "_device", arg_device)
 
     def view_attrs(
         self,
