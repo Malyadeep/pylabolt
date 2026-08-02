@@ -290,9 +290,10 @@ class Obstacle:
 
         """
         if backend.backend_type == "gpu":
-            self.device_data = ObstacleDataDevice(
-                self.obstacles, backend
-            )
+            if self.no_of_obstacles > 0:
+                self.device_data = ObstacleDataDevice(
+                    self.obstacles, backend
+                )
 
 
 class ObstacleDataDevice:
