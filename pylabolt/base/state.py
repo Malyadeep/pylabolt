@@ -143,4 +143,5 @@ class State:
         self.transport.set_backend(backend)
         self.fields.set_backend(backend)
         self.boundary.set_backend(backend)
+        self.obstacle.set_backend(backend)
         print_log("Backend set for state", self.domain.mpi_rank, verbose)

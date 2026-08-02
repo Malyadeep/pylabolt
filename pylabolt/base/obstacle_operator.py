@@ -1,4 +1,5 @@
 import numpy as np
+from numba import cuda
 
 from pylabolt.utils.helpers import print_log
 from pylabolt.parallel.cpu.obstacle_kernels import (
@@ -30,21 +31,11 @@ class ObstacleOperator:
 
         """
         self.model = model
-        self.no_of_obstacles = len(state.obstacle.obstacles)
-        self.all_obstacles_static = True
-        for obstacle in state.obstacle.obstacles:
-            if not obstacle.static:
-                self.all_obstacles_static = False
-                break
-        if state.obstacle.compute_force_torque:
-            self.local_force_torque = np.zeros(
-                (self.no_of_obstacles, 3),
-                dtype=state.control.precision
-            )
         mpi_operator.halo_exchange_cpu(
             state,
             backend,
-            bool_buffers=["solid"]
+            bool_buffers=["solid"],
+            int_buffers=["solid_id"]
         )
         # ------- Find solid-fluid boundary nodes ------- #
         self.find_obstacle_boundary_nodes_cpu(state, mpi_operator)
@@ -83,23 +74,23 @@ class ObstacleOperator:
         """
         if not state.obstacle.compute_force_torque:
             return
-        for itr in range(self.no_of_obstacles):
-            obstacle = state.obstacle.obstacles[itr]
+        for itr in range(state.obstacle.no_of_obstacles):
+            current_obstacle = state.obstacle.obstacles[itr]
             self.local_force_torque[itr, :] =\
                 self.compute_force_torque_kernel(
                     *self.compute_force_torque_args,
-                    obstacle.ref_point,
-                    obstacle.id
+                    current_obstacle.ref_point,
+                    current_obstacle.id
                 )
         global_force_torque = mpi_operator.reduce(
             self.local_force_torque,
             operation="sum"
         )
-        for itr in range(self.no_of_obstacles):
-            obstacle = state.obstacle.obstacles[itr]
-            obstacle.force[0] = global_force_torque[itr, 0]
-            obstacle.force[1] = global_force_torque[itr, 1]
-            obstacle.torque = global_force_torque[itr, 2]
+        for itr in range(state.obstacle.no_of_obstacles):
+            current_obstacle = state.obstacle.obstacles[itr]
+            current_obstacle.force[0] = global_force_torque[itr, 0]
+            current_obstacle.force[1] = global_force_torque[itr, 1]
+            current_obstacle.torque = global_force_torque[itr, 2]
 
     def find_obstacle_boundary_nodes_cpu(
         self,
@@ -210,7 +201,41 @@ class ObstacleOperator:
         Returns:
 
         """
-        pass
+        if not state.obstacle.compute_force_torque:
+            return
+        for itr in range(state.obstacle.no_of_obstacles):
+            self.compute_force_torque_kernel[
+                backend.reduce_blocks, backend.reduce_threads_per_block
+            ](
+                *self.compute_force_torque_args,
+                state.obstacle.device_data.ref_point[itr],
+                state.obstacle.device_data.id[itr, 0],
+                self.partial_force_torque_device
+            )
+            partial_size = backend.reduce_blocks
+            while partial_size > 1:
+                blocks = int(np.ceil(
+                    partial_size / backend.reduce_threads_per_block
+                ))
+                self.reduce_force_torque_kernel[
+                    blocks, backend.reduce_threads_per_block
+                ](
+                    partial_size,
+                    self.partial_force_torque_device,
+                    state.obstacle.device_data.force[itr],
+                    state.obstacle.device_data.torque[itr]
+                )
+                partial_size = blocks
+
+        # global_force_torque = mpi_operator.reduce(
+        #     self.local_force_torque,
+        #     operation="sum"
+        # )
+        # for itr in range(state.obstacle.no_of_obstacles):
+        #     obstacle = state.obstacle.obstacles[itr]
+        #     obstacle.force[0] = global_force_torque[itr, 0]
+        #     obstacle.force[1] = global_force_torque[itr, 1]
+        #     obstacle.torque = global_force_torque[itr, 2]
 
     def find_obstacle_boundary_nodes_gpu(
         self,
@@ -238,6 +263,73 @@ class ObstacleOperator:
         """
         pass
 
+    def compile(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        JIT compile obstacle operator kernels
+        Args:
+
+        Returns:
+
+        """
+        self.kernel_signatures = {}
+
+        if state.obstacle.compute_force_torque:
+            if backend.backend_type == "cpu":
+                compile_args = backend.make_compile_args(
+                    self.compute_force_torque_args
+                )
+                for itr in range(state.obstacle.no_of_obstacles):
+                    current_obstacle = state.obstacle.obstacles[itr]
+                    self.compute_force_torque_kernel(
+                        *compile_args,
+                        current_obstacle.ref_point,
+                        current_obstacle.id
+                    )
+                    self.kernel_signatures.update({
+                        self.compute_force_torque_kernel.__name__:
+                            set(self.compute_force_torque_kernel.signatures)
+                    })
+
+            elif backend.backend_type == "gpu":
+                for itr in range(state.obstacle.no_of_obstacles):
+                    compile_args = backend.make_compile_args(
+                        self.compute_force_torque_args
+                    )
+
+                    self.compute_force_torque_kernel[
+                        backend.reduce_blocks, backend.reduce_threads_per_block
+                    ](
+                        *compile_args,
+                        cuda.device_array_like(
+                            state.obstacle.device_data.ref_point[itr]
+                        ),
+                        state.obstacle.device_data.id[itr, 0],
+                        self.partial_force_torque_device,
+                    )
+                    self.reduce_force_torque_kernel[
+                        backend.reduce_blocks, backend.reduce_threads_per_block
+                    ](
+                        backend.reduce_blocks,
+                        self.partial_force_torque_device,
+                        cuda.device_array_like(
+                            state.obstacle.device_data.force[itr]
+                        ),
+                        cuda.device_array_like(
+                            state.obstacle.device_data.torque[itr]
+                        )
+                    )
+                    self.kernel_signatures.update({
+                        self.compute_force_torque_kernel.__name__:
+                            set(self.compute_force_torque_kernel.signatures),
+                        self.reduce_force_torque_kernel.__name__:
+                            set(self.reduce_force_torque_kernel.signatures),
+                    })
+
     def set_backend(
         self,
         state,
@@ -260,6 +352,12 @@ class ObstacleOperator:
             obstacle_kernels_module = obstacle_kernels_cpu
             force_torque_kernels_module = force_torque_kernels_cpu
             arg_suffix = ""
+            if (state.obstacle.compute_force_torque or
+                    (not state.obstacle.all_obstacles_static)):
+                self.local_force_torque = np.zeros(
+                    (state.obstacle.no_of_obstacles, 3),
+                    dtype=state.control.precision
+                )
         elif backend.backend_type == "gpu":
             self.find_obstacle_boundary_nodes =\
                 self.find_obstacle_boundary_nodes_gpu
@@ -270,6 +368,11 @@ class ObstacleOperator:
             obstacle_kernels_module = obstacle_kernels_gpu
             force_torque_kernels_module = force_torque_kernels_gpu
             arg_suffix = "_device"
+            if (state.obstacle.compute_force_torque or
+                    (not state.obstacle.all_obstacles_static)):
+                self.partial_force_torque_device = cuda.device_array(
+                        (backend.reduce_blocks, 3), dtype=float
+                    )
 
         self.obstacle_kernels_type = self.model.obstacle_kernels_type
 
@@ -277,6 +380,12 @@ class ObstacleOperator:
             force_torque_kernels_module,
             "compute_force_torque_" + self.obstacle_kernels_type
         )
+        if backend.backend_type == "gpu":
+            self.reduce_force_torque_kernel = getattr(
+                force_torque_kernels_module,
+                "reduce_force_torque"
+            )
+
         if self.obstacle_kernels_type == "single_phase":
             args_dict = {
                 "domain": ["size", "shape", "offset"],
@@ -293,3 +402,36 @@ class ObstacleOperator:
             for arg_name in args_list:
                 arg = getattr(arg_obj, arg_name + arg_suffix)
                 self.compute_force_torque_args += tuple([arg])
+
+    def verify_kernel_signatures(
+        self,
+        state,
+        backend,
+        verbose=True
+    ):
+        """
+        Debug function: Verifies if compiled kernel signatures
+        changed or not. Detects recompilation
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "cpu":
+            obstacle_kernels_module = obstacle_kernels_cpu
+            force_torque_kernels_module = force_torque_kernels_cpu
+        if backend.backend_type == "gpu":
+            obstacle_kernels_module = obstacle_kernels_gpu
+            force_torque_kernels_module = force_torque_kernels_gpu
+
+        for kernel_name in self.kernel_signatures:
+            kernel = getattr(force_torque_kernels_module, kernel_name)
+            if (set(kernel.signatures) !=
+                    self.kernel_signatures[kernel_name]):
+                raise RuntimeError(
+                    f"Developer error! {kernel_name}: in"
+                    f" obstacle operator compiled a new signature!"
+                )
+
+        print_log("Kernel signatures verified for obstacle operator",
+                  state.domain.mpi_rank, verbose)

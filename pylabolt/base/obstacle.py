@@ -53,6 +53,18 @@ class Obstacle:
             verbose=verbose
         )
 
+        self.no_of_obstacles = len(self.obstacles)
+        self.all_obstacles_static = True
+        for obstacle in self.obstacles:
+            if not obstacle.static:
+                self.all_obstacles_static = False
+                break
+        if not self.all_obstacles_static and not self.compute_force_torque:
+            raise ValueError(
+                "If any obstacle is not static, "
+                "then compute_force_torque must be True"
+            )
+
         print_log("Setting up obstacles done!",
                   domain.mpi_rank, verbose)
         print_log("-" * 80, domain.mpi_rank, verbose)
@@ -266,6 +278,75 @@ class Obstacle:
 
         print_log("\n", domain.mpi_rank, verbose)
 
+    def set_backend(
+        self,
+        backend
+    ):
+        """
+        Configure backend attributes for obstacle object
+        Args:
+
+        Returns:
+
+        """
+        if backend.backend_type == "gpu":
+            self.device_data = ObstacleDataDevice(
+                self.obstacles, backend
+            )
+
+
+class ObstacleDataDevice:
+    def __init__(
+        self,
+        obstacles,
+        backend
+    ):
+        """
+        Contains device data for obstacle properties
+        Attributes:
+
+        """
+        N = len(obstacles)
+        dtype = obstacles[0].force.dtype
+        id = np.zeros((N, 1), dtype=int)
+        force = np.zeros((N, 2), dtype=dtype)
+        torque = np.zeros((N, 1), dtype=dtype)
+        linear_velocity = np.zeros((N, 2), dtype=dtype)
+        angular_velocity = np.zeros((N, 1), dtype=dtype)
+        center = np.zeros((N, 2), dtype=dtype)
+        ref_point = np.zeros((N, 2), dtype=dtype)
+        inclination_angle = np.zeros((N, 1), dtype=dtype)
+        solid_density = np.zeros((N, 1), dtype=dtype)
+        # TODO: Not defined
+        mass = np.zeros((N, 1), dtype=dtype)
+        moment_of_inertia = np.zeros((N, 1), dtype=dtype)
+
+        for itr in range(N):
+            current_obstacle = obstacles[itr]
+            id[itr, 0] = current_obstacle.id
+            force[itr, :] = current_obstacle.force
+            torque[itr, 0] = current_obstacle.torque
+            linear_velocity[itr, :] = current_obstacle.linear_velocity
+            angular_velocity[itr, 0] = current_obstacle.angular_velocity
+            center[itr, :] = current_obstacle.center
+            inclination_angle[itr, 0] = current_obstacle.inclination_angle
+            ref_point[itr, :] = current_obstacle.ref_point
+            # mass[itr, 0] = current_obstacle.inclination_angle
+            # moment_of_inertia[itr, 0] = current_obstacle.moment_of_inertia
+            solid_density[itr, 0] = current_obstacle.solid_density
+
+        self.id = backend.allocate_to_device(id)
+        self.force = backend.allocate_to_device(force)
+        self.torque = backend.allocate_to_device(torque)
+        self.linear_velocity = backend.allocate_to_device(linear_velocity)
+        self.angular_velocity = backend.allocate_to_device(angular_velocity)
+        self.center = backend.allocate_to_device(center)
+        self.inclination_angle = backend.allocate_to_device(inclination_angle)
+        self.ref_point = backend.allocate_to_device(ref_point)
+        # self.mass = backend.allocate_to_device(mass)
+        # self.moment_of_inertia = backend.allocate_to_device(moment_of_inertia)
+        self.solid_density = backend.allocate_to_device(solid_density)
+
 
 class Circle:
     def __init__(
@@ -325,13 +406,13 @@ class Circle:
             raise ValueError(
                 "density missing in obstacle: " + user_obstacle_name
             )
-        density = user_obstacle_dict["density"]
-        if type(density) not in (float, int):
+        solid_density = user_obstacle_dict["density"]
+        if type(solid_density) not in (float, int):
             raise ValueError(
                 "density must be float or int for obstacle type circle: " +
                 user_obstacle_name
             )
-        self.solid_density = control.precision(density)
+        self.solid_density = control.precision(solid_density)
 
         if "static" not in user_obstacle_dict:
             raise ValueError(
@@ -534,13 +615,13 @@ class Ellipse:
             raise ValueError(
                 "density missing in obstacle: " + user_obstacle_name
             )
-        density = user_obstacle_dict["density"]
-        if type(density) not in (float, int):
+        solid_density = user_obstacle_dict["density"]
+        if type(solid_density) not in (float, int):
             raise ValueError(
                 "density must be float or int for obstacle type ellipse: " +
                 user_obstacle_name
             )
-        self.solid_density = control.precision(density)
+        self.solid_density = control.precision(solid_density)
 
         if "static" not in user_obstacle_dict:
             raise ValueError(

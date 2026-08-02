@@ -54,7 +54,8 @@ class FluidLB:
         self.obstacle_kernels_type = "single_phase"
         self.residue_fields = ["density", "velocity"]
         self.save_fields = [
-            "density", "velocity", "solid", "solid_id"
+            "density", "velocity", "solid", "solid_id",
+            "solid_boundary", "fluid_boundary"
         ]
 
     def get_collision_args(self):
@@ -124,8 +125,7 @@ class Solver:
             comm,
             self.state,
             backend,
-            n_threads,
-            mpi_rank
+            n_threads
         )
         self.mpi_operator = MPIOperator(
             comm,
@@ -207,6 +207,7 @@ class Solver:
                   self.state.domain.mpi_rank, verbose)
 
         self.mpi_operator.compile(self.state, self.backend)
+        self.obstacle_operator.compile(self.state, self.backend)
         self.collision_operator.compile(self.state, self.backend)
         self.force_operator.compile(self.state, self.backend)
         self.compute_fields_operator.compile(self.state, self.backend)
@@ -226,6 +227,7 @@ class Solver:
 
         args = (self.state, self.backend)
         self.mpi_operator.verify_kernel_signatures(*args)
+        self.obstacle_operator.verify_kernel_signatures(*args)
         self.collision_operator.verify_kernel_signatures(*args)
         self.force_operator.verify_kernel_signatures(*args)
         self.streaming_operator.verify_kernel_signatures(*args)
@@ -258,7 +260,8 @@ class Solver:
         self.boundary_operator.compute_force(
             self.state,
             self.backend,
-            self.mpi_operator
+            self.mpi_operator,
+            time_step=0
         )
         self.obstacle_operator.compute_force_torque(
             self.state,
@@ -272,7 +275,10 @@ class Solver:
             self.backend,
             self.state.control.start_time
         )
-        self.io_operator.write_histories(self.state, time_step=0)
+        self.io_operator.write_histories(
+            self.state,
+            time_step=0
+        )
 
         run_time_start = time.perf_counter()
 
@@ -318,7 +324,8 @@ class Solver:
             self.boundary_operator.compute_force(
                 self.state,
                 self.backend,
-                self.mpi_operator
+                self.mpi_operator,
+                time_step
             )
             self.obstacle_operator.compute_force_torque(
                 self.state,

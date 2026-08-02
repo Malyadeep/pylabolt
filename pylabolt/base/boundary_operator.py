@@ -111,7 +111,10 @@ class BoundaryOperator:
                             backend.reduce_threads_per_block
                         ](
                             backend.reduce_blocks,
-                            self.partial_force_device
+                            self.partial_force_device,
+                            cuda.device_array_like(
+                                state.boundary.local_force_device[itr]
+                            )
                         )
                     # TODO: Repeating calls will overwrite the
                     # kernel signature. Here, not a problem
@@ -125,7 +128,6 @@ class BoundaryOperator:
                             self.reduce_force_kernel.__name__:
                                 set(self.reduce_force_kernel.signatures)
                         })
-            print(self.kernel_signatures["force"])
 
         print_log("Compiled boundary operator", state.domain.mpi_rank, verbose)
 
@@ -175,7 +177,10 @@ class BoundaryOperator:
             for itr in range(len(self.boundary_kernels_fluid)):
                 kernel_fluid = self.boundary_kernels_fluid[itr]
                 if kernel_fluid is not None:
-                    kernel_fluid[backend.blocks, backend.threads_per_block](
+                    kernel_fluid[
+                        backend.boundary_blocks,
+                        backend.boundary_threads_per_block
+                    ](
                         *self.boundary_args_fluid[itr]
                     )
 
@@ -183,7 +188,10 @@ class BoundaryOperator:
             for itr in range(len(self.boundary_kernels_phase)):
                 kernel_phase = self.boundary_kernels_phase[itr]
                 if kernel_phase is not None:
-                    kernel_phase[backend.blocks, backend.threads_per_block](
+                    kernel_phase[
+                        backend.boundary_blocks,
+                        backend.boundary_threads_per_block
+                    ](
                         *self.boundary_args_phase[itr]
                     )
 
@@ -191,7 +199,8 @@ class BoundaryOperator:
         self,
         state,
         backend,
-        mpi_operator
+        mpi_operator,
+        time_step
     ):
         """
         Compute force on boundary with CPU kernel
@@ -202,26 +211,29 @@ class BoundaryOperator:
         """
         if not state.boundary.compute_force:
             return
+        if time_step % state.boundary.write_interval != 0:
+            return
         for itr in range(self.no_of_boundaries):
             boundary_element = state.boundary.boundary_elements[itr]
             if boundary_element.wall:
-                self.local_force[itr, :] =\
+                state.boundary.local_force[itr, :] =\
                     self.compute_force_kernel(
                         *self.boundary_force_args[itr]
                     )
-        global_force = mpi_operator.reduce(
-            self.local_force, operation="sum"
+        state.boundary.global_force = mpi_operator.reduce(
+            state.boundary.local_force, operation="sum"
         )
         for itr in range(self.no_of_boundaries):
             boundary_element = state.boundary.boundary_elements[itr]
-            boundary_element.force[0] = global_force[itr, 0]
-            boundary_element.force[1] = global_force[itr, 1]
+            boundary_element.force[0] = state.boundary.global_force[itr, 0]
+            boundary_element.force[1] = state.boundary.global_force[itr, 1]
 
     def compute_force_gpu(
         self,
         state,
         backend,
-        mpi_operator
+        mpi_operator,
+        time_step
     ):
         """
         Compute force on boundary with GPU kernel
@@ -231,6 +243,8 @@ class BoundaryOperator:
 
         """
         if not state.boundary.compute_force:
+            return
+        if time_step % state.boundary.write_interval != 0:
             return
         for itr in range(self.no_of_boundaries):
             boundary_element = state.boundary.boundary_elements[itr]
@@ -250,21 +264,18 @@ class BoundaryOperator:
                         blocks, backend.reduce_threads_per_block
                     ](
                         partial_size,
-                        self.partial_force_device
+                        self.partial_force_device,
+                        state.boundary.local_force_device[itr]
                     )
                     partial_size = blocks
-                self.local_force[itr, 0] = self.partial_force_device[:1, 0].\
-                    copy_to_host()[0]
-                self.local_force[itr, 1] = self.partial_force_device[:1, 1].\
-                    copy_to_host()[0]
 
         # global_force = mpi_operator.reduce(
         #     self.local_force, operation="sum"
         # )
-        for itr in range(self.no_of_boundaries):
-            boundary_element = state.boundary.boundary_elements[itr]
-            boundary_element.force[0] = self.local_force[itr, 0]
-            boundary_element.force[1] = self.local_force[itr, 1]
+        # for itr in range(self.no_of_boundaries):
+        #     boundary_element = state.boundary.boundary_elements[itr]
+        #     boundary_element.force[0] = self.local_force[itr, 0]
+        #     boundary_element.force[1] = self.local_force[itr, 1]
 
     def set_backend(
         self,
@@ -333,14 +344,11 @@ class BoundaryOperator:
                     self.boundary_args_phase.append(None)
 
         if state.boundary.compute_force:
-            self.local_force = np.zeros(
-                (self.no_of_boundaries, 2),
-                dtype=state.control.precision
-            )
             if backend.backend_type == "gpu":
                 self.partial_force_device = cuda.device_array(
                     (backend.reduce_blocks, 2), dtype=float
                 )
+
             self.boundary_force_args = []
             self.boundary_force_type = self.model.obstacle_kernels_type
             self.compute_force_kernel = getattr(

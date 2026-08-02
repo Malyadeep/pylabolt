@@ -1,6 +1,7 @@
 import os
 import json
 import numpy as np
+from types import SimpleNamespace
 
 from pylabolt.utils.helpers import print_log
 import pylabolt.parallel.cpu.io_operator_kernels as io_operator_kernels_cpu
@@ -247,23 +248,23 @@ class InputOutputOperator:
                 ) as current_file:
                     current_file.write(
                         f"{'#':5} {'PyLaBolt obstacle history'}\n"
-                        f"{'#':5} {'ID':6}: {obstacle.id}\n"
-                        f"{'#':5} {'Name':6}: {obstacle.name}\n"
-                        f"{'#':5} {'Type':6}: {obstacle.type}\n"
-                        f"{'#':5} {'Columns':6}:\n"
+                        f"{'#':5} {'ID':8}: {obstacle.id}\n"
+                        f"{'#':5} {'Name':8}: {obstacle.name}\n"
+                        f"{'#':5} {'Type':8}: {obstacle.type}\n"
+                        f"{'#':5} {'Columns':8}:\n"
                     )
                     current_file.write(
                         f"{'#':5}"
-                        f"{'time':10}"
-                        f"{'pos_x':10}"
-                        f"{'pos_y':10}"
-                        f"{'alpha':10}"
-                        f"{'vel_x':10}"
-                        f"{'vel_y':10}"
-                        f"{'omega':10}"
-                        f"{'force_x':10}"
-                        f"{'force_y':10}"
-                        f"{'torque':10}\n"
+                        f"{'time':21}"
+                        f"{'pos_x':24}"
+                        f"{'pos_y':24}"
+                        f"{'alpha':24}"
+                        f"{'vel_x':24}"
+                        f"{'vel_y':24}"
+                        f"{'omega':24}"
+                        f"{'force_x':24}"
+                        f"{'force_y':24}"
+                        f"{'torque':24}\n"
                     )
         if state.boundary.write_boundary_data and state.domain.mpi_rank == 0:
             for boundary_element in state.boundary.boundary_elements:
@@ -275,21 +276,24 @@ class InputOutputOperator:
                 ) as current_file:
                     current_file.write(
                         f"{'#':5} {'PyLaBolt boundary history'}\n"
-                        f"{'#':5} {'Name':6}: {boundary_element.name}\n"
-                        f"{'#':5} {'Columns':6}:\n"
+                        f"{'#':5} {'Name':8}: {boundary_element.name}\n"
+                        f"{'#':5} {'Columns':8}:\n"
                     )
                     current_file.write(
-                        f"{'#':5} {'time':10} {'force_x':10} {'force_y':10}\n"
+                        f"{'#':5}"
+                        f"{'time':21}"
+                        f"{'force_x':24}"
+                        f"{'force_y':24}\n"
                     )
 
-    def write_histories(
+    def write_histories_cpu(
         self,
         state,
         time_step
     ):
         """
         Write to disk obstacle and boundary data including
-        force, torque, velocity, position
+        force, torque, velocity, position for backend CPU
         Args:
 
         Returns:
@@ -318,6 +322,78 @@ class InputOutputOperator:
                 for boundary_element in state.boundary.boundary_elements:
                     if not boundary_element.wall:
                         continue
+                    with open(
+                        self.history_save_path + boundary_element.name +
+                        ".dat", "a"
+                    ) as current_file:
+                        current_file.write(
+                            f"{time_step:<24}"
+                            f"{boundary_element.force[0]:24.16e}"
+                            f"{boundary_element.force[1]:24.16e}\n"
+                        )
+
+    def write_histories_gpu(
+        self,
+        state,
+        time_step
+    ):
+        """
+        Write to disk obstacle and boundary data including
+        force, torque, velocity, position for backend GPU
+        Args:
+
+        Returns:
+
+        """
+        if state.obstacle.write_obstacle_data and state.domain.mpi_rank == 0:
+            if time_step % state.obstacle.write_interval == 0:
+                obstacle_data_device = state.obstacle.device_data
+                global_obstacle_data = SimpleNamespace(
+                    force=obstacle_data_device.force.copy_to_host(),
+                    torque=obstacle_data_device.torque.copy_to_host(),
+                    linear_velocity=obstacle_data_device.linear_velocity.
+                    copy_to_host(),
+                    angular_velocity=obstacle_data_device.angular_velocity.
+                    copy_to_host(),
+                    center=obstacle_data_device.center.copy_to_host(),
+                    inclination_angle=obstacle_data_device.inclination_angle.
+                    copy_to_host()
+                )
+                for itr, obstacle in enumerate(state.obstacle.obstacles):
+                    obstacle.force[:] = global_obstacle_data.force[itr, :]
+                    obstacle.torque = global_obstacle_data.torque[itr, 0]
+                    obstacle.linear_velocity[:] =\
+                        global_obstacle_data.linear_velocity[itr, :]
+                    obstacle.angular_velocity =\
+                        global_obstacle_data.angular_velocity[itr, 0]
+                    obstacle.center[:] = global_obstacle_data.center[itr, :]
+                    obstacle.inclination_angle =\
+                        global_obstacle_data.inclination_angle[itr, 0]
+                    with open(
+                        self.history_save_path + obstacle.name + ".dat", "a"
+                    ) as current_file:
+                        current_file.write(
+                            f"{time_step:<24}"
+                            f"{obstacle.center[0]:24.16e}"
+                            f"{obstacle.center[1]:24.16e}"
+                            f"{obstacle.inclination_angle:24.16e}"
+                            f"{obstacle.linear_velocity[0]:24.16e}"
+                            f"{obstacle.linear_velocity[1]:24.16e}"
+                            f"{obstacle.angular_velocity:24.16e}"
+                            f"{obstacle.force[0]:24.16e}"
+                            f"{obstacle.force[1]:24.16e}"
+                            f"{obstacle.torque:24.16e}\n"
+                        )
+        if state.boundary.write_boundary_data and state.domain.mpi_rank == 0:
+            if time_step % state.boundary.write_interval == 0:
+                local_force = state.boundary.local_force_device.copy_to_host()
+                for itr, boundary_element in enumerate(
+                    state.boundary.boundary_elements
+                ):
+                    if not boundary_element.wall:
+                        continue
+                    boundary_element.force[0] = local_force[itr, 0]
+                    boundary_element.force[1] = local_force[itr, 1]
                     with open(
                         self.history_save_path + boundary_element.name +
                         ".dat", "a"
@@ -400,12 +476,14 @@ class InputOutputOperator:
         """
         if backend.backend_type == "cpu":
             self.write_fields = self.write_fields_cpu
+            self.write_histories = self.write_histories_cpu
             self.copy_inner_data_kernel_scalar =\
                 io_operator_kernels_cpu.copy_inner_data_scalar
             self.copy_inner_data_kernel_vector =\
                 io_operator_kernels_cpu.copy_inner_data_vector
         elif backend.backend_type == "gpu":
             self.write_fields = self.write_fields_gpu
+            self.write_histories = self.write_histories_gpu
             self.copy_inner_data_kernel_scalar =\
                 io_operator_kernels_gpu.copy_inner_data_scalar
             self.copy_inner_data_kernel_vector =\

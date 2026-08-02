@@ -175,6 +175,8 @@ class Boundary:
             verbose=verbose
         )
 
+        self.no_of_boundaries = len(self.boundary_elements)
+
         print_log("Setting up domain boundaries done!",
                   domain.mpi_rank, verbose)
         print_log("-" * 80, domain.mpi_rank, verbose)
@@ -650,12 +652,20 @@ class Boundary:
         backend
     ):
         """
-        Configure backend attributes for mesh object
+        Configure backend attributes for boundary object
         Args:
 
         Returns:
 
         """
+        self.local_force = np.zeros(
+            (self.no_of_boundaries, 2),
+            dtype=self.boundary_elements[0].surface_normals.dtype
+        )
+        self.global_force = np.zeros(
+            (self.no_of_boundaries, 2),
+            dtype=self.boundary_elements[0].surface_normals.dtype
+        )
         if backend.backend_type == "gpu":
             self._device_attrs_element = [
                 "boundary_nodes",
@@ -688,6 +698,13 @@ class Boundary:
                     getattr(self, arg_name)
                 )
                 setattr(self, arg_name + "_device", arg_device)
+
+            self.local_force_device = backend.allocate_to_device(
+                self.local_force
+            )
+            self.global_force_device = backend.allocate_to_device(
+                self.global_force
+            )
 
     def view_attrs(
         self,

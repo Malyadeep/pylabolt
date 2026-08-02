@@ -46,13 +46,18 @@ class Backend:
                 self.reduce_threads_per_block = REDUCE_BLOCK_SIZE
             else:
                 self.threads_per_block = 256
+                self.boundary_threads_per_block = 64
                 self.reduce_threads_per_block = REDUCE_BLOCK_SIZE
             self.blocks = int(
-                    np.ceil(state.domain.size / self.threads_per_block)
-                )
+                np.ceil(state.domain.size / self.threads_per_block)
+            )
+            boundary_size = 2 * (state.domain.shape[0] + state.domain.shape[1])
+            self.boundary_blocks = int(
+                np.ceil(boundary_size / self.boundary_threads_per_block)
+            )
             self.reduce_blocks = int(
-                    np.ceil(state.domain.size / self.reduce_threads_per_block)
-                )
+                np.ceil(state.domain.size / self.reduce_threads_per_block)
+            )
             print_log(f"{'Threads-per-block':<25}: {self.threads_per_block}",
                       state.domain.mpi_rank, verbose=verbose)
             print_log(f"{'No-of-blocks':<25}: {self.blocks}",

@@ -65,14 +65,14 @@ def compute_force_torque_single_phase(
             rx_min = rx
             ry_min = ry
             if x_periodic:
-                if np.abs(rx + Nx) < np.abs(rx_min):
+                if abs(rx + Nx) < abs(rx_min):
                     rx_min = rx + Nx
-                if np.abs(rx - Nx) < np.abs(rx_min):
+                if abs(rx - Nx) < abs(rx_min):
                     rx_min = rx - Nx
             if y_periodic:
-                if np.abs(ry + Ny) < np.abs(ry_min):
+                if abs(ry + Ny) < abs(ry_min):
                     ry_min = ry + Ny
-                if np.abs(ry - Ny) < np.abs(ry_min):
+                if abs(ry - Ny) < abs(ry_min):
                     ry_min = ry - Ny
             pop_local = pop[ind]
             pop_new_local = pop_new[ind]
@@ -123,8 +123,13 @@ def compute_force_torque_single_phase(
 @cuda.jit
 def reduce_force_torque(
     partial_size,
-    partial_force_torque
+    partial_force_torque,
+    local_force,
+    local_torque
 ):
+    # TODO: On GPU decide should we merge force, torque buffers?
+    # For multi GPU with MPI, clubbing together should
+    # save communication time
     """
     Reduction kernel to recursively compute force on obstacle
     Residues always accumulated in float64
@@ -165,6 +170,10 @@ def reduce_force_torque(
         for component in range(3):
             partial_force_torque[block_idx, component] =\
                 shared_force_torque[0, component]
+        if block_idx == 0:
+            local_force[0] = shared_force_torque[0, 0]
+            local_force[1] = shared_force_torque[0, 1]
+            local_torque[0] = shared_force_torque[0, 2]
 
 
 # --------------------------------------------------------------------------#
@@ -245,7 +254,8 @@ def compute_boundary_force_single_phase(
 @cuda.jit
 def reduce_boundary_force(
     partial_size,
-    partial_force
+    partial_force,
+    local_force
 ):
     """
     Reduction kernel to recursively compute force on boundaries
@@ -287,3 +297,6 @@ def reduce_boundary_force(
         for component in range(2):
             partial_force[block_idx, component] =\
                 shared_force[0, component]
+        if block_idx == 0:
+            for component in range(2):
+                local_force[component] = shared_force[0, component]
