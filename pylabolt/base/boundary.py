@@ -257,10 +257,15 @@ class Boundary:
             if "interval" not in temp_dict:
                 raise ValueError("interval missing boundary_dict options!")
             self.write_interval = temp_dict["interval"]
-            if not (isinstance(self.write_interval, int) and
-                    self.write_interval > 0):
+            if not (isinstance(self.write_interval, (int, type(None)))):
                 raise ValueError(
-                    "interval must be int and > 0 in boundary_dict options"
+                    "interval must be int or None in boundary_dict options"
+                )
+            if (isinstance(self.write_interval, int)
+                    and self.write_interval <= 0):
+                raise ValueError(
+                    "if interval is int then it must be > 0"
+                    " in boundary_dict options"
                 )
         print_log(
             "write_boundary_data: " + str(self.write_boundary_data),

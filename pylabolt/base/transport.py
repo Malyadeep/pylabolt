@@ -32,7 +32,7 @@ class Transport:
                 raise ValueError("kin_visc must be a float/int")
             self.kin_visc = control.precision(self.kin_visc)
             print_log(
-                f"{"kinematic viscosity":20s}: {self.kin_visc}",
+                f"{'kinematic viscosity':20s}: {self.kin_visc}",
                 domain.mpi_rank, verbose
             )
 
@@ -61,23 +61,23 @@ class Transport:
             )
 
             print_log(
-                f"{"kinematic viscosity 1":20s}: {self.kin_visc_1}",
+                f"{'kinematic viscosity 1':20s}: {self.kin_visc_1}",
                 domain.mpi_rank, verbose
             )
             print_log(
-                f"{"kinematic viscosity 2":20s}: {self.kin_visc_2}",
+                f"{'kinematic viscosity 2':20s}: {self.kin_visc_2}",
                 domain.mpi_rank, verbose
             )
             print_log(
-                f"{"density 1":20s}: {self.density_1}",
+                f"{'density 1':20s}: {self.density_1}",
                 domain.mpi_rank, verbose
             )
             print_log(
-                f"{"density 2":20s}: {self.density_2}",
+                f"{'density 2':20s}: {self.density_2}",
                 domain.mpi_rank, verbose
             )
             print_log(
-                f"{"surface tension":20s}: {self.surface_tension}",
+                f"{'surface tension':20s}: {self.surface_tension}",
                 domain.mpi_rank, verbose
             )
 

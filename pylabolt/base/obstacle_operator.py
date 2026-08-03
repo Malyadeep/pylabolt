@@ -209,7 +209,7 @@ class ObstacleOperator:
             ](
                 *self.compute_force_torque_args,
                 state.obstacle.device_data.ref_point[itr],
-                state.obstacle.device_data.id[itr, 0],
+                state.obstacle.device_data.id[itr],
                 self.partial_force_torque_device
             )
             partial_size = backend.reduce_blocks
@@ -308,7 +308,7 @@ class ObstacleOperator:
                         cuda.device_array_like(
                             state.obstacle.device_data.ref_point[itr]
                         ),
-                        state.obstacle.device_data.id[itr, 0],
+                        state.obstacle.device_data.id[itr],
                         self.partial_force_torque_device,
                     )
                     self.reduce_force_torque_kernel[

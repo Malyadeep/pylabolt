@@ -168,6 +168,8 @@ class InputOutputOperator:
         Returns:
 
         """
+        if state.control.save_interval is None:
+            return
         if time_step % state.control.save_interval != 0:
             return
         for item in self.fields_save:
@@ -200,6 +202,8 @@ class InputOutputOperator:
         Returns:
 
         """
+        if state.control.save_interval is None:
+            return
         if time_step % state.control.save_interval != 0:
             return
         for item in self.fields_save_device:
@@ -299,7 +303,9 @@ class InputOutputOperator:
         Returns:
 
         """
-        if state.obstacle.write_obstacle_data and state.domain.mpi_rank == 0:
+        if (state.obstacle.write_obstacle_data and
+                state.domain.mpi_rank == 0 and
+                state.obstacle.write_interval is not None):
             if time_step % state.obstacle.write_interval == 0:
                 for obstacle in state.obstacle.obstacles:
                     with open(
@@ -317,7 +323,9 @@ class InputOutputOperator:
                             f"{obstacle.force[1]:24.16e}"
                             f"{obstacle.torque:24.16e}\n"
                         )
-        if state.boundary.write_boundary_data and state.domain.mpi_rank == 0:
+        if (state.boundary.write_boundary_data and
+                state.domain.mpi_rank == 0 and
+                state.boundary.write_interval is not None):
             if time_step % state.boundary.write_interval == 0:
                 for boundary_element in state.boundary.boundary_elements:
                     if not boundary_element.wall:
@@ -345,7 +353,9 @@ class InputOutputOperator:
         Returns:
 
         """
-        if state.obstacle.write_obstacle_data and state.domain.mpi_rank == 0:
+        if (state.obstacle.write_obstacle_data and
+                state.domain.mpi_rank == 0 and
+                state.obstacle.write_interval is not None):
             if time_step % state.obstacle.write_interval == 0:
                 obstacle_data_device = state.obstacle.device_data
                 global_obstacle_data = SimpleNamespace(
@@ -384,7 +394,9 @@ class InputOutputOperator:
                             f"{obstacle.force[1]:24.16e}"
                             f"{obstacle.torque:24.16e}\n"
                         )
-        if state.boundary.write_boundary_data and state.domain.mpi_rank == 0:
+        if (state.boundary.write_boundary_data and
+                state.domain.mpi_rank == 0 and
+                state.boundary.write_interval is not None):
             if time_step % state.boundary.write_interval == 0:
                 local_force = state.boundary.local_force_device.copy_to_host()
                 for itr, boundary_element in enumerate(

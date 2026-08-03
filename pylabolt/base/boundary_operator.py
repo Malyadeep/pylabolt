@@ -211,6 +211,8 @@ class BoundaryOperator:
         """
         if not state.boundary.compute_force:
             return
+        if state.boundary.write_interval is None:
+            return
         if time_step % state.boundary.write_interval != 0:
             return
         for itr in range(self.no_of_boundaries):
@@ -243,6 +245,8 @@ class BoundaryOperator:
 
         """
         if not state.boundary.compute_force:
+            return
+        if state.boundary.write_interval is None:
             return
         if time_step % state.boundary.write_interval != 0:
             return

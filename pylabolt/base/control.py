@@ -15,9 +15,9 @@ class Control:
         Attributes:
             start_time: int
             end_time: int
-            std_out_interval: int
-            save_interval: int
-            checkpoint_interval: int
+            std_out_interval: int/None
+            save_interval: int/None
+            checkpoint_interval: int/None
             precision_type: str
             precision: dtype
         """

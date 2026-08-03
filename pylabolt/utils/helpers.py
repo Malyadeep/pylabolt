@@ -40,6 +40,8 @@ class SimulationStatusLogger:
         time_step,
         **values
     ):
+        if state.control.std_out_interval is None:
+            return
         if time_step % state.control.std_out_interval != 0:
             return
         log_string = [f"{'time:':<5} {time_step:<10}"]
