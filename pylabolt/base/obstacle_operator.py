@@ -87,10 +87,16 @@ class ObstacleOperator:
             operation="sum"
         )
         for itr in range(state.obstacle.no_of_obstacles):
-            current_obstacle = state.obstacle.obstacles[itr]
-            current_obstacle.force[0] = global_force_torque[itr, 0]
-            current_obstacle.force[1] = global_force_torque[itr, 1]
-            current_obstacle.torque = global_force_torque[itr, 2]
+            # current_obstacle = state.obstacle.obstacles[itr]
+            # current_obstacle.force[0] = global_force_torque[itr, 0]
+            # current_obstacle.force[1] = global_force_torque[itr, 1]
+            # current_obstacle.torque = global_force_torque[itr, 2]
+            state.obstacle.obstacle_data.force[itr, 0] =\
+                global_force_torque[itr, 0]
+            state.obstacle.obstacle_data.force[itr, 1] =\
+                global_force_torque[itr, 1]
+            state.obstacle.obstacle_data.torque[itr, 0] =\
+                global_force_torque[itr, 2]
 
     def find_obstacle_boundary_nodes_cpu(
         self,
@@ -208,8 +214,8 @@ class ObstacleOperator:
                 backend.reduce_blocks, backend.reduce_threads_per_block
             ](
                 *self.compute_force_torque_args,
-                state.obstacle.device_data.ref_point[itr],
-                state.obstacle.device_data.id[itr],
+                state.obstacle.obstacle_data.ref_point_device[itr],
+                state.obstacle.obstacle_data.id_device[itr],
                 self.partial_force_torque_device
             )
             partial_size = backend.reduce_blocks
@@ -222,8 +228,8 @@ class ObstacleOperator:
                 ](
                     partial_size,
                     self.partial_force_torque_device,
-                    state.obstacle.device_data.force[itr],
-                    state.obstacle.device_data.torque[itr]
+                    state.obstacle.obstacle_data.force_device[itr],
+                    state.obstacle.obstacle_data.torque_device[itr]
                 )
                 partial_size = blocks
 
@@ -306,9 +312,9 @@ class ObstacleOperator:
                     ](
                         *compile_args,
                         cuda.device_array_like(
-                            state.obstacle.device_data.ref_point[itr]
+                            state.obstacle.obstacle_data.ref_point_device[itr]
                         ),
-                        state.obstacle.device_data.id[itr],
+                        state.obstacle.obstacle_data.id_device[itr],
                         self.partial_force_torque_device,
                     )
                     self.reduce_force_torque_kernel[
@@ -317,10 +323,10 @@ class ObstacleOperator:
                         backend.reduce_blocks,
                         self.partial_force_torque_device,
                         cuda.device_array_like(
-                            state.obstacle.device_data.force[itr]
+                            state.obstacle.obstacle_data.force_device[itr]
                         ),
                         cuda.device_array_like(
-                            state.obstacle.device_data.torque[itr]
+                            state.obstacle.obstacle_data.torque_device[itr]
                         )
                     )
                     self.kernel_signatures.update({

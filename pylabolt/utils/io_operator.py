@@ -307,7 +307,19 @@ class InputOutputOperator:
                 state.domain.mpi_rank == 0 and
                 state.obstacle.write_interval is not None):
             if time_step % state.obstacle.write_interval == 0:
-                for obstacle in state.obstacle.obstacles:
+                for itr, obstacle in enumerate(state.obstacle.obstacles):
+                    obstacle.center[:] =\
+                        state.obstacle.obstacle_data.center[itr]
+                    obstacle.inclination_angle =\
+                        state.obstacle.obstacle_data.inclination_angle[itr, 0]
+                    obstacle.linear_velocity[:] =\
+                        state.obstacle.obstacle_data.linear_velocity[itr]
+                    obstacle.angular_velocity =\
+                        state.obstacle.obstacle_data.angular_velocity[itr, 0]
+                    obstacle.force[:] =\
+                        state.obstacle.obstacle_data.force[itr]
+                    obstacle.torque =\
+                        state.obstacle.obstacle_data.torque[itr, 0]
                     with open(
                         self.history_save_path + obstacle.name + ".dat", "a"
                     ) as current_file:
@@ -357,17 +369,19 @@ class InputOutputOperator:
                 state.domain.mpi_rank == 0 and
                 state.obstacle.write_interval is not None):
             if time_step % state.obstacle.write_interval == 0:
-                obstacle_data_device = state.obstacle.device_data
                 global_obstacle_data = SimpleNamespace(
-                    force=obstacle_data_device.force.copy_to_host(),
-                    torque=obstacle_data_device.torque.copy_to_host(),
-                    linear_velocity=obstacle_data_device.linear_velocity.
-                    copy_to_host(),
-                    angular_velocity=obstacle_data_device.angular_velocity.
-                    copy_to_host(),
-                    center=obstacle_data_device.center.copy_to_host(),
-                    inclination_angle=obstacle_data_device.inclination_angle.
-                    copy_to_host()
+                    force=state.obstacle.obstacle_data.
+                    force_device.copy_to_host(),
+                    torque=state.obstacle.obstacle_data.
+                    torque_device.copy_to_host(),
+                    linear_velocity=state.obstacle.obstacle_data.
+                    linear_velocity_device.copy_to_host(),
+                    angular_velocity=state.obstacle.obstacle_data.
+                    angular_velocity_device.copy_to_host(),
+                    center=state.obstacle.obstacle_data.
+                    center_device.copy_to_host(),
+                    inclination_angle=state.obstacle.obstacle_data.
+                    inclination_angle_device.copy_to_host()
                 )
                 for itr, obstacle in enumerate(state.obstacle.obstacles):
                     obstacle.force[:] = global_obstacle_data.force[itr, :]

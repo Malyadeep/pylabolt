@@ -294,64 +294,82 @@ class Obstacle:
         Returns:
 
         """
-        if backend.backend_type == "gpu":
-            if self.no_of_obstacles > 0:
-                self.device_data = ObstacleDataDevice(
-                    self.obstacles, backend
-                )
+        if self.no_of_obstacles > 0:
+            self.obstacle_data = ObstacleDataDevice(self.obstacles)
+            if backend.backend_type == "gpu":
+                self.obstacle_data.setup_device(backend)
 
 
 class ObstacleDataDevice:
     def __init__(
         self,
-        obstacles,
-        backend
+        obstacles
     ):
         """
         Contains device data for obstacle properties
         Attributes:
 
         """
-        N = len(obstacles)
-        dtype = obstacles[0].force.dtype
-        id = np.zeros((N, 1), dtype=int)
-        force = np.zeros((N, 2), dtype=dtype)
-        torque = np.zeros((N, 1), dtype=dtype)
-        linear_velocity = np.zeros((N, 2), dtype=dtype)
-        angular_velocity = np.zeros((N, 1), dtype=dtype)
-        center = np.zeros((N, 2), dtype=dtype)
-        ref_point = np.zeros((N, 2), dtype=dtype)
-        inclination_angle = np.zeros((N, 1), dtype=dtype)
-        solid_density = np.zeros((N, 1), dtype=dtype)
-        # TODO: Not defined
-        mass = np.zeros((N, 1), dtype=dtype)
-        moment_of_inertia = np.zeros((N, 1), dtype=dtype)
+        self.N = len(obstacles)
+        self.dtype = obstacles[0].force.dtype
+        self.id = np.zeros((self.N, 1), dtype=int)
+        self.force = np.zeros((self.N, 2), dtype=self.dtype)
+        self.torque = np.zeros((self.N, 1), dtype=self.dtype)
+        self.linear_velocity = np.zeros((self.N, 2), dtype=self.dtype)
+        self.angular_velocity = np.zeros((self.N, 1), dtype=self.dtype)
+        self.center = np.zeros((self.N, 2), dtype=self.dtype)
+        self.ref_point = np.zeros((self.N, 2), dtype=self.dtype)
+        self.inclination_angle = np.zeros((self.N, 1), dtype=self.dtype)
+        self.solid_density = np.zeros((self.N, 1), dtype=self.dtype)
+        self.mass = np.zeros((self.N, 1), dtype=self.dtype)
+        self.moment_of_inertia = np.zeros((self.N, 1), dtype=self.dtype)
 
-        for itr in range(N):
+        for itr in range(self.N):
             current_obstacle = obstacles[itr]
-            id[itr, 0] = current_obstacle.id
-            force[itr, :] = current_obstacle.force
-            torque[itr, 0] = current_obstacle.torque
-            linear_velocity[itr, :] = current_obstacle.linear_velocity
-            angular_velocity[itr, 0] = current_obstacle.angular_velocity
-            center[itr, :] = current_obstacle.center
-            inclination_angle[itr, 0] = current_obstacle.inclination_angle
-            ref_point[itr, :] = current_obstacle.ref_point
-            # mass[itr, 0] = current_obstacle.inclination_angle
-            # moment_of_inertia[itr, 0] = current_obstacle.moment_of_inertia
-            solid_density[itr, 0] = current_obstacle.solid_density
+            self.id[itr, 0] = current_obstacle.id
+            self.force[itr, :] = current_obstacle.force
+            self.torque[itr, 0] = current_obstacle.torque
+            self.linear_velocity[itr, :] = current_obstacle.linear_velocity
+            self.angular_velocity[itr, 0] = current_obstacle.angular_velocity
+            self.center[itr, :] = current_obstacle.center
+            self.inclination_angle[itr, 0] = current_obstacle.inclination_angle
+            self.ref_point[itr, :] = current_obstacle.ref_point
+            self.mass[itr, 0] = current_obstacle.mass
+            self.moment_of_inertia[itr, 0] = current_obstacle.moment_of_inertia
+            self.solid_density[itr, 0] = current_obstacle.solid_density
 
-        self.id = backend.allocate_to_device(id)
-        self.force = backend.allocate_to_device(force)
-        self.torque = backend.allocate_to_device(torque)
-        self.linear_velocity = backend.allocate_to_device(linear_velocity)
-        self.angular_velocity = backend.allocate_to_device(angular_velocity)
-        self.center = backend.allocate_to_device(center)
-        self.inclination_angle = backend.allocate_to_device(inclination_angle)
-        self.ref_point = backend.allocate_to_device(ref_point)
-        # self.mass = backend.allocate_to_device(mass)
-        # self.moment_of_inertia = backend.allocate_to_device(moment_of_inertia)
-        self.solid_density = backend.allocate_to_device(solid_density)
+    def setup_device(
+        self,
+        backend
+    ):
+        """
+        Allocates obstacle data arrays to GPU memory
+        Args:
+            backend: Backend object
+        Returns:
+            None
+        """
+        self.id_device = backend.allocate_to_device(self.id)
+        self.force_device = backend.allocate_to_device(self.force)
+        self.torque_device = backend.allocate_to_device(self.torque)
+        self.linear_velocity_device = backend.allocate_to_device(
+            self.linear_velocity
+        )
+        self.angular_velocity_device = backend.allocate_to_device(
+            self.angular_velocity
+        )
+        self.center_device = backend.allocate_to_device(self.center)
+        self.inclination_angle_device = backend.allocate_to_device(
+            self.inclination_angle
+        )
+        self.ref_point_device = backend.allocate_to_device(self.ref_point)
+        self.mass_device = backend.allocate_to_device(self.mass)
+        self.moment_of_inertia_device = backend.allocate_to_device(
+            self.moment_of_inertia
+        )
+        self.solid_density_device = backend.allocate_to_device(
+            self.solid_density
+        )
 
 
 class Circle:
@@ -431,6 +449,9 @@ class Circle:
                 user_obstacle_name
             )
         self.static = static
+
+        self.mass = (np.pi * self.radius * self.radius * self.solid_density)
+        self.moment_of_inertia = self.mass * self.radius * self.radius / 2
 
         if self.static:
             self.motion_type = None
@@ -640,6 +661,15 @@ class Ellipse:
                 user_obstacle_name
             )
         self.static = static
+
+        self.mass = (
+            np.pi * self.semi_major_axis * self.semi_minor_axis *
+            self.solid_density
+        )
+        self.moment_of_inertia = self.mass * (
+            self.semi_major_axis * self.semi_major_axis +
+            self.semi_minor_axis * self.semi_minor_axis
+        ) / 4
 
         if self.static:
             self.motion_type = None
