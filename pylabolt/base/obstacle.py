@@ -323,6 +323,10 @@ class ObstacleDataDevice:
         self.solid_density = np.zeros((self.N, 1), dtype=self.dtype)
         self.mass = np.zeros((self.N, 1), dtype=self.dtype)
         self.moment_of_inertia = np.zeros((self.N, 1), dtype=self.dtype)
+        self.static = np.ones((self.N, 1), dtype=bool)
+        self.calculated = np.zeros((self.N, 1), dtype=bool)
+        self.rotation_allowed = np.zeros((self.N, 1), dtype=bool)
+        self.translation_allowed = np.zeros((self.N, 1), dtype=bool)
 
         for itr in range(self.N):
             current_obstacle = obstacles[itr]
@@ -337,6 +341,11 @@ class ObstacleDataDevice:
             self.mass[itr, 0] = current_obstacle.mass
             self.moment_of_inertia[itr, 0] = current_obstacle.moment_of_inertia
             self.solid_density[itr, 0] = current_obstacle.solid_density
+            self.static[itr, 0] = current_obstacle.static
+            self.calculated[itr, 0] = current_obstacle.calculated
+            self.rotation_allowed[itr, 0] = current_obstacle.rotation_allowed
+            self.translation_allowed[itr, 0] =\
+                current_obstacle.translation_allowed
 
     def setup_device(
         self,
@@ -370,6 +379,14 @@ class ObstacleDataDevice:
         self.solid_density_device = backend.allocate_to_device(
             self.solid_density
         )
+        self.static = backend.allocate_to_device(self.static)
+        self.calculated = backend.allocate_to_device(self.calculated)
+        self.rotation_allowed = backend.allocate_to_device(
+            self.rotation_allowed
+        )
+        self.translation_allowed = backend.allocate_to_device(
+            self.translation_allowed
+        )
 
 
 class Circle:
@@ -398,6 +415,14 @@ class Circle:
         self.surface_normals_fluid = []
         self.force = np.zeros(2, dtype=control.precision)
         self.torque = control.precision(0)
+        self.motion_type = None
+        self.degree_of_freedom = None
+        self.linear_velocity = np.zeros(2, dtype=control.precision)
+        self.angular_velocity = control.precision(0)
+        self.static = True
+        self.calculated = False,
+        self.rotation_allowed = False
+        self.translation_allowed = False
 
         if "radius" not in user_obstacle_dict:
             raise ValueError(
@@ -453,12 +478,7 @@ class Circle:
         self.mass = (np.pi * self.radius * self.radius * self.solid_density)
         self.moment_of_inertia = self.mass * self.radius * self.radius / 2
 
-        if self.static:
-            self.motion_type = None
-            self.degree_of_freedom = None
-            self.linear_velocity = np.zeros(2, dtype=control.precision)
-            self.angular_velocity = control.precision(0)
-        else:
+        if not self.static:
             if "solid_motion_dict" not in user_obstacle_dict:
                 raise ValueError(
                     "solid_motion_dict missing in obstacle: " +
@@ -510,6 +530,16 @@ class Circle:
             self.angular_velocity = np.array(
                 self.angular_velocity, dtype=control.precision
             )
+
+            if self.motion_type == "calculated":
+                self.calculated = True
+            if self.degree_of_freedom == "rotation":
+                self.rotation_allowed = True
+            elif self.degree_of_freedom == "translation":
+                self.translation_allowed = True
+            elif self.degree_of_freedom == "both":
+                self.rotation_allowed = True
+                self.translation_allowed = True
 
         self.reconstruct_args = (
             self.center,
@@ -584,6 +614,14 @@ class Ellipse:
         self.surface_normals_fluid = []
         self.force = np.zeros(2, dtype=control.precision)
         self.torque = control.precision(0)
+        self.motion_type = None
+        self.degree_of_freedom = None
+        self.linear_velocity = np.zeros(2, dtype=control.precision)
+        self.angular_velocity = control.precision(0)
+        self.static = True
+        self.calculated = False,
+        self.rotation_allowed = False
+        self.translation_allowed = False
 
         if "semi_major_axis" not in user_obstacle_dict:
             raise ValueError(
@@ -671,12 +709,7 @@ class Ellipse:
             self.semi_minor_axis * self.semi_minor_axis
         ) / 4
 
-        if self.static:
-            self.motion_type = None
-            self.degree_of_freedom = None
-            self.linear_velocity = np.zeros(2, dtype=control.precision)
-            self.angular_velocity = control.precision(0)
-        else:
+        if not self.static:
             if "solid_motion_dict" not in user_obstacle_dict:
                 raise ValueError(
                     "solid_motion_dict missing in obstacle: " +
@@ -728,6 +761,16 @@ class Ellipse:
             self.angular_velocity = np.array(
                 self.angular_velocity, dtype=control.precision
             )
+
+            if self.motion_type == "calculated":
+                self.calculated = True
+            if self.degree_of_freedom == "rotation":
+                self.rotation_allowed = True
+            elif self.degree_of_freedom == "translation":
+                self.translation_allowed = True
+            elif self.degree_of_freedom == "both":
+                self.rotation_allowed = True
+                self.translation_allowed = True
 
         self.reconstruct_args = (
             self.center,

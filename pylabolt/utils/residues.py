@@ -117,14 +117,18 @@ class ResidueOperator:
                 compile_args = backend.make_compile_args(args)
                 if len(self.residues["res_" + item]) == 1:
                     self.compute_residues_kernel_scalar[
-                        backend.reduce_blocks, backend.reduce_threads_per_block
+                        backend.reduce_blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         *compile_args,
                         self.partial_numerator_device[item],
                         self.partial_denominator_device[item]
                     )
                     self.reduce_residues_kernel_scalar[
-                        backend.reduce_blocks, backend.reduce_threads_per_block
+                        backend.reduce_blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         backend.reduce_blocks,
                         self.partial_numerator_device[item],
@@ -132,14 +136,18 @@ class ResidueOperator:
                     )
                 elif len(self.residues["res_" + item]) == 2:
                     self.compute_residues_kernel_vector[
-                        backend.reduce_blocks, backend.reduce_threads_per_block
+                        backend.reduce_blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         *compile_args,
                         self.partial_numerator_device[item],
                         self.partial_denominator_device[item]
                     )
                     self.reduce_residues_kernel_vector[
-                        backend.reduce_blocks, backend.reduce_threads_per_block
+                        backend.reduce_blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         backend.reduce_blocks,
                         self.partial_numerator_device[item],
@@ -243,7 +251,9 @@ class ResidueOperator:
             )
             if len(self.residues["res_" + item]) == 1:
                 self.compute_residues_kernel_scalar[
-                    backend.reduce_blocks, backend.reduce_threads_per_block
+                    backend.reduce_blocks,
+                    backend.reduce_threads_per_block,
+                    backend.numba_stream
                 ](*args)
                 partial_size = backend.reduce_blocks
                 while partial_size > 1:
@@ -251,7 +261,9 @@ class ResidueOperator:
                         partial_size / backend.reduce_threads_per_block
                     ))
                     self.reduce_residues_kernel_scalar[
-                        blocks, backend.reduce_threads_per_block
+                        blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         partial_size,
                         self.partial_numerator_device[item],
@@ -268,7 +280,9 @@ class ResidueOperator:
                 )
             elif len(self.residues["res_" + item]) == 2:
                 self.compute_residues_kernel_vector[
-                    backend.reduce_blocks, backend.reduce_threads_per_block
+                    backend.reduce_blocks,
+                    backend.reduce_threads_per_block,
+                    backend.numba_stream
                 ](*args)
                 partial_size = backend.reduce_blocks
                 while partial_size > 1:
@@ -276,7 +290,9 @@ class ResidueOperator:
                         partial_size / backend.reduce_threads_per_block
                     ))
                     self.reduce_residues_kernel_vector[
-                        blocks, backend.reduce_threads_per_block
+                        blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         partial_size,
                         self.partial_numerator_device[item],

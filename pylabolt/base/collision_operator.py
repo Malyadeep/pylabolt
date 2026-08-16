@@ -221,7 +221,9 @@ class CollisionOperator:
                 self.collision_kernel_fluid(*compile_args)
             elif backend.backend_type == "gpu":
                 self.collision_kernel_fluid[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*compile_args)
 
             compile_args = backend.make_compile_args(
@@ -231,7 +233,9 @@ class CollisionOperator:
                 self.initialize_pop_kernel_fluid(*compile_args)
             elif backend.backend_type == "gpu":
                 self.initialize_pop_kernel_fluid[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*compile_args)
 
             self.kernel_signatures.update({
@@ -251,7 +255,9 @@ class CollisionOperator:
                 self.collision_kernel_phase(*compile_args)
             elif backend.backend_type == "gpu":
                 self.collision_kernel_phase[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*compile_args)
 
             compile_args = backend.make_compile_args(
@@ -261,7 +267,9 @@ class CollisionOperator:
                 self.initialize_pop_kernel_phase(*compile_args)
             elif backend.backend_type == "gpu":
                 self.initialize_pop_kernel_phase[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*compile_args)
 
             self.kernel_signatures.update({
@@ -314,12 +322,16 @@ class CollisionOperator:
         """
         if fluid:
             self.collision_kernel_fluid[
-                backend.blocks, backend.threads_per_block
+                backend.blocks,
+                backend.threads_per_block,
+                backend.numba_stream
             ](*self.collision_args_fluid)
 
         if phase:
             self.collision_kernel_phase[
-                backend.blocks, backend.threads_per_block
+                backend.blocks,
+                backend.threads_per_block,
+                backend.numba_stream
             ](*self.collision_args_phase)
 
     def initialize_pop(
@@ -346,13 +358,17 @@ class CollisionOperator:
         elif backend.backend_type == "gpu":
             if state.fluid:
                 self.initialize_pop_kernel_fluid[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](
                     *self.initialize_pop_args_fluid
                 )
             if state.phase:
                 self.initialize_pop_kernel_phase[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](
                     *self.initialize_pop_args_phase
                 )

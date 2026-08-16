@@ -58,7 +58,9 @@ class BoundaryOperator:
                         kernel_fluid(*compile_args)
                     elif backend.backend_type == "gpu":
                         kernel_fluid[
-                            backend.blocks, backend.threads_per_block
+                            backend.boundary_blocks,
+                            backend.boundary_threads_per_block,
+                            backend.numba_stream
                         ](*compile_args)
 
                     self.kernel_signatures["fluid"].update({
@@ -78,7 +80,9 @@ class BoundaryOperator:
                         kernel_phase(*compile_args)
                     elif backend.backend_type == "gpu":
                         kernel_phase[
-                            backend.blocks, backend.threads_per_block
+                            backend.boundary_blocks,
+                            backend.boundary_threads_per_block,
+                            backend.numba_stream
                         ](*compile_args)
 
                     self.kernel_signatures["phase"].update({
@@ -179,7 +183,8 @@ class BoundaryOperator:
                 if kernel_fluid is not None:
                     kernel_fluid[
                         backend.boundary_blocks,
-                        backend.boundary_threads_per_block
+                        backend.boundary_threads_per_block,
+                        backend.numba_stream
                     ](
                         *self.boundary_args_fluid[itr]
                     )
@@ -190,7 +195,8 @@ class BoundaryOperator:
                 if kernel_phase is not None:
                     kernel_phase[
                         backend.boundary_blocks,
-                        backend.boundary_threads_per_block
+                        backend.boundary_threads_per_block,
+                        backend.numba_stream
                     ](
                         *self.boundary_args_phase[itr]
                     )
@@ -254,7 +260,9 @@ class BoundaryOperator:
             boundary_element = state.boundary.boundary_elements[itr]
             if boundary_element.wall:
                 self.compute_force_kernel[
-                    backend.reduce_blocks, backend.reduce_threads_per_block
+                    backend.reduce_blocks,
+                    backend.reduce_threads_per_block,
+                    backend.numba_stream
                 ](
                     *self.boundary_force_args[itr],
                     self.partial_force_device
@@ -265,7 +273,9 @@ class BoundaryOperator:
                         partial_size / backend.reduce_threads_per_block
                     ))
                     self.reduce_force_kernel[
-                        blocks, backend.reduce_threads_per_block
+                        blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         partial_size,
                         self.partial_force_device,

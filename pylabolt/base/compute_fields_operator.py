@@ -48,7 +48,9 @@ class ComputeFieldsOperator:
                 kernel(*compile_args)
             elif backend.backend_type == "gpu":
                 kernel[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*compile_args)
             self.kernel_signatures.update({
                 kernel.__name__: set(kernel.signatures)
@@ -92,7 +94,9 @@ class ComputeFieldsOperator:
             kernel = self.compute_fields_kernels[current_field]
             args = self.compute_fields_args[current_field]
             kernel[
-                backend.blocks, backend.threads_per_block
+                backend.blocks,
+                backend.threads_per_block,
+                backend.numba_stream
             ](*args)
 
     def set_kernel_args(

@@ -1,6 +1,7 @@
 import numpy as np
 import numba
 from numba import cuda
+import cupy as cp
 
 from pylabolt.utils.helpers import print_log
 
@@ -62,6 +63,9 @@ class Backend:
                       state.domain.mpi_rank, verbose=verbose)
             print_log(f"{'No-of-blocks':<25}: {self.blocks}",
                       state.domain.mpi_rank, verbose=verbose)
+            self.cupy_stream = cp.cuda.Stream(non_blocking=True)
+            self.numba_stream = cuda.external_stream(self.cupy_stream.ptr)
+
 
     def make_compile_args(
         self,

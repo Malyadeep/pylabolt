@@ -121,7 +121,9 @@ class ForceOperator:
                 self.compute_gravity_force(*compile_args)
             elif backend.backend_type == "gpu":
                 self.compute_gravity_force[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*compile_args)
 
             self.kernel_signatures.update({
@@ -162,7 +164,9 @@ class ForceOperator:
 
         """
         self.compute_gravity_force[
-            backend.blocks, backend.threads_per_block
+            backend.blocks,
+            backend.threads_per_block,
+            backend.numba_stream
         ](*self.compute_gravity_force_args)
 
     def set_backend(

@@ -211,12 +211,15 @@ class ObstacleOperator:
             return
         for itr in range(state.obstacle.no_of_obstacles):
             self.compute_force_torque_kernel[
-                backend.reduce_blocks, backend.reduce_threads_per_block
+                backend.reduce_blocks,
+                backend.reduce_threads_per_block,
+                backend.numba_stream
             ](
                 *self.compute_force_torque_args,
-                state.obstacle.obstacle_data.ref_point_device[itr],
-                state.obstacle.obstacle_data.id_device[itr],
-                self.partial_force_torque_device
+                state.obstacle.obstacle_data.ref_point_device,
+                state.obstacle.obstacle_data.id_device,
+                self.partial_force_torque_device,
+                itr
             )
             partial_size = backend.reduce_blocks
             while partial_size > 1:
@@ -224,12 +227,15 @@ class ObstacleOperator:
                     partial_size / backend.reduce_threads_per_block
                 ))
                 self.reduce_force_torque_kernel[
-                    blocks, backend.reduce_threads_per_block
+                    blocks,
+                    backend.reduce_threads_per_block,
+                    backend.numba_stream
                 ](
                     partial_size,
                     self.partial_force_torque_device,
-                    state.obstacle.obstacle_data.force_device[itr],
-                    state.obstacle.obstacle_data.torque_device[itr]
+                    state.obstacle.obstacle_data.force_device,
+                    state.obstacle.obstacle_data.torque_device,
+                    itr
                 )
                 partial_size = blocks
 
@@ -268,6 +274,21 @@ class ObstacleOperator:
 
         """
         pass
+
+    def update_obstacle_properties(
+        self,
+        state,
+        backend
+    ):
+        """
+        Update obstacle position and velocities
+        Args:
+
+        Returns:
+
+        """
+        if backend:
+            self.update_position_velocity_kernel()
 
     def compile(
         self,
@@ -308,26 +329,32 @@ class ObstacleOperator:
                     )
 
                     self.compute_force_torque_kernel[
-                        backend.reduce_blocks, backend.reduce_threads_per_block
+                        backend.reduce_blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         *compile_args,
                         cuda.device_array_like(
-                            state.obstacle.obstacle_data.ref_point_device[itr]
+                            state.obstacle.obstacle_data.ref_point_device
                         ),
-                        state.obstacle.obstacle_data.id_device[itr],
+                        state.obstacle.obstacle_data.id_device,
                         self.partial_force_torque_device,
+                        itr
                     )
                     self.reduce_force_torque_kernel[
-                        backend.reduce_blocks, backend.reduce_threads_per_block
+                        backend.reduce_blocks,
+                        backend.reduce_threads_per_block,
+                        backend.numba_stream
                     ](
                         backend.reduce_blocks,
                         self.partial_force_torque_device,
                         cuda.device_array_like(
-                            state.obstacle.obstacle_data.force_device[itr]
+                            state.obstacle.obstacle_data.force_device
                         ),
                         cuda.device_array_like(
-                            state.obstacle.obstacle_data.torque_device[itr]
-                        )
+                            state.obstacle.obstacle_data.torque_device
+                        ),
+                        itr
                     )
                     self.kernel_signatures.update({
                         self.compute_force_torque_kernel.__name__:
@@ -408,6 +435,9 @@ class ObstacleOperator:
             for arg_name in args_list:
                 arg = getattr(arg_obj, arg_name + arg_suffix)
                 self.compute_force_torque_args += tuple([arg])
+
+        self.update_position_velocity_kernel =\
+            obstacle_kernels_module.update_position_velocity
 
     def verify_kernel_signatures(
         self,

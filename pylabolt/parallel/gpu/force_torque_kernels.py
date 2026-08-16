@@ -30,7 +30,8 @@ def compute_force_torque_single_phase(
     pop_new,
     ref_point,
     current_solid_id,
-    partial_force_torque
+    partial_force_torque,
+    itr
 ):
     """
     Compute force acting on solid for density based
@@ -54,14 +55,14 @@ def compute_force_torque_single_phase(
 
     if ind < size:
         if (not ghost_node[ind] and fluid_boundary[ind] and
-                solid_id[ind] == current_solid_id[0]):
+                solid_id[ind] == current_solid_id[itr, 0]):
             x = ind // shape[1]
             y = ind - x * shape[1]
             x_global, y_global = local_to_global(
                 x - 1, y - 1, offset
             )
-            rx = x_global - ref_point[0]
-            ry = y_global - ref_point[1]
+            rx = x_global - ref_point[itr, 0]
+            ry = y_global - ref_point[itr, 1]
             rx_min = rx
             ry_min = ry
             if x_periodic:
@@ -125,7 +126,8 @@ def reduce_force_torque(
     partial_size,
     partial_force_torque,
     local_force,
-    local_torque
+    local_torque,
+    itr
 ):
     # TODO: On GPU decide should we merge force, torque buffers?
     # For multi GPU with MPI, clubbing together should
@@ -171,9 +173,9 @@ def reduce_force_torque(
             partial_force_torque[block_idx, component] =\
                 shared_force_torque[0, component]
         if block_idx == 0:
-            local_force[0] = shared_force_torque[0, 0]
-            local_force[1] = shared_force_torque[0, 1]
-            local_torque[0] = shared_force_torque[0, 2]
+            local_force[itr, 0] = shared_force_torque[0, 0]
+            local_force[itr, 1] = shared_force_torque[0, 1]
+            local_torque[itr, 0] = shared_force_torque[0, 2]
 
 
 # --------------------------------------------------------------------------#

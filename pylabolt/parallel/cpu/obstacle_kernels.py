@@ -352,3 +352,76 @@ def check_fluid_boundary_overlap(
                         sum_fluid_boundary_overlap += 1
                         break
     return sum_fluid_boundary_overlap
+
+
+# --------------------------------------------------------------------------#
+""" Kernels to update obstacle position and velocities """
+
+
+@numba.njit(parallel=False, nogil=True)
+def update_position_velocity(
+    grid_global_shape,
+    x_periodic,
+    y_periodic,
+    gravity,
+    no_of_obstacles,
+    force,
+    torque,
+    linear_velocity,
+    angular_velocity,
+    center,
+    inclination_angle,
+    mass,
+    moment_of_inertia,
+    static,
+    calculated,
+    rotation_allowed,
+    translation_allowed
+):
+    """
+    Update position and velocities of moving obstacles
+    Args:
+
+    Returns:
+
+    """
+    for obs_no in range(no_of_obstacles):
+        if not static[obs_no, 0]:
+            angular_velocity_old = angular_velocity[obs_no, 0]
+            linear_velocity_old = linear_velocity[obs_no]
+            torque_temp = 0
+            force_temp_x, force_temp_y = 0, 0
+            if calculated:
+                if rotation_allowed:
+                    angular_velocity[obs_no, 0] +=\
+                        torque[obs_no, 0] / moment_of_inertia[obs_no, 0]
+                    torque_temp = torque[obs_no, 0]
+                if translation_allowed:
+                    linear_velocity[obs_no, 0] +=\
+                        force[obs_no, 0] / mass[obs_no, 0] + gravity[0]
+                    linear_velocity[obs_no, 1] +=\
+                        force[obs_no, 1] / mass[obs_no, 0] + gravity[1]
+                    force_temp_x = force[obs_no, 0]
+                    force_temp_y = force[obs_no, 1]
+            if rotation_allowed:
+                inclination_angle[obs_no, 0] = angular_velocity_old +\
+                    0.5 * torque_temp / moment_of_inertia[obs_no, 0]
+            if translation_allowed:
+                if x_periodic:
+                    center[obs_no, 0] = (
+                        center[obs_no, 0] + linear_velocity_old[0] +
+                        0.5 * (force_temp_x / mass[obs_no, 0] + gravity[0]) +
+                        grid_global_shape[0]
+                    ) % grid_global_shape[0]
+                else:
+                    center[obs_no, 0] += linear_velocity_old[0] +\
+                        0.5 * (force_temp_x / mass[obs_no, 0] + gravity[0])
+                if y_periodic:
+                    center[obs_no, 1] = (
+                        center[obs_no, 1] + linear_velocity_old[1] +
+                        0.5 * (force_temp_y / mass[obs_no, 0] + gravity[1]) +
+                        grid_global_shape[1]
+                    ) % grid_global_shape[1]
+                else:
+                    center[obs_no, 1] += linear_velocity_old[1] +\
+                        0.5 * (force_temp_y / mass[obs_no, 0] + gravity[1])

@@ -201,6 +201,50 @@ class Solver:
                   self.state.domain.mpi_rank, verbose)
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
 
+    def single_time_step(
+        self,
+        verbose=True
+    ):
+        self.compute_fields_operator.compute_fields(
+            self.state,
+            self.backend,
+            field=["density"]
+        )
+        self.force_operator.compute_force_field(
+            self.state,
+            self.backend
+        )
+        self.compute_fields_operator.compute_fields(
+            self.state,
+            self.backend,
+            field=["velocity"]
+        )
+        self.collision_operator.collide(
+            self.state,
+            self.backend,
+            fluid=True
+        )
+        self.mpi_operator.halo_exchange(
+            self.state,
+            self.backend,
+            float_buffers=["pop_fluid"]
+        )
+        self.streaming_operator.stream(
+            self.state,
+            self.backend,
+            fluid=True
+        )
+        self.boundary_operator.set_boundary(
+            self.state,
+            self.backend,
+            fluid=True
+        )
+        self.obstacle_operator.compute_force_torque(
+            self.state,
+            self.backend,
+            self.mpi_operator
+        )
+
     def compile(self, verbose=True):
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
         print_log("JIT Compilation starts...\n",
@@ -216,9 +260,24 @@ class Solver:
         self.residue_operator.compile(self.state, self.backend)
         self.io_operator.compile(self.state, self.backend)
 
+        if self.backend.backend_type == "gpu":
+            self.backend.cupy_stream.synchronize()
+
+        if self.backend.backend_type == "cpu":
+            self.execute_single_time_step = self.single_time_step
+        elif self.backend.backend_type == "gpu":
+            with self.backend.cupy_stream:
+                self.backend.cupy_stream.begin_capture()
+                self.single_time_step()
+                self.graph = self.backend.cupy_stream.end_capture()
+            self.execute_single_time_step = self.graph_launch
+
         print_log("\nJIT Compilation done!",
                   self.state.domain.mpi_rank, verbose)
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
+
+    def graph_launch(self):
+        self.graph.launch(self.backend.cupy_stream)
 
     def verify_kernel_signatures(self, verbose=True):
         print_log("-" * 80, self.state.domain.mpi_rank, verbose)
@@ -287,50 +346,13 @@ class Solver:
             self.state.control.start_time + 1,
             self.state.control.end_time + 1,
         ):
-            self.compute_fields_operator.compute_fields(
-                self.state,
-                self.backend,
-                field=["density"]
-            )
-            self.force_operator.compute_force_field(
-                self.state,
-                self.backend
-            )
-            self.compute_fields_operator.compute_fields(
-                self.state,
-                self.backend,
-                field=["velocity"]
-            )
-            self.collision_operator.collide(
-                self.state,
-                self.backend,
-                fluid=True
-            )
-            self.mpi_operator.halo_exchange(
-                self.state,
-                self.backend,
-                float_buffers=["pop_fluid"]
-            )
-            self.streaming_operator.stream(
-                self.state,
-                self.backend,
-                fluid=True
-            )
-            self.boundary_operator.set_boundary(
-                self.state,
-                self.backend,
-                fluid=True
-            )
+            self.execute_single_time_step()
+
             self.boundary_operator.compute_force(
                 self.state,
                 self.backend,
                 self.mpi_operator,
                 time_step
-            )
-            self.obstacle_operator.compute_force_torque(
-                self.state,
-                self.backend,
-                self.mpi_operator
             )
             self.residue_operator.compute_residues(
                 self.state,

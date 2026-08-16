@@ -44,7 +44,9 @@ class StreamingOperator:
                 self.streaming_kernel_fluid(*compile_args)
             elif backend.backend_type == "gpu":
                 self.streaming_kernel_fluid[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*compile_args)
 
             self.kernel_signatures.update({
@@ -58,7 +60,9 @@ class StreamingOperator:
                 self.streaming_kernel_phase(*compile_args)
             elif backend.backend_type == "gpu":
                 self.streaming_kernel_phase[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*compile_args)
 
             self.kernel_signatures.update({
@@ -105,12 +109,16 @@ class StreamingOperator:
         """
         if fluid:
             self.streaming_kernel_fluid[
-                backend.blocks, backend.threads_per_block
+                backend.blocks,
+                backend.threads_per_block,
+                backend.numba_stream
             ](*self.streaming_args_fluid)
 
         if phase:
             self.streaming_kernel_phase[
-                backend.blocks, backend.threads_per_block
+                backend.blocks,
+                backend.threads_per_block,
+                backend.numba_stream
             ](*self.streaming_args_phase)
 
     def set_backend(

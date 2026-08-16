@@ -227,3 +227,37 @@ def compute_normals_ellipse(
         mag = np.sqrt(x_g * x_g + y_g * y_g)
         surface_normals_fluid[itr, 0] = x_g / mag
         surface_normals_fluid[itr, 1] = y_g / mag
+
+
+# --------------------------------------------------------------------------#
+""" Kernels to update obstacle position and velocities """
+
+
+@numba.njit(parallel=False, nogil=True)
+def update_position_velocity(
+    grid_global_shape,
+    x_periodic,
+    y_periodic,
+    gravity,
+    no_of_obstacles,
+    force,
+    torque,
+    linear_velocity,
+    angular_velocity,
+    center,
+    inclination_angle,
+    mass,
+    moment_of_inertia,
+    static,
+    calculated,
+    rotation_allowed,
+    translation_allowed
+):
+    """
+    Update position and velocities of moving obstacles
+    Args:
+
+    Returns:
+
+    """
+    pass

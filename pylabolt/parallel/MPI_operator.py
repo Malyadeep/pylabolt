@@ -546,7 +546,11 @@ class MPIOperator:
             exchange_y = MPI_kernels_gpu.exchange_y_scalar
             if (layout_end - layout_start) > 1:
                 exchange_y = MPI_kernels_gpu.exchange_y_vector
-            exchange_y[backend.blocks, backend.threads_per_block](
+            exchange_y[
+                backend.blocks,
+                backend.threads_per_block,
+                backend.numba_stream
+            ](
                 field_to_copy,
                 state.domain.shape_device
             )
@@ -574,7 +578,11 @@ class MPIOperator:
             exchange_x = MPI_kernels_gpu.exchange_x_scalar
             if (layout_end - layout_start) > 1:
                 exchange_x = MPI_kernels_gpu.exchange_x_vector
-            exchange_x[backend.blocks, backend.threads_per_block](
+            exchange_x[
+                backend.blocks,
+                backend.threads_per_block,
+                backend.numba_stream
+            ](
                 field_to_copy,
                 state.domain.shape_device
             )
@@ -694,10 +702,18 @@ class MPIOperator:
                 if (layout_end - layout_start) > 1:
                     exchange_x = MPI_kernels_gpu.exchange_x_vector
                     exchange_y = MPI_kernels_gpu.exchange_y_vector
-                exchange_x[backend.blocks, backend.threads_per_block](
+                exchange_x[
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
+                ](
                     *compile_args
                 )
-                exchange_y[backend.blocks, backend.threads_per_block](
+                exchange_y[
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
+                ](
                     *compile_args
                 )
 

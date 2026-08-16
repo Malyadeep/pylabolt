@@ -216,11 +216,15 @@ class InputOutputOperator:
             )
             if self.fields_save_metadata[item]["components"] == 1:
                 self.copy_inner_data_kernel_scalar[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*args)
             elif self.fields_save_metadata[item]["components"] == 2:
                 self.copy_inner_data_kernel_vector[
-                    backend.blocks, backend.threads_per_block
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
                 ](*args)
             self.fields_save[item] = self.fields_save_device[item].\
                 copy_to_host()
@@ -470,11 +474,15 @@ class InputOutputOperator:
                 compile_args = backend.make_compile_args(args)
                 if self.fields_save_metadata[item]["components"] == 1:
                     self.copy_inner_data_kernel_scalar[
-                        backend.blocks, backend.threads_per_block
+                        backend.blocks,
+                        backend.threads_per_block,
+                        backend.numba_stream
                     ](*compile_args)
                 elif self.fields_save_metadata[item]["components"] == 2:
                     self.copy_inner_data_kernel_vector[
-                        backend.blocks, backend.threads_per_block
+                        backend.blocks,
+                        backend.threads_per_block,
+                        backend.numba_stream
                     ](*compile_args)
 
         self.kernel_signatures = {
