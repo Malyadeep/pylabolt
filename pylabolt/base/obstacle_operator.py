@@ -23,6 +23,7 @@ class ObstacleOperator:
         state,
         backend,
         mpi_operator,
+        force_operator,
         verbose=True
     ):
         """
@@ -31,6 +32,7 @@ class ObstacleOperator:
 
         """
         self.model = model
+        self.force_operator = force_operator
         mpi_operator.halo_exchange_cpu(
             state,
             backend,
@@ -57,7 +59,7 @@ class ObstacleOperator:
         Returns:
 
         """
-        pass
+        self.update_obstacle_properties(backend)
 
     def compute_force_torque_cpu(
         self,
@@ -67,6 +69,7 @@ class ObstacleOperator:
     ):
         """
         Compute force and torque acting on obstacles
+        Backend: CPU
         Args:
 
         Returns:
@@ -97,6 +100,22 @@ class ObstacleOperator:
                 global_force_torque[itr, 1]
             state.obstacle.obstacle_data.torque[itr, 0] =\
                 global_force_torque[itr, 2]
+
+    def update_obstacle_properties_cpu(
+        self,
+        backend
+    ):
+        """
+        Update obstacle position and velocities using
+        Backend: CPU
+        Args:
+
+        Returns:
+
+        """
+        self.update_position_velocity_kernel(
+            *self.update_position_velocity_args
+        )
 
     def find_obstacle_boundary_nodes_cpu(
         self,
@@ -249,6 +268,26 @@ class ObstacleOperator:
         #     obstacle.force[1] = global_force_torque[itr, 1]
         #     obstacle.torque = global_force_torque[itr, 2]
 
+    def update_obstacle_properties_gpu(
+        self,
+        backend
+    ):
+        """
+        Update obstacle position and velocities using
+        Backend: GPU
+        Args:
+
+        Returns:
+
+        """
+        self.update_position_velocity_kernel[
+            1,
+            backend.threads_per_block,
+            backend.numba_stream
+        ](
+            *self.update_position_velocity_args
+        )
+
     def find_obstacle_boundary_nodes_gpu(
         self,
         state
@@ -274,21 +313,6 @@ class ObstacleOperator:
 
         """
         pass
-
-    def update_obstacle_properties(
-        self,
-        state,
-        backend
-    ):
-        """
-        Update obstacle position and velocities
-        Args:
-
-        Returns:
-
-        """
-        if backend:
-            self.update_position_velocity_kernel()
 
     def compile(
         self,
@@ -321,6 +345,17 @@ class ObstacleOperator:
                         self.compute_force_torque_kernel.__name__:
                             set(self.compute_force_torque_kernel.signatures)
                     })
+
+                compile_args = backend.make_compile_args(
+                    self.update_position_velocity_args
+                )
+                self.update_position_velocity_kernel(
+                    *compile_args
+                )
+                self.kernel_signatures.update({
+                    self.update_position_velocity_kernel.__name__:
+                        set(self.update_position_velocity_kernel.signatures)
+                })
 
             elif backend.backend_type == "gpu":
                 for itr in range(state.obstacle.no_of_obstacles):
@@ -363,6 +398,21 @@ class ObstacleOperator:
                             set(self.reduce_force_torque_kernel.signatures),
                     })
 
+                compile_args = backend.make_compile_args(
+                    self.update_position_velocity_args
+                )
+                self.update_position_velocity_kernel[
+                    1,
+                    backend.threads_per_block,
+                    backend.numba_stream
+                ](
+                    *compile_args
+                )
+                self.kernel_signatures.update({
+                    self.update_position_velocity_kernel.__name__:
+                        set(self.update_position_velocity_kernel.signatures)
+                })
+
     def set_backend(
         self,
         state,
@@ -382,6 +432,8 @@ class ObstacleOperator:
                 self.find_obstacle_normals_cpu
             self.compute_force_torque =\
                 self.compute_force_torque_cpu
+            self.update_obstacle_properties =\
+                self.update_obstacle_properties_cpu
             obstacle_kernels_module = obstacle_kernels_cpu
             force_torque_kernels_module = force_torque_kernels_cpu
             arg_suffix = ""
@@ -398,6 +450,8 @@ class ObstacleOperator:
                 self.find_obstacle_normals_gpu
             self.compute_force_torque =\
                 self.compute_force_torque_gpu
+            self.update_obstacle_properties =\
+                self.update_obstacle_properties_gpu
             obstacle_kernels_module = obstacle_kernels_gpu
             force_torque_kernels_module = force_torque_kernels_gpu
             arg_suffix = "_device"
@@ -438,6 +492,27 @@ class ObstacleOperator:
 
         self.update_position_velocity_kernel =\
             obstacle_kernels_module.update_position_velocity
+        obstacle_data = state.obstacle.obstacle_data
+        self.update_position_velocity_args = (
+            getattr(state.mesh, "grid_global_shape" + arg_suffix),
+            getattr(state.boundary, "x_periodic" + arg_suffix),
+            getattr(state.boundary, "y_periodic" + arg_suffix),
+            getattr(self.force_operator, "gravity" + arg_suffix),
+            getattr(obstacle_data, "N"),
+            getattr(obstacle_data, "force" + arg_suffix),
+            getattr(obstacle_data, "torque" + arg_suffix),
+            getattr(obstacle_data, "linear_velocity" + arg_suffix),
+            getattr(obstacle_data, "angular_velocity" + arg_suffix),
+            getattr(obstacle_data, "center" + arg_suffix),
+            getattr(obstacle_data, "inclination_angle" + arg_suffix),
+            getattr(obstacle_data, "ref_point" + arg_suffix),
+            getattr(obstacle_data, "mass" + arg_suffix),
+            getattr(obstacle_data, "moment_of_inertia" + arg_suffix),
+            getattr(obstacle_data, "static" + arg_suffix),
+            getattr(obstacle_data, "calculated" + arg_suffix),
+            getattr(obstacle_data, "rotation_allowed" + arg_suffix),
+            getattr(obstacle_data, "translation_allowed" + arg_suffix)
+        )
 
     def verify_kernel_signatures(
         self,

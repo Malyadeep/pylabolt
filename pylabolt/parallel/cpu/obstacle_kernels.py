@@ -371,6 +371,7 @@ def update_position_velocity(
     angular_velocity,
     center,
     inclination_angle,
+    ref_point,
     mass,
     moment_of_inertia,
     static,
@@ -391,22 +392,22 @@ def update_position_velocity(
             linear_velocity_old = linear_velocity[obs_no]
             torque_temp = 0
             force_temp_x, force_temp_y = 0, 0
-            if calculated:
-                if rotation_allowed:
+            if calculated[obs_no, 0]:
+                if rotation_allowed[obs_no, 0]:
                     angular_velocity[obs_no, 0] +=\
                         torque[obs_no, 0] / moment_of_inertia[obs_no, 0]
                     torque_temp = torque[obs_no, 0]
-                if translation_allowed:
+                if translation_allowed[obs_no, 0]:
                     linear_velocity[obs_no, 0] +=\
                         force[obs_no, 0] / mass[obs_no, 0] + gravity[0]
                     linear_velocity[obs_no, 1] +=\
                         force[obs_no, 1] / mass[obs_no, 0] + gravity[1]
                     force_temp_x = force[obs_no, 0]
                     force_temp_y = force[obs_no, 1]
-            if rotation_allowed:
+            if rotation_allowed[obs_no, 0]:
                 inclination_angle[obs_no, 0] = angular_velocity_old +\
                     0.5 * torque_temp / moment_of_inertia[obs_no, 0]
-            if translation_allowed:
+            if translation_allowed[obs_no, 0]:
                 if x_periodic:
                     center[obs_no, 0] = (
                         center[obs_no, 0] + linear_velocity_old[0] +
@@ -416,6 +417,7 @@ def update_position_velocity(
                 else:
                     center[obs_no, 0] += linear_velocity_old[0] +\
                         0.5 * (force_temp_x / mass[obs_no, 0] + gravity[0])
+                ref_point[obs_no, 0] = center[obs_no, 0]
                 if y_periodic:
                     center[obs_no, 1] = (
                         center[obs_no, 1] + linear_velocity_old[1] +
@@ -425,3 +427,4 @@ def update_position_velocity(
                 else:
                     center[obs_no, 1] += linear_velocity_old[1] +\
                         0.5 * (force_temp_y / mass[obs_no, 0] + gravity[1])
+                ref_point[obs_no, 1] = center[obs_no, 1]

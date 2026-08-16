@@ -263,16 +263,16 @@ class InputOutputOperator:
                     )
                     current_file.write(
                         f"{'#':5}"
-                        f"{'time':21}"
-                        f"{'pos_x':24}"
-                        f"{'pos_y':24}"
-                        f"{'alpha':24}"
-                        f"{'vel_x':24}"
-                        f"{'vel_y':24}"
-                        f"{'omega':24}"
-                        f"{'force_x':24}"
-                        f"{'force_y':24}"
-                        f"{'torque':24}\n"
+                        f"{'time':<21}"
+                        f"{'pos_x':<30}"
+                        f"{'pos_y':<30}"
+                        f"{'alpha':<30}"
+                        f"{'vel_x':<30}"
+                        f"{'vel_y':<30}"
+                        f"{'omega':<30}"
+                        f"{'force_x':<30}"
+                        f"{'force_y':<30}"
+                        f"{'torque':<30}\n"
                     )
         if state.boundary.write_boundary_data and state.domain.mpi_rank == 0:
             for boundary_element in state.boundary.boundary_elements:
@@ -289,9 +289,9 @@ class InputOutputOperator:
                     )
                     current_file.write(
                         f"{'#':5}"
-                        f"{'time':21}"
-                        f"{'force_x':24}"
-                        f"{'force_y':24}\n"
+                        f"{'time':<21}"
+                        f"{'force_x':<30}"
+                        f"{'force_y':<30}\n"
                     )
 
     def write_histories_cpu(
@@ -329,15 +329,15 @@ class InputOutputOperator:
                     ) as current_file:
                         current_file.write(
                             f"{time_step:<24}"
-                            f"{obstacle.center[0]:24.16e}"
-                            f"{obstacle.center[1]:24.16e}"
-                            f"{obstacle.inclination_angle:24.16e}"
-                            f"{obstacle.linear_velocity[0]:24.16e}"
-                            f"{obstacle.linear_velocity[1]:24.16e}"
-                            f"{obstacle.angular_velocity:24.16e}"
-                            f"{obstacle.force[0]:24.16e}"
-                            f"{obstacle.force[1]:24.16e}"
-                            f"{obstacle.torque:24.16e}\n"
+                            f"{obstacle.center[0]:<30.16e}"
+                            f"{obstacle.center[1]:<30.16e}"
+                            f"{obstacle.inclination_angle:<30.16e}"
+                            f"{obstacle.linear_velocity[0]:<30.16e}"
+                            f"{obstacle.linear_velocity[1]:<30.16e}"
+                            f"{obstacle.angular_velocity:<30.16e}"
+                            f"{obstacle.force[0]:<30.16e}"
+                            f"{obstacle.force[1]:<30.16e}"
+                            f"{obstacle.torque:<30.16e}\n"
                         )
         if (state.boundary.write_boundary_data and
                 state.domain.mpi_rank == 0 and
@@ -352,8 +352,8 @@ class InputOutputOperator:
                     ) as current_file:
                         current_file.write(
                             f"{time_step:<24}"
-                            f"{boundary_element.force[0]:24.16e}"
-                            f"{boundary_element.force[1]:24.16e}\n"
+                            f"{boundary_element.force[0]:<30.16e}"
+                            f"{boundary_element.force[1]:<30.16e}\n"
                         )
 
     def write_histories_gpu(
@@ -402,15 +402,15 @@ class InputOutputOperator:
                     ) as current_file:
                         current_file.write(
                             f"{time_step:<24}"
-                            f"{obstacle.center[0]:24.16e}"
-                            f"{obstacle.center[1]:24.16e}"
-                            f"{obstacle.inclination_angle:24.16e}"
-                            f"{obstacle.linear_velocity[0]:24.16e}"
-                            f"{obstacle.linear_velocity[1]:24.16e}"
-                            f"{obstacle.angular_velocity:24.16e}"
-                            f"{obstacle.force[0]:24.16e}"
-                            f"{obstacle.force[1]:24.16e}"
-                            f"{obstacle.torque:24.16e}\n"
+                            f"{obstacle.center[0]:<30.16e}"
+                            f"{obstacle.center[1]:<30.16e}"
+                            f"{obstacle.inclination_angle:<30.16e}"
+                            f"{obstacle.linear_velocity[0]:<30.16e}"
+                            f"{obstacle.linear_velocity[1]:<30.16e}"
+                            f"{obstacle.angular_velocity:<30.16e}"
+                            f"{obstacle.force[0]:<30.16e}"
+                            f"{obstacle.force[1]:<30.16e}"
+                            f"{obstacle.torque:<30.16e}\n"
                         )
         if (state.boundary.write_boundary_data and
                 state.domain.mpi_rank == 0 and
@@ -430,8 +430,8 @@ class InputOutputOperator:
                     ) as current_file:
                         current_file.write(
                             f"{time_step:<24}"
-                            f"{boundary_element.force[0]:24.16e}"
-                            f"{boundary_element.force[1]:24.16e}\n"
+                            f"{boundary_element.force[0]:<30.16e}"
+                            f"{boundary_element.force[1]:<30.16e}\n"
                         )
 
     def compile(

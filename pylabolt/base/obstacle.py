@@ -295,18 +295,18 @@ class Obstacle:
 
         """
         if self.no_of_obstacles > 0:
-            self.obstacle_data = ObstacleDataDevice(self.obstacles)
+            self.obstacle_data = ObstacleData(self.obstacles)
             if backend.backend_type == "gpu":
                 self.obstacle_data.setup_device(backend)
 
 
-class ObstacleDataDevice:
+class ObstacleData:
     def __init__(
         self,
         obstacles
     ):
         """
-        Contains device data for obstacle properties
+        Contains data for obstacle properties for continuous modification
         Attributes:
 
         """
@@ -379,12 +379,12 @@ class ObstacleDataDevice:
         self.solid_density_device = backend.allocate_to_device(
             self.solid_density
         )
-        self.static = backend.allocate_to_device(self.static)
-        self.calculated = backend.allocate_to_device(self.calculated)
-        self.rotation_allowed = backend.allocate_to_device(
+        self.static_device = backend.allocate_to_device(self.static)
+        self.calculated_device = backend.allocate_to_device(self.calculated)
+        self.rotation_allowed_device = backend.allocate_to_device(
             self.rotation_allowed
         )
-        self.translation_allowed = backend.allocate_to_device(
+        self.translation_allowed_device = backend.allocate_to_device(
             self.translation_allowed
         )
 

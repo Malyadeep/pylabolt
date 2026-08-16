@@ -131,12 +131,6 @@ class Solver:
             comm,
             self.state,
         )
-        self.obstacle_operator = ObstacleOperator(
-            self.model,
-            self.state,
-            self.backend,
-            self.mpi_operator
-        )
         self.collision_operator = CollisionOperator(
             simulation,
             self.model,
@@ -164,6 +158,13 @@ class Solver:
             self.state,
             self.backend
         )
+        self.obstacle_operator = ObstacleOperator(
+            self.model,
+            self.state,
+            self.backend,
+            self.mpi_operator,
+            self.force_operator
+        )
         self.residue_operator = ResidueOperator(
             self.model,
             self.state,
@@ -188,12 +189,12 @@ class Solver:
 
         self.state.set_backend(self.backend)
         self.mpi_operator.set_backend(self.state, self.backend)
-        self.obstacle_operator.set_backend(self.state, self.backend)
         self.collision_operator.set_backend(self.state, self.backend)
         self.force_operator.set_backend(self.state, self.backend)
         self.compute_fields_operator.set_backend(self.state, self.backend)
         self.streaming_operator.set_backend(self.state, self.backend)
         self.boundary_operator.set_backend(self.state, self.backend)
+        self.obstacle_operator.set_backend(self.state, self.backend)
         self.residue_operator.set_backend(self.state, self.backend)
         self.io_operator.set_backend(self.state, self.backend)
 
@@ -205,6 +206,11 @@ class Solver:
         self,
         verbose=True
     ):
+        self.obstacle_operator.move_obstacles(
+            self.state,
+            self.backend,
+            self.mpi_operator
+        )
         self.compute_fields_operator.compute_fields(
             self.state,
             self.backend,
@@ -251,12 +257,12 @@ class Solver:
                   self.state.domain.mpi_rank, verbose)
 
         self.mpi_operator.compile(self.state, self.backend)
-        self.obstacle_operator.compile(self.state, self.backend)
         self.collision_operator.compile(self.state, self.backend)
         self.force_operator.compile(self.state, self.backend)
         self.compute_fields_operator.compile(self.state, self.backend)
         self.streaming_operator.compile(self.state, self.backend)
         self.boundary_operator.compile(self.state, self.backend)
+        self.obstacle_operator.compile(self.state, self.backend)
         self.residue_operator.compile(self.state, self.backend)
         self.io_operator.compile(self.state, self.backend)
 
