@@ -1,7 +1,13 @@
 import numpy as np
 import numba
 from numba import cuda
-import cupy as cp
+try:
+    import cupy as cp
+    _ = cp.cuda.runtime.getDeviceCount()
+    HAS_GPU = True
+except (ImportError, Exception):
+    HAS_GPU = False
+    cp = None
 
 from pylabolt.utils.helpers import print_log
 
@@ -32,6 +38,14 @@ class Backend:
             print_log(f"{'Threads-per-rank':<25}: {self.no_of_threads}",
                       state.domain.mpi_rank, verbose=verbose)
         if self.backend_type == "gpu":
+            if not HAS_GPU:
+                print_log("-" * 80, state.domain.mpi_rank, verbose=True)
+                print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
+                print_log(
+                    "GPU backend chosen, but NVIDIA GPU/drivers/CUDA not detected!",
+                    state.domain.mpi_rank, verbose=True
+                )
+                comm.Abort()
             if state.domain.mpi_size > 1:
                 print_log("-" * 80, state.domain.mpi_rank, verbose=True)
                 print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)

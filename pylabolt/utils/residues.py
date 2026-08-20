@@ -256,7 +256,7 @@ class ResidueOperator:
                     backend.numba_stream
                 ](*args)
                 partial_size = backend.reduce_blocks
-                while partial_size > 1:
+                while True:
                     blocks = int(np.ceil(
                         partial_size / backend.reduce_threads_per_block
                     ))
@@ -269,6 +269,8 @@ class ResidueOperator:
                         self.partial_numerator_device[item],
                         self.partial_denominator_device[item]
                     )
+                    if blocks == 1:
+                        break
                     partial_size = blocks
                 local_numerator = self.partial_numerator_device[item][:1].\
                     copy_to_host()[0]
@@ -285,7 +287,7 @@ class ResidueOperator:
                     backend.numba_stream
                 ](*args)
                 partial_size = backend.reduce_blocks
-                while partial_size > 1:
+                while True:
                     blocks = int(np.ceil(
                         partial_size / backend.reduce_threads_per_block
                     ))
@@ -298,6 +300,8 @@ class ResidueOperator:
                         self.partial_numerator_device[item],
                         self.partial_denominator_device[item]
                     )
+                    if blocks == 1:
+                        break
                     partial_size = blocks
                 local_numerator = self.partial_numerator_device[item][:1].\
                     copy_to_host()[0]

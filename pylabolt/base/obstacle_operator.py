@@ -241,7 +241,7 @@ class ObstacleOperator:
                 itr
             )
             partial_size = backend.reduce_blocks
-            while partial_size > 1:
+            while True:
                 blocks = int(np.ceil(
                     partial_size / backend.reduce_threads_per_block
                 ))
@@ -256,6 +256,10 @@ class ObstacleOperator:
                     state.obstacle.obstacle_data.torque_device,
                     itr
                 )
+
+                if blocks == 1:
+                    break
+
                 partial_size = blocks
 
         # global_force_torque = mpi_operator.reduce(
