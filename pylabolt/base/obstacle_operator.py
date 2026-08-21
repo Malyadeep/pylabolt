@@ -59,7 +59,18 @@ class ObstacleOperator:
         Returns:
 
         """
+        # ------- Update solid position and velocity ------- #
         self.update_obstacle_properties(backend)
+        # ------- Make copy of field data for interpolation ------- #
+        # TODO
+        # ------- Reconstruct solid obstacles ------- #
+        self.reconstruct_obstacles()
+        # ------- Compute obstacle boundary nodes ------- #
+        self.find_obstacle_boundary_nodes(state, mpi_operator)
+        # ------- Compute obstacle surface normals ------- #
+        self.find_obstacle_normals(state)
+        # ------- Refill fresh nodes, destroy old nodes ------- #
+        # TODO
 
     def compute_force_torque_cpu(
         self,
@@ -190,6 +201,9 @@ class ObstacleOperator:
                     state.domain.size,
                     state.domain.shape,
                     state.domain.offset,
+                    state.mesh.grid_global_shape,
+                    state.boundary.x_periodic,
+                    state.boundary.y_periodic,
                     state.fields.solid_boundary,
                     state.fields.fluid_boundary,
                     state.fields.solid_id,
@@ -202,6 +216,9 @@ class ObstacleOperator:
                     state.domain.size,
                     state.domain.shape,
                     state.domain.offset,
+                    state.mesh.grid_global_shape,
+                    state.boundary.x_periodic,
+                    state.boundary.y_periodic,
                     state.fields.solid_boundary,
                     state.fields.fluid_boundary,
                     state.fields.solid_id,

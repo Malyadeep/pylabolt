@@ -55,7 +55,8 @@ class FluidLB:
         self.residue_fields = ["density", "velocity"]
         self.save_fields = [
             "density", "velocity", "solid", "solid_id",
-            "solid_boundary", "fluid_boundary"
+            "solid_boundary", "fluid_boundary",
+            "surface_normals"
         ]
 
     def get_collision_args(self):

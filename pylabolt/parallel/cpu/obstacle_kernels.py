@@ -98,6 +98,9 @@ def compute_normals_circle(
     size,
     shape,
     offset,
+    grid_global_shape,
+    x_periodic,
+    y_periodic,
     solid_boundary,
     fluid_boundary,
     solid_id,
@@ -112,7 +115,7 @@ def compute_normals_circle(
     Returns:
 
     """
-    # TODO: periodic wrapping of normals when solid crosses boundary
+    Nx, Ny = grid_global_shape
     for ind in prange(size):
         if (solid_id[ind] == current_solid_id and
                 (solid_boundary[ind] or fluid_boundary[ind])):
@@ -123,9 +126,21 @@ def compute_normals_circle(
             )
             rx = x_global - center[0]
             ry = y_global - center[1]
-            mag = np.sqrt(rx * rx + ry * ry)
-            surface_normals[ind, 0] = rx / mag
-            surface_normals[ind, 1] = ry / mag
+            rx_min = rx
+            ry_min = ry
+            if x_periodic:
+                if np.abs(rx + Nx) < np.abs(rx_min):
+                    rx_min = rx + Nx
+                if np.abs(rx - Nx) < np.abs(rx_min):
+                    rx_min = rx - Nx
+            if y_periodic:
+                if np.abs(ry + Ny) < np.abs(ry_min):
+                    ry_min = ry + Ny
+                if np.abs(ry - Ny) < np.abs(ry_min):
+                    ry_min = ry - Ny
+            mag = np.sqrt(rx_min * rx_min + ry_min * ry_min)
+            surface_normals[ind, 0] = rx_min / mag
+            surface_normals[ind, 1] = ry_min / mag
 
 
 # --------------------------------------------------------------------------#
@@ -229,6 +244,9 @@ def compute_normals_ellipse(
     size,
     shape,
     offset,
+    grid_global_shape,
+    x_periodic,
+    y_periodic,
     solid_boundary,
     fluid_boundary,
     solid_id,
@@ -246,9 +264,9 @@ def compute_normals_ellipse(
     Returns:
 
     """
-    # TODO: periodic wrapping of normals when solid crosses boundary
     cos_alpha = np.cos(inclination_angle)
     sin_alpha = np.sin(inclination_angle)
+    Nx, Ny = grid_global_shape
     for ind in prange(size):
         if (solid_id[ind] == current_solid_id and
                 (solid_boundary[ind] or fluid_boundary[ind])):
@@ -259,8 +277,20 @@ def compute_normals_ellipse(
             )
             rx = x_global - center[0]
             ry = y_global - center[1]
-            x_proj = rx * cos_alpha + ry * sin_alpha
-            y_proj = - rx * sin_alpha + ry * cos_alpha
+            rx_min = rx
+            ry_min = ry
+            if x_periodic:
+                if np.abs(rx + Nx) < np.abs(rx_min):
+                    rx_min = rx + Nx
+                if np.abs(rx - Nx) < np.abs(rx_min):
+                    rx_min = rx - Nx
+            if y_periodic:
+                if np.abs(ry + Ny) < np.abs(ry_min):
+                    ry_min = ry + Ny
+                if np.abs(ry - Ny) < np.abs(ry_min):
+                    ry_min = ry - Ny
+            x_proj = rx_min * cos_alpha + ry_min * sin_alpha
+            y_proj = - rx_min * sin_alpha + ry_min * cos_alpha
             gx = x_proj / (semi_major_axis * semi_major_axis)
             gy = y_proj / (semi_minor_axis * semi_minor_axis)
             x_g = gx * cos_alpha - gy * sin_alpha
@@ -331,7 +361,7 @@ def check_fluid_boundary_overlap(
     ghost_node
 ):
     """
-    Compute fluid solid boundary nodes
+    Check and count number of overlapping fluid boundary nodes
     Args:
 
     Returns:
