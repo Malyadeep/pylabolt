@@ -55,7 +55,7 @@ def compute_force_torque_single_phase(
 
     if ind < size:
         if (not ghost_node[ind] and fluid_boundary[ind] and
-                solid_id[ind] == current_solid_id[itr, 0]):
+                solid_id[ind] == current_solid_id):
             x = ind // shape[1]
             y = ind - x * shape[1]
             x_global, y_global = local_to_global(
