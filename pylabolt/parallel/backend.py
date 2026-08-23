@@ -33,53 +33,56 @@ class Backend:
         self.no_of_threads = n_threads
         print_log(f"{'Backend':<25}: {self.backend_type}",
                   state.domain.mpi_rank, verbose=verbose)
-        if self.backend_type == "cpu":
-            numba.set_num_threads(self.no_of_threads)
-            print_log(f"{'Threads-per-rank':<25}: {self.no_of_threads}",
-                      state.domain.mpi_rank, verbose=verbose)
-        if self.backend_type == "gpu":
-            if not HAS_GPU:
-                print_log("-" * 80, state.domain.mpi_rank, verbose=True)
-                print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
-                print_log(
-                    "GPU backend chosen, but NVIDIA GPU/drivers/CUDA not detected!",
-                    state.domain.mpi_rank, verbose=True
+        try:
+            if self.backend_type == "cpu":
+                numba.set_num_threads(self.no_of_threads)
+                print_log(f"{'Threads-per-rank':<25}: {self.no_of_threads}",
+                          state.domain.mpi_rank, verbose=verbose)
+            if self.backend_type == "gpu":
+                if not HAS_GPU:
+                    raise ValueError(
+                        "GPU backend chosen, but NVIDIA GPU/drivers/CUDA" +
+                        " not detected!"
+                    )
+                if state.domain.mpi_size > 1:
+                    raise ValueError(
+                        "Multi-GPU execution is not supported yet! \n" +
+                        "nx: 1 and ny: 1 is required for GPU backend"
+                    )
+                print_log("GPU info:", state.domain.mpi_rank, verbose=verbose)
+                cuda.detect()
+                if n_threads != 1:
+                    self.threads_per_block = n_threads
+                    self.reduce_threads_per_block = REDUCE_BLOCK_SIZE
+                else:
+                    self.threads_per_block = 256
+                    self.boundary_threads_per_block = 64
+                    self.reduce_threads_per_block = REDUCE_BLOCK_SIZE
+                self.blocks = int(
+                    np.ceil(state.domain.size / self.threads_per_block)
                 )
-                comm.Abort()
-            if state.domain.mpi_size > 1:
-                print_log("-" * 80, state.domain.mpi_rank, verbose=True)
-                print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
-                print_log("Multi-GPU execution is not supported yet!",
-                          state.domain.mpi_rank, verbose=True)
-                print_log("nx: 1 and ny: 1 is required for GPU backend",
-                          state.domain.mpi_rank, verbose=True)
-                comm.Abort()
-            print_log("GPU info:", state.domain.mpi_rank, verbose=verbose)
-            cuda.detect()
-            if n_threads != 1:
-                self.threads_per_block = n_threads
-                self.reduce_threads_per_block = REDUCE_BLOCK_SIZE
-            else:
-                self.threads_per_block = 256
-                self.boundary_threads_per_block = 64
-                self.reduce_threads_per_block = REDUCE_BLOCK_SIZE
-            self.blocks = int(
-                np.ceil(state.domain.size / self.threads_per_block)
-            )
-            boundary_size = 2 * (state.domain.shape[0] + state.domain.shape[1])
-            self.boundary_blocks = int(
-                np.ceil(boundary_size / self.boundary_threads_per_block)
-            )
-            self.reduce_blocks = int(
-                np.ceil(state.domain.size / self.reduce_threads_per_block)
-            )
-            print_log(f"{'Threads-per-block':<25}: {self.threads_per_block}",
-                      state.domain.mpi_rank, verbose=verbose)
-            print_log(f"{'No-of-blocks':<25}: {self.blocks}",
-                      state.domain.mpi_rank, verbose=verbose)
-            self.cupy_stream = cp.cuda.Stream(non_blocking=True)
-            self.numba_stream = cuda.external_stream(self.cupy_stream.ptr)
-
+                boundary_size = 2 * (
+                    state.domain.shape[0] + state.domain.shape[1]
+                )
+                self.boundary_blocks = int(
+                    np.ceil(boundary_size / self.boundary_threads_per_block)
+                )
+                self.reduce_blocks = int(
+                    np.ceil(state.domain.size / self.reduce_threads_per_block)
+                )
+                print_log(f"{'Threads-per-block':<25}: "
+                          f"{self.threads_per_block}",
+                          state.domain.mpi_rank, verbose=verbose)
+                print_log(f"{'No-of-blocks':<25}: {self.blocks}",
+                          state.domain.mpi_rank, verbose=verbose)
+                self.cupy_stream = cp.cuda.Stream(non_blocking=True)
+                self.numba_stream = cuda.external_stream(self.cupy_stream.ptr)
+        except Exception as e:
+            print_log("-" * 80, state.domain.mpi_rank, verbose=True)
+            print_log("FATAL ERROR!", state.domain.mpi_rank, verbose=True)
+            print_log(str(e), state.domain.mpi_rank, verbose=True)
+            comm.Barrier()
+            comm.Abort()
 
     def make_compile_args(
         self,

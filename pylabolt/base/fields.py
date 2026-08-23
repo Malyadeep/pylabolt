@@ -19,6 +19,7 @@ class Fields:
             solid_boundary: (Nx * Ny) bool array
             ghost_node: (Nx * Ny) bool array
             periodic_boundary: (Nx * Ny) bool array
+            surface_normals: (Nx * Ny, 2) float array
         Attributes (fluid = True):
             velocity: (Nx * Ny, 2) float array
             density: (Nx * Ny) float array
@@ -196,7 +197,8 @@ class Fields:
                 "solid_boundary",
                 "fluid_boundary",
                 "ghost_node",
-                "periodic_boundary"
+                "periodic_boundary",
+                "surface_normals"
             ]
             if self.fluid:
                 self._device_attrs.extend([

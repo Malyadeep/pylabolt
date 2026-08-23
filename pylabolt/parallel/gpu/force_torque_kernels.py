@@ -1,4 +1,3 @@
-import numpy as np
 from numba import cuda
 from numba import float64
 
@@ -31,7 +30,7 @@ def compute_force_torque_single_phase(
     ref_point,
     current_solid_id,
     partial_force_torque,
-    itr
+    obs_no
 ):
     """
     Compute force acting on solid for density based
@@ -61,8 +60,8 @@ def compute_force_torque_single_phase(
             x_global, y_global = local_to_global(
                 x - 1, y - 1, offset
             )
-            rx = x_global - ref_point[itr, 0]
-            ry = y_global - ref_point[itr, 1]
+            rx = x_global - ref_point[obs_no, 0]
+            ry = y_global - ref_point[obs_no, 1]
             rx_min = rx
             ry_min = ry
             if x_periodic:
@@ -127,7 +126,7 @@ def reduce_force_torque(
     partial_force_torque,
     local_force,
     local_torque,
-    itr
+    obs_no
 ):
     # TODO: On GPU decide should we merge force, torque buffers?
     # For multi GPU with MPI, clubbing together should
@@ -173,9 +172,9 @@ def reduce_force_torque(
             partial_force_torque[block_idx, component] =\
                 shared_force_torque[0, component]
         if block_idx == 0:
-            local_force[itr, 0] = shared_force_torque[0, 0]
-            local_force[itr, 1] = shared_force_torque[0, 1]
-            local_torque[itr, 0] = shared_force_torque[0, 2]
+            local_force[obs_no, 0] = shared_force_torque[0, 0]
+            local_force[obs_no, 1] = shared_force_torque[0, 1]
+            local_torque[obs_no, 0] = shared_force_torque[0, 2]
 
 
 # --------------------------------------------------------------------------#

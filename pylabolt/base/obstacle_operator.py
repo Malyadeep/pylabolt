@@ -15,8 +15,6 @@ class ObstacleOperator:
         self,
         model,
         state,
-        backend,
-        mpi_operator,
         force_operator,
         verbose=True
     ):
@@ -25,18 +23,61 @@ class ObstacleOperator:
         Attributes:
 
         """
+        print_log("-" * 80, state.domain.mpi_rank, verbose)
+        print_log("Setting up obstacle operator...",
+                  state.domain.mpi_rank, verbose)
         self.model = model
         self.force_operator = force_operator
-        mpi_operator.halo_exchange_cpu(
+        print_log("Setting up obstacle operator done!",
+                  state.domain.mpi_rank, verbose)
+        print_log("-" * 80, state.domain.mpi_rank, verbose)
+
+    def initialize_obstacles(
+        self,
+        state,
+        backend,
+        mpi_operator
+    ):
+        """
+        Initialiizes obstacles on the grid.
+        Computes fluid and solid boundaries.
+        Computes surface normals
+        Args:
+
+        Returns:
+
+        """
+        mpi_operator.halo_exchange(
             state,
             backend,
             bool_buffers=["solid"],
             int_buffers=["solid_id"]
         )
         # ------- Find solid-fluid boundary nodes ------- #
-        self.find_obstacle_boundary_nodes_cpu(state, mpi_operator)
+        self.find_obstacle_boundary_nodes(state, backend, mpi_operator)
         # ------- Find solid-fluid normals ------- #
-        self.find_obstacle_normals_cpu(state)
+        self.find_obstacle_normals(state, backend, initialize=True)
+        if backend.backend_type == "gpu":
+            try:
+                conflict_count =\
+                    self.local_count_fluid_boundary_overlap_device.\
+                    copy_to_host()
+                if conflict_count[0] > 0:
+                    raise RuntimeError
+            except RuntimeError:
+                print_log(
+                    f"Fluid Boundary node overlap detected for"
+                    f" {conflict_count[0]} nodes!",
+                    state.domain.mpi_rank, verbose=True
+                )
+                print_log(
+                    "This indicates two solid obstacles have" +
+                    " a common fluid boundary node which is illegal!\n" +
+                    "To avoid this issue, ensure solid particle surfaces " +
+                    "have 2-3 lattice nodes in between.",
+                    state.domain.mpi_rank, verbose=True
+                )
+                mpi_operator.comm.Abort()
 
     def move_obstacles(
         self,
@@ -60,11 +101,22 @@ class ObstacleOperator:
         # ------- Make copy of field data for interpolation ------- #
         # TODO
         # ------- Reconstruct solid obstacles ------- #
-        self.reconstruct_obstacles()
+        self.reconstruct_obstacles(
+            state,
+            backend
+        )
         # ------- Compute obstacle boundary nodes ------- #
-        self.find_obstacle_boundary_nodes(state, mpi_operator)
+        self.find_obstacle_boundary_nodes(
+            state,
+            backend,
+            mpi_operator
+        )
         # ------- Compute obstacle surface normals ------- #
-        self.find_obstacle_normals(state)
+        self.find_obstacle_normals(
+            state,
+            backend,
+            initialize=False
+        )
         # ------- Refill fresh nodes, destroy old nodes ------- #
         # TODO
 
@@ -125,7 +177,8 @@ class ObstacleOperator:
 
     def reconstruct_obstacles_cpu(
         self,
-        state
+        state,
+        backend
     ):
         """
         Reconstruct moving obstacles
@@ -136,14 +189,15 @@ class ObstacleOperator:
 
         """
         for obs_no, current_obstacle in enumerate(state.obstacle.obstacles):
-            if (current_obstacle.type == "circle" and
-                    not current_obstacle.static):
+            if current_obstacle.static:
+                continue
+
+            if current_obstacle.type == "circle":
                 obstacle_kernels_cpu.construct_circle(
                     *self.reconstruct_obstacles_args[obs_no],
                     obs_no
                 )
-            elif (current_obstacle.type == "ellipse" and
-                    not current_obstacle.static):
+            elif current_obstacle.type == "ellipse":
                 obstacle_kernels_cpu.construct_ellipse(
                     *self.reconstruct_obstacles_args[obs_no],
                     obs_no
@@ -152,6 +206,7 @@ class ObstacleOperator:
     def find_obstacle_boundary_nodes_cpu(
         self,
         state,
+        backend,
         mpi_operator
     ):
         """
@@ -193,7 +248,9 @@ class ObstacleOperator:
 
     def find_obstacle_normals_cpu(
         self,
-        state
+        state,
+        backend,
+        initialize=False
     ):
         """
         Compute obstacle normals on both fluid and solid boundary
@@ -204,6 +261,9 @@ class ObstacleOperator:
 
         """
         for obs_no, current_obstacle in enumerate(state.obstacle.obstacles):
+            if not initialize and current_obstacle.static:
+                continue
+
             if current_obstacle.type == "circle":
                 obstacle_kernels_cpu.compute_normals_circle(
                     *self.compute_normals_args[obs_no],
@@ -289,8 +349,10 @@ class ObstacleOperator:
 
         """
         for obs_no, current_obstacle in enumerate(state.obstacle.obstacles):
-            if (current_obstacle.type == "circle" and
-                    not current_obstacle.static):
+            if current_obstacle.static:
+                continue
+
+            if current_obstacle.type == "circle":
                 obstacle_kernels_gpu.construct_circle[
                     backend.blocks,
                     backend.threads_per_block,
@@ -299,8 +361,7 @@ class ObstacleOperator:
                     *self.reconstruct_obstacles_args[obs_no],
                     obs_no
                 )
-            elif (current_obstacle.type == "ellipse" and
-                    not current_obstacle.static):
+            elif current_obstacle.type == "ellipse":
                 obstacle_kernels_gpu.construct_ellipse[
                     backend.blocks,
                     backend.threads_per_block,
@@ -374,10 +435,16 @@ class ObstacleOperator:
                 self.local_count_fluid_boundary_overlap_device
             )
 
+            if blocks == 1:
+                break
+
+            partial_size = blocks
+
     def find_obstacle_normals_gpu(
         self,
         state,
-        backend
+        backend,
+        initialize=False
     ):
         """
         Compute obstacle normals on both fluid and solid boundary
@@ -388,6 +455,9 @@ class ObstacleOperator:
 
         """
         for obs_no, current_obstacle in enumerate(state.obstacle.obstacles):
+            if not initialize and current_obstacle.static:
+                continue
+
             if current_obstacle.type == "circle":
                 obstacle_kernels_gpu.compute_normals_circle[
                     backend.blocks,
@@ -398,7 +468,11 @@ class ObstacleOperator:
                     obs_no
                 )
             elif current_obstacle.type == "ellipse":
-                obstacle_kernels_cpu.compute_normals_ellipse(
+                obstacle_kernels_gpu.compute_normals_ellipse[
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
+                ](
                     *self.compute_normals_args[obs_no],
                     obs_no
                 )
@@ -420,6 +494,7 @@ class ObstacleOperator:
 
         # ------- Compile force and torque kernels ------- #
         if state.obstacle.compute_force_torque:
+            self.kernel_signatures.update({"force_torque_kernels": {}})
             if backend.backend_type == "cpu":
                 compile_args = backend.make_compile_args(
                     self.compute_force_torque_args
@@ -431,7 +506,7 @@ class ObstacleOperator:
                         state.obstacle.obstacle_data.ref_point[itr],
                         current_obstacle.id
                     )
-                    self.kernel_signatures.update({
+                    self.kernel_signatures["force_torque_kernels"].update({
                         self.compute_force_torque_kernel.__name__:
                             set(self.compute_force_torque_kernel.signatures)
                     })
@@ -471,7 +546,7 @@ class ObstacleOperator:
                         ),
                         itr
                     )
-                    self.kernel_signatures.update({
+                    self.kernel_signatures["force_torque_kernels"].update({
                         self.compute_force_torque_kernel.__name__:
                             set(self.compute_force_torque_kernel.signatures),
                         self.reduce_force_torque_kernel.__name__:
@@ -479,6 +554,7 @@ class ObstacleOperator:
                     })
 
         if not state.obstacle.all_obstacles_static:
+            self.kernel_signatures.update({"obstacle_kernels": {}})
             if backend.backend_type == "cpu":
                 # ------- Compile position-velocity update kernel ------- #
                 compile_args = backend.make_compile_args(
@@ -487,17 +563,94 @@ class ObstacleOperator:
                 self.update_position_velocity_kernel(
                     *compile_args
                 )
-                self.kernel_signatures.update({
+                self.kernel_signatures["obstacle_kernels"].update({
                     self.update_position_velocity_kernel.__name__:
                         set(self.update_position_velocity_kernel.signatures)
                 })
 
                 # ------- Compile obstacle reconstruction kernel ------- #
-                # TODO
+                for obs_no in range(state.obstacle.no_of_obstacles):
+                    current_obstacle = state.obstacle.obstacles[obs_no]
+                    if current_obstacle.static:
+                        continue
+                    compile_args = backend.make_compile_args(
+                        self.reconstruct_obstacles_args[obs_no]
+                    )
+                    if current_obstacle.type == "circle":
+                        obstacle_kernels_cpu.construct_circle(
+                            *compile_args,
+                            obs_no
+                        )
+                        self.kernel_signatures["obstacle_kernels"].update({
+                            obstacle_kernels_cpu.construct_circle.__name__:
+                                set(obstacle_kernels_cpu.construct_circle.
+                                    signatures)
+                        })
+                    elif current_obstacle.type == "ellipse":
+                        obstacle_kernels_cpu.construct_ellipse(
+                            *compile_args,
+                            obs_no
+                        )
+                        self.kernel_signatures["obstacle_kernels"].update({
+                            obstacle_kernels_cpu.construct_ellipse.__name__:
+                                set(obstacle_kernels_cpu.construct_ellipse.
+                                    signatures)
+                        })
+
                 # ------- Compile obstacle boundary nodes kernel ------- #
-                # TODO
+                compile_args = backend.make_compile_args(
+                    self.compute_obstacle_boundary_args
+                )
+                obstacle_kernels_cpu.compute_obstacle_boundary(
+                    *compile_args
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    obstacle_kernels_cpu.compute_obstacle_boundary.__name__:
+                        set(obstacle_kernels_cpu.compute_obstacle_boundary.
+                            signatures)
+                })
+                compile_args = backend.make_compile_args(
+                    self.check_fluid_boundary_overlap_args
+                )
+                _ = obstacle_kernels_cpu.check_fluid_boundary_overlap(
+                    *compile_args
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    obstacle_kernels_cpu.check_fluid_boundary_overlap.__name__:
+                        set(obstacle_kernels_cpu.check_fluid_boundary_overlap.
+                            signatures)
+                })
+
                 # ------- Compile obstacle normals kernel ------- #
-                # TODO
+                for obs_no in range(state.obstacle.no_of_obstacles):
+                    current_obstacle = state.obstacle.obstacles[obs_no]
+                    compile_args = backend.make_compile_args(
+                        self.compute_normals_args[obs_no]
+                    )
+                    if current_obstacle.type == "circle":
+                        obstacle_kernels_cpu.compute_normals_circle(
+                            *compile_args,
+                            obs_no
+                        )
+                        self.kernel_signatures["obstacle_kernels"].update({
+                            obstacle_kernels_cpu.compute_normals_circle
+                            .__name__: set(
+                                obstacle_kernels_cpu.compute_normals_circle.
+                                signatures
+                            )
+                        })
+                    elif current_obstacle.type == "ellipse":
+                        obstacle_kernels_cpu.compute_normals_ellipse(
+                            *compile_args,
+                            obs_no
+                        )
+                        self.kernel_signatures["obstacle_kernels"].update({
+                            obstacle_kernels_cpu.compute_normals_ellipse
+                            .__name__: set(
+                                obstacle_kernels_cpu.compute_normals_ellipse.
+                                signatures
+                            )
+                        })
 
             elif backend.backend_type == "gpu":
                 compile_args = backend.make_compile_args(
@@ -510,17 +663,137 @@ class ObstacleOperator:
                 ](
                     *compile_args
                 )
-                self.kernel_signatures.update({
+                self.kernel_signatures["obstacle_kernels"].update({
                     self.update_position_velocity_kernel.__name__:
                         set(self.update_position_velocity_kernel.signatures)
                 })
 
                 # ------- Compile obstacle reconstruction kernel ------- #
-                # TODO
+                for obs_no in range(state.obstacle.no_of_obstacles):
+                    current_obstacle = state.obstacle.obstacles[obs_no]
+                    if current_obstacle.static:
+                        continue
+                    compile_args = backend.make_compile_args(
+                        self.reconstruct_obstacles_args[obs_no]
+                    )
+                    if current_obstacle.type == "circle":
+                        obstacle_kernels_gpu.construct_circle[
+                            backend.blocks,
+                            backend.threads_per_block,
+                            backend.numba_stream
+                        ](
+                            *compile_args,
+                            obs_no
+                        )
+                        self.kernel_signatures["obstacle_kernels"].update({
+                            obstacle_kernels_gpu.construct_circle.__name__:
+                                set(obstacle_kernels_gpu.construct_circle.
+                                    signatures)
+                        })
+                    elif current_obstacle.type == "ellipse":
+                        obstacle_kernels_gpu.construct_ellipse[
+                            backend.blocks,
+                            backend.threads_per_block,
+                            backend.numba_stream
+                        ](
+                            *compile_args,
+                            obs_no
+                        )
+                        self.kernel_signatures["obstacle_kernels"].update({
+                            obstacle_kernels_gpu.construct_ellipse.__name__:
+                                set(obstacle_kernels_gpu.construct_ellipse.
+                                    signatures)
+                        })
+
                 # ------- Compile obstacle boundary nodes kernel ------- #
-                # TODO
+                compile_args = backend.make_compile_args(
+                    self.compute_obstacle_boundary_args
+                )
+                obstacle_kernels_gpu.compute_obstacle_boundary[
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
+                ](
+                    *compile_args
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    obstacle_kernels_gpu.compute_obstacle_boundary.__name__:
+                        set(obstacle_kernels_gpu.compute_obstacle_boundary.
+                            signatures)
+                })
+                compile_args = backend.make_compile_args(
+                    self.check_fluid_boundary_overlap_args
+                )
+                obstacle_kernels_gpu.check_fluid_boundary_overlap[
+                    backend.reduce_blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
+                ](
+                    *compile_args,
+                    self.partial_fluid_boundary_overlap_device
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    obstacle_kernels_gpu.check_fluid_boundary_overlap.__name__:
+                        set(obstacle_kernels_gpu.check_fluid_boundary_overlap.
+                            signatures)
+                })
+                obstacle_kernels_gpu.reduce_fluid_boundary_overlap[
+                    backend.reduce_blocks,
+                    backend.reduce_threads_per_block,
+                    backend.numba_stream
+                ](
+                    backend.reduce_blocks,
+                    self.partial_fluid_boundary_overlap_device,
+                    cuda.device_array_like(
+                        self.local_count_fluid_boundary_overlap_device
+                    )
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    obstacle_kernels_gpu.reduce_fluid_boundary_overlap.
+                    __name__: set(
+                        obstacle_kernels_gpu.reduce_fluid_boundary_overlap.
+                        signatures
+                    )
+                })
+
                 # ------- Compile obstacle normals kernel ------- #
-                # TODO
+                for obs_no in range(state.obstacle.no_of_obstacles):
+                    current_obstacle = state.obstacle.obstacles[obs_no]
+                    compile_args = backend.make_compile_args(
+                        self.compute_normals_args[obs_no]
+                    )
+                    if current_obstacle.type == "circle":
+                        obstacle_kernels_gpu.compute_normals_circle[
+                            backend.blocks,
+                            backend.threads_per_block,
+                            backend.numba_stream
+                        ](
+                            *compile_args,
+                            obs_no
+                        )
+                        self.kernel_signatures["obstacle_kernels"].update({
+                            obstacle_kernels_gpu.compute_normals_circle
+                            .__name__: set(
+                                obstacle_kernels_gpu.compute_normals_circle.
+                                signatures
+                            )
+                        })
+                    elif current_obstacle.type == "ellipse":
+                        obstacle_kernels_gpu.compute_normals_ellipse[
+                            backend.blocks,
+                            backend.threads_per_block,
+                            backend.numba_stream
+                        ](
+                            *compile_args,
+                            obs_no
+                        )
+                        self.kernel_signatures["obstacle_kernels"].update({
+                            obstacle_kernels_gpu.compute_normals_ellipse
+                            .__name__: set(
+                                obstacle_kernels_gpu.compute_normals_ellipse.
+                                signatures
+                            )
+                        })
 
     def set_backend(
         self,
@@ -582,32 +855,33 @@ class ObstacleOperator:
 
         self.obstacle_kernels_type = self.model.obstacle_kernels_type
 
-        self.compute_force_torque_kernel = getattr(
-            force_torque_kernels_module,
-            "compute_force_torque_" + self.obstacle_kernels_type
-        )
-        if backend.backend_type == "gpu":
-            self.reduce_force_torque_kernel = getattr(
+        if state.obstacle.compute_force_torque:
+            self.compute_force_torque_kernel = getattr(
                 force_torque_kernels_module,
-                "reduce_force_torque"
+                "compute_force_torque_" + self.obstacle_kernels_type
             )
+            if backend.backend_type == "gpu":
+                self.reduce_force_torque_kernel = getattr(
+                    force_torque_kernels_module,
+                    "reduce_force_torque"
+                )
 
-        if self.obstacle_kernels_type == "single_phase":
-            args_dict = {
-                "domain": ["size", "shape", "offset"],
-                "mesh": ["grid_global_shape"],
-                "lattice": ["cx", "cy", "inv_list", "no_of_directions"],
-                "boundary": ["x_periodic", "y_periodic"],
-                "fields": ["solid", "solid_id", "fluid_boundary",
-                           "ghost_node", "pop_fluid", "pop_fluid_new"]
-            }
-        self.compute_force_torque_args = ()
-        for arg_item in args_dict:
-            args_list = args_dict[arg_item]
-            arg_obj = getattr(state, arg_item)
-            for arg_name in args_list:
-                arg = getattr(arg_obj, arg_name + arg_suffix)
-                self.compute_force_torque_args += tuple([arg])
+            if self.obstacle_kernels_type == "single_phase":
+                args_dict = {
+                    "domain": ["size", "shape", "offset"],
+                    "mesh": ["grid_global_shape"],
+                    "lattice": ["cx", "cy", "inv_list", "no_of_directions"],
+                    "boundary": ["x_periodic", "y_periodic"],
+                    "fields": ["solid", "solid_id", "fluid_boundary",
+                               "ghost_node", "pop_fluid", "pop_fluid_new"]
+                }
+            self.compute_force_torque_args = ()
+            for arg_item in args_dict:
+                args_list = args_dict[arg_item]
+                arg_obj = getattr(state, arg_item)
+                for arg_name in args_list:
+                    arg = getattr(arg_obj, arg_name + arg_suffix)
+                    self.compute_force_torque_args += tuple([arg])
 
         if not state.obstacle.all_obstacles_static:
             self.update_position_velocity_kernel =\
@@ -657,7 +931,7 @@ class ObstacleOperator:
                         getattr(obstacle_data, "angular_velocity" +
                                 arg_suffix),
                         getattr(obstacle_data, "solid_density" + arg_suffix),
-                        getattr(obstacle_data, "center" + arg_suffix)[obs_no],
+                        getattr(obstacle_data, "center" + arg_suffix),
                         getattr(current_obstacle, "radius" + arg_suffix),
                         getattr(current_obstacle, "id" + arg_suffix)
                     )
@@ -679,7 +953,7 @@ class ObstacleOperator:
                         getattr(obstacle_data, "angular_velocity" +
                                 arg_suffix),
                         getattr(obstacle_data, "solid_density" + arg_suffix),
-                        getattr(obstacle_data, "center" + arg_suffix)[obs_no],
+                        getattr(obstacle_data, "center" + arg_suffix),
                         getattr(current_obstacle, "semi_major_axis" +
                                 arg_suffix),
                         getattr(current_obstacle, "semi_minor_axis" +
@@ -712,14 +986,13 @@ class ObstacleOperator:
                 getattr(state.fields, "fluid_boundary" + arg_suffix),
                 getattr(state.fields, "ghost_node" + arg_suffix)
             )
-            
+
             self.compute_normals_args = []
             for obs_no, current_obstacle in enumerate(
                 state.obstacle.obstacles
             ):
                 args = ()
-                if (current_obstacle.type == "circle" and
-                        not current_obstacle.static):
+                if current_obstacle.type == "circle":
                     args = (
                         getattr(state.domain, "size" + arg_suffix),
                         getattr(state.domain, "shape" + arg_suffix),
@@ -735,8 +1008,7 @@ class ObstacleOperator:
                                 arg_suffix),
                         getattr(current_obstacle, "id" + arg_suffix)
                     )
-                elif (current_obstacle.type == "ellipse" and
-                        not current_obstacle.static):
+                elif current_obstacle.type == "ellipse":
                     args = (
                         getattr(state.domain, "size" + arg_suffix),
                         getattr(state.domain, "shape" + arg_suffix),
@@ -781,14 +1053,27 @@ class ObstacleOperator:
             obstacle_kernels_module = obstacle_kernels_gpu
             force_torque_kernels_module = force_torque_kernels_gpu
 
-        for kernel_name in self.kernel_signatures:
-            kernel = getattr(force_torque_kernels_module, kernel_name)
-            if (set(kernel.signatures) !=
-                    self.kernel_signatures[kernel_name]):
-                raise RuntimeError(
-                    f"Developer error! {kernel_name}: in"
-                    f" obstacle operator compiled a new signature!"
-                )
+        if state.obstacle.compute_force_torque:
+            for kernel_name in self.kernel_signatures["force_torque_kernels"]:
+                kernel = getattr(force_torque_kernels_module, kernel_name)
+                if (set(kernel.signatures) !=
+                        self.kernel_signatures["force_torque_kernels"]
+                        [kernel_name]):
+                    raise RuntimeError(
+                        f"Developer error! {kernel_name}: in"
+                        f" obstacle operator compiled a new signature!"
+                    )
+
+        if not state.obstacle.all_obstacles_static:
+            for kernel_name in self.kernel_signatures["obstacle_kernels"]:
+                kernel = getattr(obstacle_kernels_module, kernel_name)
+                if (set(kernel.signatures) !=
+                        self.kernel_signatures["obstacle_kernels"]
+                        [kernel_name]):
+                    raise RuntimeError(
+                        f"Developer error! {kernel_name}: in"
+                        f" obstacle operator compiled a new signature!"
+                    )
 
         print_log("Kernel signatures verified for obstacle operator",
                   state.domain.mpi_rank, verbose)

@@ -151,19 +151,15 @@ class Solver:
         )
         self.streaming_operator = StreamingOperator(
             self.model,
-            self.state,
-            self.backend
+            self.state
         )
         self.boundary_operator = BoundaryOperator(
             self.model,
-            self.state,
-            self.backend
+            self.state
         )
         self.obstacle_operator = ObstacleOperator(
             self.model,
             self.state,
-            self.backend,
-            self.mpi_operator,
             self.force_operator
         )
         self.residue_operator = ResidueOperator(
@@ -207,15 +203,15 @@ class Solver:
         self,
         verbose=True
     ):
-        self.obstacle_operator.move_obstacles(
-            self.state,
-            self.backend,
-            self.mpi_operator
-        )
         self.compute_fields_operator.compute_fields(
             self.state,
             self.backend,
             field=["density"]
+        )
+        self.obstacle_operator.move_obstacles(
+            self.state,
+            self.backend,
+            self.mpi_operator
         )
         self.force_operator.compute_force_field(
             self.state,
@@ -317,6 +313,11 @@ class Solver:
         )
 
         """ Initialization """
+        self.obstacle_operator.initialize_obstacles(
+            self.state,
+            self.backend,
+            self.mpi_operator
+        )
         self.collision_operator.initialize_pop(
             self.state,
             self.backend

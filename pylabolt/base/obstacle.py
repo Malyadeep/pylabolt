@@ -298,6 +298,16 @@ class Obstacle:
             self.obstacle_data = ObstacleData(self.obstacles)
             if backend.backend_type == "gpu":
                 self.obstacle_data.setup_device(backend)
+                for current_obstacle in self.obstacles:
+                    for arg_name in current_obstacle.device_attrs:
+                        arg_device = backend.allocate_to_device(
+                            getattr(current_obstacle, arg_name)
+                        )
+                        setattr(
+                            current_obstacle,
+                            arg_name + "_device",
+                            arg_device
+                        )
 
 
 class ObstacleData:
@@ -558,12 +568,13 @@ class Circle:
             fields.ghost_node,
             fields.density,
             fields.velocity,
-            self.linear_velocity,
-            self.angular_velocity,
-            self.solid_density,
-            self.center,
+            np.array([self.linear_velocity]),
+            np.array([[self.angular_velocity]]),
+            np.array([[self.solid_density]]),
+            np.array([self.center]),
             self.radius,
-            self.id
+            self.id,
+            0
         )
 
     @property
@@ -586,6 +597,13 @@ class Circle:
             "linear_velocity": [float(item) for item in self.linear_velocity],
             "angular_velocity": self.angular_velocity
         }
+
+    @property
+    def device_attrs(self):
+        return [
+            "id",
+            "radius"
+        ]
 
 
 class Ellipse:
@@ -791,14 +809,15 @@ class Ellipse:
             fields.ghost_node,
             fields.density,
             fields.velocity,
-            self.linear_velocity,
-            self.angular_velocity,
-            self.solid_density,
-            self.center,
+            np.array([self.linear_velocity]),
+            np.array([[self.angular_velocity]]),
+            np.array([[self.solid_density]]),
+            np.array([self.center]),
             self.semi_major_axis,
             self.semi_minor_axis,
-            self.inclination_angle,
-            self.id
+            np.array([[self.inclination_angle]]),
+            self.id,
+            0
         )
 
     @property
@@ -823,6 +842,14 @@ class Ellipse:
             "linear_velocity": [float(item) for item in self.linear_velocity],
             "angular_velocity": self.angular_velocity
         }
+
+    @property
+    def device_attrs(self):
+        return [
+            "id",
+            "semi_major_axis",
+            "semi_minor_axis"
+        ]
 
 
 def create_custom_obstacle():

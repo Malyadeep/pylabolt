@@ -214,8 +214,8 @@ def construct_ellipse(
     current_solid_id,
     obs_no
 ):
-    cos_alpha = np.cos(inclination_angle)
-    sin_alpha = np.sin(inclination_angle)
+    cos_alpha = np.cos(inclination_angle[obs_no, 0])
+    sin_alpha = np.sin(inclination_angle[obs_no, 0])
     ind = cuda.grid(1)
     if ind < size:
         if not ghost_node[ind]:

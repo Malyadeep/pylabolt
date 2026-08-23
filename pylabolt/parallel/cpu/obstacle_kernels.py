@@ -58,7 +58,8 @@ def construct_circle(
     solid_density,
     center,
     radius,
-    current_solid_id
+    current_solid_id,
+    obs_no
 ):
     """
     Sets solid node values for obstacle type circle
@@ -80,17 +81,17 @@ def construct_circle(
                 grid_global_shape,
                 x_periodic,
                 y_periodic,
-                center,
+                center[obs_no],
                 radius
             )
             if inside_solid:
                 solid[ind] = True
                 solid_id[ind] = current_solid_id
-                velocity[ind, 0] = linear_velocity[0] -\
-                    angular_velocity * ry
-                velocity[ind, 1] = linear_velocity[1] +\
-                    angular_velocity * rx
-                density[ind] = solid_density
+                velocity[ind, 0] = linear_velocity[obs_no, 0] -\
+                    angular_velocity[obs_no, 0] * ry
+                velocity[ind, 1] = linear_velocity[obs_no, 1] +\
+                    angular_velocity[obs_no, 0] * rx
+                density[ind] = solid_density[obs_no, 0]
 
 
 @numba.njit(parallel=True, nogil=True)
@@ -106,7 +107,8 @@ def compute_normals_circle(
     solid_id,
     surface_normals,
     center,
-    current_solid_id
+    current_solid_id,
+    obs_no
 ):
     """
     Compute surface normals for obstacle type ellipse
@@ -124,8 +126,8 @@ def compute_normals_circle(
             x_global, y_global = local_to_global(
                 x - 1, y - 1, offset
             )
-            rx = x_global - center[0]
-            ry = y_global - center[1]
+            rx = x_global - center[obs_no, 0]
+            ry = y_global - center[obs_no, 1]
             rx_min = rx
             ry_min = ry
             if x_periodic:
@@ -206,10 +208,11 @@ def construct_ellipse(
     semi_major_axis,
     semi_minor_axis,
     inclination_angle,
-    current_solid_id
+    current_solid_id,
+    obs_no
 ):
-    cos_alpha = np.cos(inclination_angle)
-    sin_alpha = np.sin(inclination_angle)
+    cos_alpha = np.cos(inclination_angle[obs_no, 0])
+    sin_alpha = np.sin(inclination_angle[obs_no, 0])
     for ind in prange(size):
         if not ghost_node[ind]:
             x = ind // shape[1]
@@ -223,7 +226,7 @@ def construct_ellipse(
                 grid_global_shape,
                 x_periodic,
                 y_periodic,
-                center,
+                center[obs_no],
                 semi_major_axis,
                 semi_minor_axis,
                 cos_alpha,
@@ -232,11 +235,11 @@ def construct_ellipse(
             if inside_solid:
                 solid[ind] = True
                 solid_id[ind] = current_solid_id
-                velocity[ind, 0] = linear_velocity[0] -\
-                    angular_velocity * ry
-                velocity[ind, 1] = linear_velocity[1] +\
-                    angular_velocity * rx
-                density[ind] = solid_density
+                velocity[ind, 0] = linear_velocity[obs_no, 0] -\
+                    angular_velocity[obs_no, 0] * ry
+                velocity[ind, 1] = linear_velocity[obs_no, 1] +\
+                    angular_velocity[obs_no, 0] * rx
+                density[ind] = solid_density[obs_no, 0]
 
 
 @numba.njit(parallel=True, nogil=True)
@@ -255,7 +258,8 @@ def compute_normals_ellipse(
     semi_major_axis,
     semi_minor_axis,
     inclination_angle,
-    current_solid_id
+    current_solid_id,
+    obs_no
 ):
     """
     Compute surface normals for obstacle type ellipse
@@ -264,8 +268,8 @@ def compute_normals_ellipse(
     Returns:
 
     """
-    cos_alpha = np.cos(inclination_angle)
-    sin_alpha = np.sin(inclination_angle)
+    cos_alpha = np.cos(inclination_angle[obs_no, 0])
+    sin_alpha = np.sin(inclination_angle[obs_no, 0])
     Nx, Ny = grid_global_shape
     for ind in prange(size):
         if (solid_id[ind] == current_solid_id and
@@ -275,8 +279,8 @@ def compute_normals_ellipse(
             x_global, y_global = local_to_global(
                 x - 1, y - 1, offset
             )
-            rx = x_global - center[0]
-            ry = y_global - center[1]
+            rx = x_global - center[obs_no, 0]
+            ry = y_global - center[obs_no, 1]
             rx_min = rx
             ry_min = ry
             if x_periodic:

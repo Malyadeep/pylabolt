@@ -272,6 +272,10 @@ class MPIOperator:
 
         """
         if self.left_rank is not None:
+            source_x = 1
+            dest_x = 0
+            if self.left_rank == state.domain.mpi_rank:
+                dest_x = state.domain.shape[0] - 1
             for field_name in buffer_names:
                 layout_start, layout_end = \
                     buffer_object.layout[field_name]
@@ -285,7 +289,7 @@ class MPIOperator:
                     layout_start,
                     layout_end,
                     state.domain.shape,
-                    x=1
+                    x=source_x
                 )
 
             self.comm.Sendrecv(
@@ -310,7 +314,7 @@ class MPIOperator:
                     layout_start,
                     layout_end,
                     state.domain.shape,
-                    x=0
+                    x=dest_x
                 )
 
     def _exchange_right(
@@ -327,6 +331,10 @@ class MPIOperator:
 
         """
         if self.right_rank is not None:
+            source_x = (state.domain.shape[0] - 2)
+            dest_x = (state.domain.shape[0] - 1)
+            if self.right_rank == state.domain.mpi_rank:
+                dest_x = 0
             for field_name in buffer_names:
                 layout_start, layout_end = \
                     buffer_object.layout[field_name]
@@ -340,7 +348,7 @@ class MPIOperator:
                     layout_start,
                     layout_end,
                     state.domain.shape,
-                    x=(state.domain.shape[0] - 2)
+                    x=source_x
                 )
 
             self.comm.Sendrecv(
@@ -365,7 +373,7 @@ class MPIOperator:
                     layout_start,
                     layout_end,
                     state.domain.shape,
-                    x=(state.domain.shape[0] - 1)
+                    x=dest_x
                 )
 
     def _exchange_top(
@@ -382,6 +390,10 @@ class MPIOperator:
 
         """
         if self.top_rank is not None:
+            source_y = (state.domain.shape[1] - 2)
+            dest_y = (state.domain.shape[1] - 1)
+            if self.top_rank == state.domain.mpi_rank:
+                dest_y = 0
             for field_name in buffer_names:
                 layout_start, layout_end = \
                     buffer_object.layout[field_name]
@@ -395,7 +407,7 @@ class MPIOperator:
                     layout_start,
                     layout_end,
                     state.domain.shape,
-                    y=(state.domain.shape[1] - 2)
+                    y=source_y
                 )
 
             self.comm.Sendrecv(
@@ -420,7 +432,7 @@ class MPIOperator:
                     layout_start,
                     layout_end,
                     state.domain.shape,
-                    y=(state.domain.shape[1] - 1)
+                    y=dest_y
                 )
 
     def _exchange_bottom(
@@ -437,6 +449,10 @@ class MPIOperator:
 
         """
         if self.bottom_rank is not None:
+            source_y = 1
+            dest_y = 0
+            if self.bottom_rank == state.domain.mpi_rank:
+                dest_y = state.domain.shape[1] - 1
             for field_name in buffer_names:
                 layout_start, layout_end = \
                     buffer_object.layout[field_name]
@@ -450,7 +466,7 @@ class MPIOperator:
                     layout_start,
                     layout_end,
                     state.domain.shape,
-                    y=1
+                    y=source_y
                 )
 
             self.comm.Sendrecv(
@@ -475,7 +491,7 @@ class MPIOperator:
                     layout_start,
                     layout_end,
                     state.domain.shape,
-                    y=0
+                    y=dest_y
                 )
 
     def halo_exchange_gpu(
