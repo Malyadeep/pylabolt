@@ -11,6 +11,7 @@ class HaloBuffer:
         self,
         state,
         field_dict,
+        aliases,
         dtype
     ):
         """
@@ -19,6 +20,7 @@ class HaloBuffer:
 
         """
         self.field_dict = field_dict
+        self.aliases = aliases
         self.layout = {}
         self.components = 0
         self.offset = 0
@@ -76,22 +78,33 @@ class MPIOperator:
             "solid_boundary": 1,
             "fluid_boundary": 1
         }
+        bool_field_aliases = {
+            "solid": "solid",
+            "solid_boundary": "solid_boundary",
+            "fluid_boundary": "fluid_boundary"
+        }
         self.bool_buffer = HaloBuffer(
             state,
             bool_field_dict,
+            bool_field_aliases,
             np.bool_
         )
 
         int_field_dict = {
             "solid_id": 1
         }
+        int_field_aliases = {
+            "solid_id": "solid_id"
+        }
         self.int_buffer = HaloBuffer(
             state,
             int_field_dict,
+            int_field_aliases,
             int
         )
 
         float_field_dict = {}
+        float_field_aliases = {}
         if state.fluid is True:
             float_field_dict.update({
                 "pop_fluid": state.lattice.no_of_directions,
@@ -99,15 +112,29 @@ class MPIOperator:
                 "pressure": 1,
                 "density": 1
             })
+            float_field_aliases.update({
+                "pop_fluid": "pop_fluid",
+                "pop_fluid_new": "pop_fluid",
+                "velocity": "velocity",
+                "pressure": "pressure",
+                "density": "density"
+            })
         if state.phase is True:
             float_field_dict.update({
                 "pop_phase": state.lattice.no_of_directions,
                 "phase_field": 1,
                 "grad_phase_field": 2
             })
+            float_field_aliases.update({
+                "pop_phase": "pop_phase",
+                "pop_phase_new": "pop_phase",
+                "phase_field": "phase_field",
+                "grad_phase_field": "grad_phase_field"
+            })
         self.float_buffer = HaloBuffer(
             state,
             float_field_dict,
+            float_field_aliases,
             state.control.precision
         )
 
@@ -229,6 +256,14 @@ class MPIOperator:
                 self._exchange_bottom(*args)
 
         if float_buffers is not None:
+            if ("pop_fluid" in float_buffers and
+                    "pop_fluid_new" in float_buffers):
+                self.comm.Barrier()
+                raise RuntimeError(
+                    f"{'Developer error!'}"
+                    f"{' pop and pop_new cannot be halo-exchanged'}"
+                    f"{' at the same step!'}"
+                )
             buffer_object = self.float_buffer
             args = (float_buffers, buffer_object, state)
             if state.domain.i_proc % 2 == 0:
@@ -277,8 +312,9 @@ class MPIOperator:
             if self.left_rank == state.domain.mpi_rank:
                 dest_x = state.domain.shape[0] - 1
             for field_name in buffer_names:
+                buffer_alias = buffer_object.aliases[field_name]
                 layout_start, layout_end = \
-                    buffer_object.layout[field_name]
+                    buffer_object.layout[buffer_alias]
                 field_to_copy = getattr(state.fields, field_name)
                 send_copy_y = MPI_kernels_cpu.send_copy_y_scalar
                 if (layout_end - layout_start) > 1:
@@ -302,8 +338,9 @@ class MPIOperator:
             )
 
             for field_name in buffer_names:
+                buffer_alias = buffer_object.aliases[field_name]
                 layout_start, layout_end = \
-                    buffer_object.layout[field_name]
+                    buffer_object.layout[buffer_alias]
                 field_to_copy = getattr(state.fields, field_name)
                 recv_copy_y = MPI_kernels_cpu.recv_copy_y_scalar
                 if (layout_end - layout_start) > 1:
@@ -336,8 +373,9 @@ class MPIOperator:
             if self.right_rank == state.domain.mpi_rank:
                 dest_x = 0
             for field_name in buffer_names:
+                buffer_alias = buffer_object.aliases[field_name]
                 layout_start, layout_end = \
-                    buffer_object.layout[field_name]
+                    buffer_object.layout[buffer_alias]
                 field_to_copy = getattr(state.fields, field_name)
                 send_copy_y = MPI_kernels_cpu.send_copy_y_scalar
                 if (layout_end - layout_start) > 1:
@@ -361,8 +399,9 @@ class MPIOperator:
             )
 
             for field_name in buffer_names:
+                buffer_alias = buffer_object.aliases[field_name]
                 layout_start, layout_end = \
-                    buffer_object.layout[field_name]
+                    buffer_object.layout[buffer_alias]
                 field_to_copy = getattr(state.fields, field_name)
                 recv_copy_y = MPI_kernels_cpu.recv_copy_y_scalar
                 if (layout_end - layout_start) > 1:
@@ -395,8 +434,9 @@ class MPIOperator:
             if self.top_rank == state.domain.mpi_rank:
                 dest_y = 0
             for field_name in buffer_names:
+                buffer_alias = buffer_object.aliases[field_name]
                 layout_start, layout_end = \
-                    buffer_object.layout[field_name]
+                    buffer_object.layout[buffer_alias]
                 field_to_copy = getattr(state.fields, field_name)
                 send_copy_x = MPI_kernels_cpu.send_copy_x_scalar
                 if (layout_end - layout_start) > 1:
@@ -420,8 +460,9 @@ class MPIOperator:
             )
 
             for field_name in buffer_names:
+                buffer_alias = buffer_object.aliases[field_name]
                 layout_start, layout_end = \
-                    buffer_object.layout[field_name]
+                    buffer_object.layout[buffer_alias]
                 field_to_copy = getattr(state.fields, field_name)
                 recv_copy_x = MPI_kernels_cpu.recv_copy_x_scalar
                 if (layout_end - layout_start) > 1:
@@ -454,8 +495,9 @@ class MPIOperator:
             if self.bottom_rank == state.domain.mpi_rank:
                 dest_y = state.domain.shape[1] - 1
             for field_name in buffer_names:
+                buffer_alias = buffer_object.aliases[field_name]
                 layout_start, layout_end = \
-                    buffer_object.layout[field_name]
+                    buffer_object.layout[buffer_alias]
                 field_to_copy = getattr(state.fields, field_name)
                 send_copy_x = MPI_kernels_cpu.send_copy_x_scalar
                 if (layout_end - layout_start) > 1:
@@ -479,8 +521,9 @@ class MPIOperator:
             )
 
             for field_name in buffer_names:
+                buffer_alias = buffer_object.aliases[field_name]
                 layout_start, layout_end = \
-                    buffer_object.layout[field_name]
+                    buffer_object.layout[buffer_alias]
                 field_to_copy = getattr(state.fields, field_name)
                 recv_copy_x = MPI_kernels_cpu.recv_copy_x_scalar
                 if (layout_end - layout_start) > 1:
@@ -511,6 +554,14 @@ class MPIOperator:
         Returns:
 
         """
+        if (float_buffers is not None and "pop_fluid" in float_buffers and
+                "pop_fluid_new" in float_buffers):
+            self.comm.Barrier()
+            raise RuntimeError(
+                f"{'Developer error!'}"
+                f"{' pop and pop_new cannot be halo-exchanged'}"
+                f"{' at the same step!'}"
+            )
         if state.boundary.x_periodic:
             if bool_buffers is not None:
                 buffer_object = self.bool_buffer
@@ -556,8 +607,9 @@ class MPIOperator:
 
         """
         for field_name in buffer_names:
+            buffer_alias = buffer_object.aliases[field_name]
             layout_start, layout_end = \
-                buffer_object.layout[field_name]
+                buffer_object.layout[buffer_alias]
             field_to_copy = getattr(state.fields, field_name + "_device")
             exchange_y = MPI_kernels_gpu.exchange_y_scalar
             if (layout_end - layout_start) > 1:
@@ -588,8 +640,9 @@ class MPIOperator:
 
         """
         for field_name in buffer_names:
+            buffer_alias = buffer_object.aliases[field_name]
             layout_start, layout_end = \
-                buffer_object.layout[field_name]
+                buffer_object.layout[buffer_alias]
             field_to_copy = getattr(state.fields, field_name + "_device")
             exchange_x = MPI_kernels_gpu.exchange_x_scalar
             if (layout_end - layout_start) > 1:

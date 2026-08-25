@@ -96,14 +96,34 @@ class ObstacleOperator:
         """
         if state.obstacle.all_obstacles_static:
             return
+        # ------- List of fields to be exchanged ------- #
+        before_snapshot_fields = self._exchange_fields["before_snapshot"]
+        after_geometry_fields = self._exchange_fields["after_geometry"]
+        after_refill_fields = self._exchange_fields["after_refill"]
         # ------- Update solid position and velocity ------- #
         self.update_obstacle_properties(backend)
+        # ------- Halo-exchange (before snapshot) ------- #
+        mpi_operator.halo_exchange(
+            state,
+            backend,
+            bool_buffers=before_snapshot_fields["bool_fields"],
+            int_buffers=before_snapshot_fields["int_fields"],
+            float_buffers=before_snapshot_fields["float_fields"]
+        )
         # ------- Make copy of field data for interpolation ------- #
         # TODO
         # ------- Reconstruct solid obstacles ------- #
         self.reconstruct_obstacles(
             state,
             backend
+        )
+        # ------- Halo-exchange (before snapshot) ------- #
+        mpi_operator.halo_exchange(
+            state,
+            backend,
+            bool_buffers=after_geometry_fields["bool_fields"],
+            int_buffers=after_geometry_fields["int_fields"],
+            float_buffers=after_geometry_fields["float_fields"]
         )
         # ------- Compute obstacle boundary nodes ------- #
         self.find_obstacle_boundary_nodes(
@@ -117,8 +137,16 @@ class ObstacleOperator:
             backend,
             initialize=False
         )
-        # ------- Refill fresh nodes, destroy old nodes ------- #
+        # ------- Refill fresh nodes ------- #
         # TODO
+        # ------- Halo-exchange (before snapshot) ------- #
+        mpi_operator.halo_exchange(
+            state,
+            backend,
+            bool_buffers=after_refill_fields["bool_fields"],
+            int_buffers=after_refill_fields["int_fields"],
+            float_buffers=after_refill_fields["float_fields"]
+        )
 
     def compute_force_torque_cpu(
         self,
@@ -173,6 +201,22 @@ class ObstacleOperator:
         """
         self.update_position_velocity_kernel(
             *self.update_position_velocity_args
+        )
+
+    def snapshot_fields_cpu(
+        self,
+        backend
+    ):
+        """
+        Takes a snapshot of the required fields into temporary buffer
+        Backend: CPU
+        Args:
+
+        Returns:
+
+        """
+        self.snapshot_kernel(
+            *self.snapshot_args
         )
 
     def reconstruct_obstacles_cpu(
@@ -389,6 +433,26 @@ class ObstacleOperator:
             backend.numba_stream
         ](
             *self.update_position_velocity_args
+        )
+
+    def snapshot_fields_gpu(
+        self,
+        backend
+    ):
+        """
+        Takes a snapshot of the required fields into temporary buffec
+        Backend: GPU
+        Args:
+
+        Returns:
+
+        """
+        self.snapshot_kernel[
+            backend.blocks,
+            backend.threads_per_block,
+            backend.numba_stream
+        ](
+            *self.snapshot_kernel_args
         )
 
     def find_obstacle_boundary_nodes_gpu(
@@ -808,6 +872,10 @@ class ObstacleOperator:
 
         """
         if backend.backend_type == "cpu":
+            self.snapshot_fields =\
+                self.snapshot_fields_cpu
+            self.update_obstacle_properties =\
+                self.update_obstacle_properties_cpu
             self.reconstruct_obstacles =\
                 self.reconstruct_obstacles_cpu
             self.find_obstacle_boundary_nodes =\
@@ -816,8 +884,6 @@ class ObstacleOperator:
                 self.find_obstacle_normals_cpu
             self.compute_force_torque =\
                 self.compute_force_torque_cpu
-            self.update_obstacle_properties =\
-                self.update_obstacle_properties_cpu
             obstacle_kernels_module = obstacle_kernels_cpu
             force_torque_kernels_module = force_torque_kernels_cpu
             arg_suffix = ""
@@ -828,6 +894,10 @@ class ObstacleOperator:
                     dtype=state.control.precision
                 )
         elif backend.backend_type == "gpu":
+            self.update_obstacle_properties =\
+                self.update_obstacle_properties_gpu
+            self.snapshot_fields =\
+                self.snapshot_fields_gpu
             self.reconstruct_obstacles =\
                 self.reconstruct_obstacles_gpu
             self.find_obstacle_boundary_nodes =\
@@ -836,8 +906,6 @@ class ObstacleOperator:
                 self.find_obstacle_normals_gpu
             self.compute_force_torque =\
                 self.compute_force_torque_gpu
-            self.update_obstacle_properties =\
-                self.update_obstacle_properties_gpu
             obstacle_kernels_module = obstacle_kernels_gpu
             force_torque_kernels_module = force_torque_kernels_gpu
             arg_suffix = "_device"
@@ -884,6 +952,64 @@ class ObstacleOperator:
                     self.compute_force_torque_args += tuple([arg])
 
         if not state.obstacle.all_obstacles_static:
+            self.snapshot_fields = [
+                "solid",
+                "solid_id",
+                "solid_boundary",
+                "fluid_boundary"
+            ]
+            if self.obstacle_kernels_type == "single_phase":
+                self._exchange_fields = {
+                    "before_snapshot": {
+                        "bool_fields": None,
+                        "int_fields": None,
+                        "float_fields": ["density", "pop_fluid_new"]
+                    },
+                    "after_geometry": {
+                        "bool_fields": ["solid"],
+                        "int_fields": ["solid_id"],
+                        "float_fields": None
+                    },
+                    "after_refill": {
+                        "bool_fields": ["solid_boundary", "fluid_boundary"],
+                        "int_fields": ["solid_id"],
+                        "float_fields": ["velocity"]
+                    }
+                }
+
+                self.snapshot_kernel =\
+                    obstacle_kernels_module.snapshot_single_phase
+                self.snapshot_fields_list.extend([
+                    "density",
+                    "pop_fluid_new"
+                ])
+                self.snapshot_fields = {}
+                for field_name in self.snapshot_fields_list:
+                    if backend.backend_type == "cpu":
+                        self.snapshot_fields.update({
+                            field_name: np.zeros_like(
+                                getattr(state.fields, field_name)
+                            )
+                        })
+                    elif backend.backend_type == "gpu":
+                        self.snapshot_fields.update({
+                            field_name: cuda.device_array_like(
+                                getattr(state.fields, field_name + "_device")
+                            )
+                        })
+                self.snapshot_kernel_args = (
+                    state.domain.size,
+                    state.lattice.no_of_directions
+                )
+                for field_name in self.snapshot_fields_list:
+                    self.snapshot_kernel_args += (
+                        getattr(state.fields, field_name + arg_suffix)
+                    )
+                for field_name in self.snapshot_fields:
+                    self.snapshot_kernel_args += (
+                        self.snapshot_fields[field_name]
+                    )
+
             self.update_position_velocity_kernel =\
                 obstacle_kernels_module.update_position_velocity
             obstacle_data = state.obstacle.obstacle_data
@@ -909,7 +1035,7 @@ class ObstacleOperator:
             )
 
             self.reconstruct_obstacles_args = []
-            for obs_no, current_obstacle in enumerate(
+            for _, current_obstacle in enumerate(
                 state.obstacle.obstacles
             ):
                 args = ()
@@ -988,7 +1114,7 @@ class ObstacleOperator:
             )
 
             self.compute_normals_args = []
-            for obs_no, current_obstacle in enumerate(
+            for _, current_obstacle in enumerate(
                 state.obstacle.obstacles
             ):
                 args = ()

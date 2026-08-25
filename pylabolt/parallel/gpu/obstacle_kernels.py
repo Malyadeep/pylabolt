@@ -542,3 +542,42 @@ def update_position_velocity(
                     center[obs_no, 1] += linear_velocity_old[1] +\
                         0.5 * (force_temp_y / mass[obs_no, 0] + gravity[1])
                 ref_point[obs_no, 1] = center[obs_no, 1]
+
+
+# --------------------------------------------------------------------------#
+""" Kernels to take snapshot """
+
+
+@cuda.jit
+def snapshot_single_phase(
+    size,
+    no_of_directions,
+    solid,
+    solid_id,
+    solid_boundary,
+    fluid_boundary,
+    density,
+    pop_fluid_new,
+    solid_snapshot,
+    solid_id_snapshot,
+    solid_boundary_snapshot,
+    fluid_boundary_snapshot,
+    density_snapshot,
+    pop_fluid_new_snapshot
+):
+    """
+    Take snapshot of required fields before solid motion
+    Args:
+
+    Returns:
+
+    """
+    ind = cuda.grid(1)
+    if ind < size:
+        solid_snapshot[ind] = solid[ind]
+        solid_id_snapshot[ind] = solid_id[ind]
+        solid_boundary_snapshot[ind] = solid_boundary[ind]
+        fluid_boundary_snapshot[ind] = fluid_boundary[ind]
+        density_snapshot[ind] = density[ind]
+        for k in range(no_of_directions):
+            pop_fluid_new_snapshot[ind, k] = pop_fluid_new[ind, k]
