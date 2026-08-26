@@ -500,3 +500,90 @@ def snapshot_single_phase(
         density_snapshot[ind] = density[ind]
         for k in range(no_of_directions):
             pop_fluid_new_snapshot[ind, k] = pop_fluid_new[ind, k]
+
+
+# --------------------------------------------------------------------------#
+""" Kernels to refill new fluid/solid nodes """
+
+
+@numba.njit(parallel=True, nogil=True)
+def refill_nodes_single_phase(
+    float_min,
+    size,
+    shape,
+    cx,
+    cy,
+    weights,
+    no_of_directions,
+    inv_cs_2,
+    inv_cs_4,
+    ghost_node,
+    velocity,
+    solid,
+    density,
+    pop_fluid_new,
+    solid_snapshot,
+    density_snapshot,
+    pop_fluid_new_snapshot
+):
+    """
+    Refill fresh fluid/solid nodes for single phase
+    density based fluid solvers
+    Args:
+
+    Returns:
+
+    """
+    for ind in prange(size):
+        if not ghost_node[ind]:
+            if not solid[ind] and solid_snapshot[ind]:
+                x = ind // shape[1]
+                y = ind - x * shape[1]
+                numerator = 0.
+                denominator = 0.
+                for k in range(1, no_of_directions):
+                    x_nb = x + cx[k]
+                    y_nb = y + cy[k]
+                    ind_nb = x_nb * shape[1] + y_nb
+                    if not solid_snapshot[ind_nb]:
+                        numerator += (
+                            weights[k] * density_snapshot[ind_nb]
+                        )
+                        denominator += weights[k]
+                density[ind] = numerator / (denominator + float_min)
+                density_local = density[ind]
+                velocity_local_x = velocity[ind, 0]
+                velocity_local_y = velocity[ind, 1]
+                u2 = (velocity_local_x * velocity_local_x +
+                      velocity_local_y * velocity_local_y)
+                for k in range(no_of_directions):
+                    cu = cx[k] * velocity_local_x + cy[k] * velocity_local_y
+                    pop_eq = weights[k] * density_local * (
+                        1 + inv_cs_2 * cu + 0.5 * inv_cs_4 * cu * cu -
+                        0.5 * inv_cs_2 * u2
+                    )
+                    numerator = 0.
+                    for m in range(1, no_of_directions):
+                        x_nb = x + cx[m]
+                        y_nb = y + cy[m]
+                        ind_nb = x_nb * shape[1] + y_nb
+                        if not solid_snapshot[ind_nb]:
+                            u2_nb = (
+                                velocity[ind_nb, 0] * velocity[ind_nb, 0] +
+                                velocity[ind_nb, 1] * velocity[ind_nb, 1]
+                            )
+                            cu_nb = (
+                                cx[k] * velocity[ind_nb, 0] +
+                                cy[k] * velocity[ind_nb, 1]
+                            )
+                            density_nb = density_snapshot[ind_nb]
+                            pop_eq_nb = weights[k] * density_nb * (
+                                1 + inv_cs_2 * cu_nb +
+                                0.5 * inv_cs_4 * cu_nb * cu_nb -
+                                0.5 * inv_cs_2 * u2_nb
+                            )
+                            numerator += weights[k] * (
+                                pop_fluid_new_snapshot[ind_nb, k] - pop_eq_nb
+                            )
+                    pop_fluid_new[ind, k] = pop_eq +\
+                        numerator / (denominator + float_min)

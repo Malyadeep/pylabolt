@@ -111,7 +111,7 @@ class ObstacleOperator:
             float_buffers=before_snapshot_fields["float_fields"]
         )
         # ------- Make copy of field data for interpolation ------- #
-        # TODO
+        self.snapshot_fields(backend)
         # ------- Reconstruct solid obstacles ------- #
         self.reconstruct_obstacles(
             state,
@@ -138,7 +138,10 @@ class ObstacleOperator:
             initialize=False
         )
         # ------- Refill fresh nodes ------- #
-        # TODO
+        self.refill_nodes(
+            state,
+            backend
+        )
         # ------- Halo-exchange (before snapshot) ------- #
         mpi_operator.halo_exchange(
             state,
@@ -318,6 +321,21 @@ class ObstacleOperator:
                     *self.compute_normals_args[obs_no],
                     obs_no
                 )
+
+    def refill_nodes_cpu(
+        self,
+        state,
+        backend
+    ):
+        """
+        Refill newly created fluid/solid nodes
+        Backend: CPU
+        Args:
+
+        Returns:
+
+        """
+        self.refill_nodes_kernel(*self.refill_nodes_args)
 
     def compute_force_torque_gpu(
         self,
@@ -540,6 +558,25 @@ class ObstacleOperator:
                     *self.compute_normals_args[obs_no],
                     obs_no
                 )
+
+    def refill_nodes_gpu(
+        self,
+        state,
+        backend
+    ):
+        """
+        Refill newly created fluid/solid nodes
+        Backend: GPU
+        Args:
+
+        Returns:
+
+        """
+        self.refill_nodes_kernel[
+            backend.blocks,
+            backend.threads_per_block,
+            backend.numba_stream
+        ](*self.refill_nodes_args)
 
     def compile(
         self,
@@ -882,6 +919,8 @@ class ObstacleOperator:
                 self.find_obstacle_boundary_nodes_cpu
             self.find_obstacle_normals =\
                 self.find_obstacle_normals_cpu
+            self.refill_nodes =\
+                self.refill_nodes_cpu
             self.compute_force_torque =\
                 self.compute_force_torque_cpu
             obstacle_kernels_module = obstacle_kernels_cpu
@@ -904,6 +943,8 @@ class ObstacleOperator:
                 self.find_obstacle_boundary_nodes_gpu
             self.find_obstacle_normals =\
                 self.find_obstacle_normals_gpu
+            self.refill_nodes =\
+                self.refill_nodes_cpu
             self.compute_force_torque =\
                 self.compute_force_torque_gpu
             obstacle_kernels_module = obstacle_kernels_gpu
@@ -952,7 +993,7 @@ class ObstacleOperator:
                     self.compute_force_torque_args += tuple([arg])
 
         if not state.obstacle.all_obstacles_static:
-            self.snapshot_fields = [
+            self.snapshot_fields_list = [
                 "solid",
                 "solid_id",
                 "solid_boundary",
@@ -1009,6 +1050,28 @@ class ObstacleOperator:
                     self.snapshot_kernel_args += (
                         self.snapshot_fields[field_name]
                     )
+
+                self.refill_nodes_kernel =\
+                    obstacle_kernels_module.refill_nodes_single_phase
+                self.refill_nodes_args = (
+                    getattr(state.control, "float_min" + arg_suffix),
+                    getattr(state.domain, "size" + arg_suffix),
+                    getattr(state.domain, "shape" + arg_suffix),
+                    getattr(state.lattice, "cx" + arg_suffix),
+                    getattr(state.lattice, "cy" + arg_suffix),
+                    getattr(state.lattice, "weights" + arg_suffix),
+                    getattr(state.lattice, "no_of_directions" + arg_suffix),
+                    getattr(state.lattice, "inv_cs_2" + arg_suffix),
+                    getattr(state.lattice, "inv_cs_4" + arg_suffix),
+                    getattr(state.fields, "ghost_node" + arg_suffix),
+                    getattr(state.fields, "velocity" + arg_suffix),
+                    getattr(state.fields, "solid" + arg_suffix),
+                    getattr(state.fields, "density" + arg_suffix),
+                    getattr(state.fields, "pop_fluid_new" + arg_suffix),
+                    self.snapshot_fields["solid"],
+                    self.snapshot_fields["density"],
+                    self.snapshot_fields["pop_fluid_new"],
+                )
 
             self.update_position_velocity_kernel =\
                 obstacle_kernels_module.update_position_velocity
