@@ -472,6 +472,7 @@ def update_position_velocity(
 def snapshot_single_phase(
     size,
     no_of_directions,
+    surface_normals,
     solid,
     solid_id,
     solid_boundary,
@@ -497,6 +498,12 @@ def snapshot_single_phase(
         solid_id_snapshot[ind] = solid_id[ind]
         solid_boundary_snapshot[ind] = solid_boundary[ind]
         fluid_boundary_snapshot[ind] = fluid_boundary[ind]
+        solid[ind] = False
+        solid_id[ind] = -1
+        solid_boundary[ind] = False
+        fluid_boundary[ind] = False
+        surface_normals[ind, 0] = 0
+        surface_normals[ind, 1] = 0
         density_snapshot[ind] = density[ind]
         for k in range(no_of_directions):
             pop_fluid_new_snapshot[ind, k] = pop_fluid_new[ind, k]

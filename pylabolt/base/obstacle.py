@@ -430,7 +430,7 @@ class Circle:
         self.linear_velocity = np.zeros(2, dtype=control.precision)
         self.angular_velocity = control.precision(0)
         self.static = True
-        self.calculated = False,
+        self.calculated = False
         self.rotation_allowed = False
         self.translation_allowed = False
 
@@ -637,7 +637,7 @@ class Ellipse:
         self.linear_velocity = np.zeros(2, dtype=control.precision)
         self.angular_velocity = control.precision(0)
         self.static = True
-        self.calculated = False,
+        self.calculated = False
         self.rotation_allowed = False
         self.translation_allowed = False
 

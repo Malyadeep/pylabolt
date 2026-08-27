@@ -218,8 +218,8 @@ class ObstacleOperator:
         Returns:
 
         """
-        self.snapshot_kernel(
-            *self.snapshot_args
+        self.snapshot_fields_kernel(
+            *self.snapshot_fields_args
         )
 
     def reconstruct_obstacles_cpu(
@@ -465,12 +465,12 @@ class ObstacleOperator:
         Returns:
 
         """
-        self.snapshot_kernel[
+        self.snapshot_fields_kernel[
             backend.blocks,
             backend.threads_per_block,
             backend.numba_stream
         ](
-            *self.snapshot_kernel_args
+            *self.snapshot_fields_args
         )
 
     def find_obstacle_boundary_nodes_gpu(
@@ -669,6 +669,18 @@ class ObstacleOperator:
                         set(self.update_position_velocity_kernel.signatures)
                 })
 
+                # ------- Snapshot fields kernel ------- #
+                compile_args = backend.make_compile_args(
+                    self.snapshot_fields_args
+                )
+                self.snapshot_fields_kernel(
+                    *compile_args
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    self.snapshot_fields_kernel.__name__:
+                        set(self.snapshot_fields_kernel.signatures)
+                })
+
                 # ------- Compile obstacle reconstruction kernel ------- #
                 for obs_no in range(state.obstacle.no_of_obstacles):
                     current_obstacle = state.obstacle.obstacles[obs_no]
@@ -753,7 +765,20 @@ class ObstacleOperator:
                             )
                         })
 
+                # ------- Refill nodes kernel ------- #
+                compile_args = backend.make_compile_args(
+                    self.refill_nodes_args
+                )
+                self.refill_nodes_kernel(
+                    *compile_args
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    self.refill_nodes_kernel.__name__:
+                        set(self.refill_nodes_kernel.signatures)
+                })
+
             elif backend.backend_type == "gpu":
+                # ------- Compile position-velocity update kernel ------- #
                 compile_args = backend.make_compile_args(
                     self.update_position_velocity_args
                 )
@@ -767,6 +792,22 @@ class ObstacleOperator:
                 self.kernel_signatures["obstacle_kernels"].update({
                     self.update_position_velocity_kernel.__name__:
                         set(self.update_position_velocity_kernel.signatures)
+                })
+
+                # ------- Snapshot fields kernel ------- #
+                compile_args = backend.make_compile_args(
+                    self.snapshot_fields_args
+                )
+                self.snapshot_fields_kernel[
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
+                ](
+                    *compile_args
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    self.snapshot_fields_kernel.__name__:
+                        set(self.snapshot_fields_kernel.signatures)
                 })
 
                 # ------- Compile obstacle reconstruction kernel ------- #
@@ -896,6 +937,22 @@ class ObstacleOperator:
                             )
                         })
 
+                # ------- Refill nodes kernel ------- #
+                compile_args = backend.make_compile_args(
+                    self.refill_nodes_args
+                )
+                self.refill_nodes_kernel[
+                    backend.blocks,
+                    backend.threads_per_block,
+                    backend.numba_stream
+                ](
+                    *compile_args
+                )
+                self.kernel_signatures["obstacle_kernels"].update({
+                    self.refill_nodes_kernel.__name__:
+                        set(self.refill_nodes_kernel.signatures)
+                })
+
     def set_backend(
         self,
         state,
@@ -1018,37 +1075,38 @@ class ObstacleOperator:
                     }
                 }
 
-                self.snapshot_kernel =\
+                self.snapshot_fields_kernel =\
                     obstacle_kernels_module.snapshot_single_phase
                 self.snapshot_fields_list.extend([
                     "density",
                     "pop_fluid_new"
                 ])
-                self.snapshot_fields = {}
+                self.snapshot_fields_dict = {}
                 for field_name in self.snapshot_fields_list:
                     if backend.backend_type == "cpu":
-                        self.snapshot_fields.update({
+                        self.snapshot_fields_dict.update({
                             field_name: np.zeros_like(
                                 getattr(state.fields, field_name)
                             )
                         })
                     elif backend.backend_type == "gpu":
-                        self.snapshot_fields.update({
+                        self.snapshot_fields_dict.update({
                             field_name: cuda.device_array_like(
                                 getattr(state.fields, field_name + "_device")
                             )
                         })
-                self.snapshot_kernel_args = (
+                self.snapshot_fields_args = (
                     state.domain.size,
-                    state.lattice.no_of_directions
+                    state.lattice.no_of_directions,
+                    getattr(state.fields, "surface_normals" + arg_suffix)
                 )
                 for field_name in self.snapshot_fields_list:
-                    self.snapshot_kernel_args += (
-                        getattr(state.fields, field_name + arg_suffix)
+                    self.snapshot_fields_args += tuple(
+                        [getattr(state.fields, field_name + arg_suffix)]
                     )
-                for field_name in self.snapshot_fields:
-                    self.snapshot_kernel_args += (
-                        self.snapshot_fields[field_name]
+                for field_name in self.snapshot_fields_dict:
+                    self.snapshot_fields_args += tuple(
+                        [self.snapshot_fields_dict[field_name]]
                     )
 
                 self.refill_nodes_kernel =\
@@ -1068,9 +1126,9 @@ class ObstacleOperator:
                     getattr(state.fields, "solid" + arg_suffix),
                     getattr(state.fields, "density" + arg_suffix),
                     getattr(state.fields, "pop_fluid_new" + arg_suffix),
-                    self.snapshot_fields["solid"],
-                    self.snapshot_fields["density"],
-                    self.snapshot_fields["pop_fluid_new"],
+                    self.snapshot_fields_dict["solid"],
+                    self.snapshot_fields_dict["density"],
+                    self.snapshot_fields_dict["pop_fluid_new"],
                 )
 
             self.update_position_velocity_kernel =\
