@@ -206,6 +206,7 @@ class InputOutputOperator:
             return
         if time_step % state.control.save_interval != 0:
             return
+        backend.synchronize()
         for item in self.fields_save_device:
             args = (
                 state.domain.inner_size_device,
@@ -297,6 +298,7 @@ class InputOutputOperator:
     def write_histories_cpu(
         self,
         state,
+        backend,
         time_step
     ):
         """
@@ -359,6 +361,7 @@ class InputOutputOperator:
     def write_histories_gpu(
         self,
         state,
+        backend,
         time_step
     ):
         """
@@ -373,6 +376,7 @@ class InputOutputOperator:
                 state.domain.mpi_rank == 0 and
                 state.obstacle.write_interval is not None):
             if time_step % state.obstacle.write_interval == 0:
+                backend.synchronize()
                 global_obstacle_data = SimpleNamespace(
                     force=state.obstacle.obstacle_data.
                     force_device.copy_to_host(),
@@ -416,6 +420,7 @@ class InputOutputOperator:
                 state.domain.mpi_rank == 0 and
                 state.boundary.write_interval is not None):
             if time_step % state.boundary.write_interval == 0:
+                backend.synchronize()
                 local_force = state.boundary.local_force_device.copy_to_host()
                 for itr, boundary_element in enumerate(
                     state.boundary.boundary_elements

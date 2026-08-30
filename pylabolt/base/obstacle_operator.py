@@ -1001,7 +1001,7 @@ class ObstacleOperator:
             self.find_obstacle_normals =\
                 self.find_obstacle_normals_gpu
             self.refill_nodes =\
-                self.refill_nodes_cpu
+                self.refill_nodes_gpu
             self.compute_force_torque =\
                 self.compute_force_torque_gpu
             obstacle_kernels_module = obstacle_kernels_gpu

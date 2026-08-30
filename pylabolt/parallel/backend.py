@@ -132,3 +132,16 @@ class Backend:
             return cuda.to_device(arg)
         else:
             return arg
+
+    def synchronize(
+        self
+    ):
+        """
+        Performs host-side synchronization for GPU backend
+        Args:
+
+        Returns:
+
+        """
+        if self.backend_type == "gpu":
+            self.cupy_stream.synchronize()

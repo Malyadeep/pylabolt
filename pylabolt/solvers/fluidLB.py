@@ -54,9 +54,7 @@ class FluidLB:
         self.obstacle_kernels_type = "single_phase"
         self.residue_fields = ["density", "velocity"]
         self.save_fields = [
-            "density", "velocity", "solid", "solid_id",
-            "solid_boundary", "fluid_boundary",
-            "surface_normals"
+            "density", "velocity", "solid", "solid_id"
         ]
 
     def get_collision_args(self):
@@ -344,6 +342,7 @@ class Solver:
         )
         self.io_operator.write_histories(
             self.state,
+            self.backend,
             time_step=0
         )
 
@@ -362,6 +361,7 @@ class Solver:
                 self.mpi_operator,
                 time_step
             )
+            # TODO: synchronize before residue computation?
             self.residue_operator.compute_residues(
                 self.state,
                 self.backend,
@@ -381,10 +381,12 @@ class Solver:
             )
             self.io_operator.write_histories(
                 self.state,
+                self.backend,
                 time_step
             )
         """ End time-loop """
 
+        self.backend.synchronize()
         run_time = time.perf_counter() - run_time_start
         print_log("\n" + "-" * 80, self.state.domain.mpi_rank, verbose)
         print_log(

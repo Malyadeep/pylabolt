@@ -13,7 +13,14 @@ def load_simulation(comm, mpi_rank):
         try:
             working_dir = os.getcwd()
             sys.path.append(working_dir)
+            print_log("-" * 80, mpi_rank, verbose=True)
+            print_log(
+                "User defined output in simulation.py:\n",
+                mpi_rank,
+                verbose=True
+            )
             import simulation
+            print_log("", mpi_rank, verbose=True)
             return simulation
         except ImportError:
             raise ImportError(

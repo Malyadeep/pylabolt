@@ -519,8 +519,10 @@ def update_position_velocity(
                     force_temp_x = force[obs_no, 0]
                     force_temp_y = force[obs_no, 1]
             if rotation_allowed[obs_no, 0]:
-                inclination_angle[obs_no, 0] = angular_velocity_old +\
+                inclination_angle[obs_no, 0] = (
+                    inclination_angle[obs_no, 0] + angular_velocity_old +
                     0.5 * torque_temp / moment_of_inertia[obs_no, 0]
+                )
             if translation_allowed[obs_no, 0]:
                 if x_periodic:
                     center[obs_no, 0] = (
