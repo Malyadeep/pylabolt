@@ -90,14 +90,10 @@ class CollisionOperator:
                 state.lattice.inv_cs_2 + 0.5
             self.omega_fluid = 1 / self.tau_fluid
             if self.collision_fluid == "MRT":
-                self.setup_MRT_params()
-                self.collision_params = (
-                    self.M,
-                    self.inv_M,
-                    self.S,
-                    self.pre_factor_mat,
-                    self.inv_pre_factor_mat
-                )
+                self.setup_MRT_params(state)
+                self.collision_params = tuple([
+                    self.omega_fluid
+                ])
             elif self.collision_fluid == "BGK":
                 self.collision_params = tuple([
                     self.omega_fluid
@@ -139,6 +135,9 @@ class CollisionOperator:
     ):
         """
         Sets up MRT matrices
+        These matrices are written for readibility and information
+        In the kernels however, the collision process is hardcoded
+        to a large extent based on these matrices, to maximise performance
         Args:
 
         Returns:
@@ -156,11 +155,12 @@ class CollisionOperator:
             [0, 0, 0, 0, 0, 1, -1, 1, -1]
         ], dtype=state.control.precision)
         self.inv_M = np.linalg.inv(self.M)
-        self.S = np.array(
+        self.diag_vec = np.array(
             [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
              self.omega_fluid, self.omega_fluid],
             dtype=state.control.precision
         )
+        self.S = np.diag(self.diag_vec, k=0)
         self.pre_factor_mat = np.matmul(np.matmul(self.inv_M, self.S), self.M)
         self.inv_pre_factor_mat = np.linalg.inv(self.pre_factor_mat)
 

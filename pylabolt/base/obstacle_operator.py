@@ -1012,12 +1012,11 @@ class ObstacleOperator:
                 self.partial_force_torque_device = cuda.device_array(
                         (backend.reduce_blocks, 3), dtype=float
                     )
-            if not state.obstacle.all_obstacles_static:
-                self.partial_fluid_boundary_overlap_device = cuda.device_array(
-                    backend.reduce_blocks, dtype=int
-                )
-                self.local_count_fluid_boundary_overlap_device =\
-                    cuda.device_array(1, dtype=int)
+            self.partial_fluid_boundary_overlap_device = cuda.device_array(
+                backend.reduce_blocks, dtype=int
+            )
+            self.local_count_fluid_boundary_overlap_device =\
+                cuda.device_array(1, dtype=int)
 
         self.obstacle_kernels_type = self.model.obstacle_kernels_type
 
@@ -1049,6 +1048,74 @@ class ObstacleOperator:
                     arg = getattr(arg_obj, arg_name + arg_suffix)
                     self.compute_force_torque_args += tuple([arg])
 
+        self.compute_obstacle_boundary_args = (
+            getattr(state.domain, "size" + arg_suffix),
+            getattr(state.domain, "shape" + arg_suffix),
+            getattr(state.lattice, "cx" + arg_suffix),
+            getattr(state.lattice, "cy" + arg_suffix),
+            getattr(state.lattice, "no_of_directions" + arg_suffix),
+            getattr(state.fields, "solid" + arg_suffix),
+            getattr(state.fields, "solid_id" + arg_suffix),
+            getattr(state.fields, "solid_boundary" + arg_suffix),
+            getattr(state.fields, "fluid_boundary" + arg_suffix),
+            getattr(state.fields, "ghost_node" + arg_suffix)
+        )
+        self.check_fluid_boundary_overlap_args = (
+            getattr(state.domain, "size" + arg_suffix),
+            getattr(state.domain, "shape" + arg_suffix),
+            getattr(state.lattice, "cx" + arg_suffix),
+            getattr(state.lattice, "cy" + arg_suffix),
+            getattr(state.lattice, "no_of_directions" + arg_suffix),
+            getattr(state.fields, "solid_id" + arg_suffix),
+            getattr(state.fields, "fluid_boundary" + arg_suffix),
+            getattr(state.fields, "ghost_node" + arg_suffix)
+        )
+
+        self.compute_normals_args = []
+        for _, current_obstacle in enumerate(
+            state.obstacle.obstacles
+        ):
+            args = ()
+            if current_obstacle.type == "circle":
+                args = (
+                    getattr(state.domain, "size" + arg_suffix),
+                    getattr(state.domain, "shape" + arg_suffix),
+                    getattr(state.domain, "offset" + arg_suffix),
+                    getattr(state.mesh, "grid_global_shape" + arg_suffix),
+                    getattr(state.boundary, "x_periodic" + arg_suffix),
+                    getattr(state.boundary, "y_periodic" + arg_suffix),
+                    getattr(state.fields, "solid_boundary" + arg_suffix),
+                    getattr(state.fields, "fluid_boundary" + arg_suffix),
+                    getattr(state.fields, "solid_id" + arg_suffix),
+                    getattr(state.fields, "surface_normals" + arg_suffix),
+                    getattr(state.obstacle.obstacle_data, "center" +
+                            arg_suffix),
+                    getattr(current_obstacle, "id" + arg_suffix)
+                )
+            elif current_obstacle.type == "ellipse":
+                args = (
+                    getattr(state.domain, "size" + arg_suffix),
+                    getattr(state.domain, "shape" + arg_suffix),
+                    getattr(state.domain, "offset" + arg_suffix),
+                    getattr(state.mesh, "grid_global_shape" + arg_suffix),
+                    getattr(state.boundary, "x_periodic" + arg_suffix),
+                    getattr(state.boundary, "y_periodic" + arg_suffix),
+                    getattr(state.fields, "solid_boundary" + arg_suffix),
+                    getattr(state.fields, "fluid_boundary" + arg_suffix),
+                    getattr(state.fields, "solid_id" + arg_suffix),
+                    getattr(state.fields, "surface_normals" + arg_suffix),
+                    getattr(state.obstacle.obstacle_data, "center" +
+                            arg_suffix),
+                    getattr(current_obstacle, "semi_major_axis" +
+                            arg_suffix),
+                    getattr(current_obstacle, "semi_minor_axis" +
+                            arg_suffix),
+                    getattr(state.obstacle.obstacle_data,
+                            "inclination_angle" + arg_suffix),
+                    getattr(current_obstacle, "id" + arg_suffix)
+                )
+            self.compute_normals_args.append(args)
+        
         if not state.obstacle.all_obstacles_static:
             self.snapshot_fields_list = [
                 "solid",
@@ -1210,74 +1277,6 @@ class ObstacleOperator:
                         getattr(current_obstacle, "id" + arg_suffix)
                     )
                 self.reconstruct_obstacles_args.append(args)
-
-            self.compute_obstacle_boundary_args = (
-                getattr(state.domain, "size" + arg_suffix),
-                getattr(state.domain, "shape" + arg_suffix),
-                getattr(state.lattice, "cx" + arg_suffix),
-                getattr(state.lattice, "cy" + arg_suffix),
-                getattr(state.lattice, "no_of_directions" + arg_suffix),
-                getattr(state.fields, "solid" + arg_suffix),
-                getattr(state.fields, "solid_id" + arg_suffix),
-                getattr(state.fields, "solid_boundary" + arg_suffix),
-                getattr(state.fields, "fluid_boundary" + arg_suffix),
-                getattr(state.fields, "ghost_node" + arg_suffix)
-            )
-            self.check_fluid_boundary_overlap_args = (
-                getattr(state.domain, "size" + arg_suffix),
-                getattr(state.domain, "shape" + arg_suffix),
-                getattr(state.lattice, "cx" + arg_suffix),
-                getattr(state.lattice, "cy" + arg_suffix),
-                getattr(state.lattice, "no_of_directions" + arg_suffix),
-                getattr(state.fields, "solid_id" + arg_suffix),
-                getattr(state.fields, "fluid_boundary" + arg_suffix),
-                getattr(state.fields, "ghost_node" + arg_suffix)
-            )
-
-            self.compute_normals_args = []
-            for _, current_obstacle in enumerate(
-                state.obstacle.obstacles
-            ):
-                args = ()
-                if current_obstacle.type == "circle":
-                    args = (
-                        getattr(state.domain, "size" + arg_suffix),
-                        getattr(state.domain, "shape" + arg_suffix),
-                        getattr(state.domain, "offset" + arg_suffix),
-                        getattr(state.mesh, "grid_global_shape" + arg_suffix),
-                        getattr(state.boundary, "x_periodic" + arg_suffix),
-                        getattr(state.boundary, "y_periodic" + arg_suffix),
-                        getattr(state.fields, "solid_boundary" + arg_suffix),
-                        getattr(state.fields, "fluid_boundary" + arg_suffix),
-                        getattr(state.fields, "solid_id" + arg_suffix),
-                        getattr(state.fields, "surface_normals" + arg_suffix),
-                        getattr(state.obstacle.obstacle_data, "center" +
-                                arg_suffix),
-                        getattr(current_obstacle, "id" + arg_suffix)
-                    )
-                elif current_obstacle.type == "ellipse":
-                    args = (
-                        getattr(state.domain, "size" + arg_suffix),
-                        getattr(state.domain, "shape" + arg_suffix),
-                        getattr(state.domain, "offset" + arg_suffix),
-                        getattr(state.mesh, "grid_global_shape" + arg_suffix),
-                        getattr(state.boundary, "x_periodic" + arg_suffix),
-                        getattr(state.boundary, "y_periodic" + arg_suffix),
-                        getattr(state.fields, "solid_boundary" + arg_suffix),
-                        getattr(state.fields, "fluid_boundary" + arg_suffix),
-                        getattr(state.fields, "solid_id" + arg_suffix),
-                        getattr(state.fields, "surface_normals" + arg_suffix),
-                        getattr(state.obstacle.obstacle_data, "center" +
-                                arg_suffix),
-                        getattr(current_obstacle, "semi_major_axis" +
-                                arg_suffix),
-                        getattr(current_obstacle, "semi_minor_axis" +
-                                arg_suffix),
-                        getattr(state.obstacle.obstacle_data,
-                                "inclination_angle" + arg_suffix),
-                        getattr(current_obstacle, "id" + arg_suffix)
-                    )
-                self.compute_normals_args.append(args)
 
     def verify_kernel_signatures(
         self,
