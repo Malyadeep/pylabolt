@@ -65,8 +65,7 @@ GPUs to run large simulations. Currently the parallel computing features support
 - To run on multiple machines/clusters, PyLaBolt uses `OpenMPI <https://www.open-mpi.org/>`_ via the `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_
   library.
 - PyLaBolt can also run simulations on NVIDIA GPUs through Numba's `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ bindings.
-- PyLaBolt provides support to convert output to `VTK <https://vtk.org/>`_ format, which can post-processed in `Paraview <https://www.paraview.org/>`_ / 
-`Mayavi <https://docs.enthought.com/mayavi/mayavi/>`_.
+- PyLaBolt provides support to convert output to `VTK <https://vtk.org/>`_ format, which can post-processed in `Paraview <https://www.paraview.org/>`_ / `Mayavi <https://docs.enthought.com/mayavi/mayavi/>`_.
 
 For more details, refer to the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
 
