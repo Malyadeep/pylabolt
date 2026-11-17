@@ -3,11 +3,13 @@ PyLaBolt
 ---------
 |Documentation status|
 
-PyLaBolt is a single phase, 2D, parallel lattice Boltzmann solver for fluid flow. It uses 
+PyLaBolt is a multiphase, 2D, modular GPU-accelerated lattice Boltzmann solver for fluid flow coupled with moving solid particles. It uses 
 `Numba <https://numba.readthedocs.io/en/stable/>`_ accelerated `Python <https://www.python.org/>`_ code
 to run lattice Boltzmann simulations on 2D lattices. Simulations can be run on CPU in parallel via 
 Numba's own `OpenMP <https://www.openmp.org/>`_ parallelization and the `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_ library.
 For running on NVIDIA GPUs, PyLaBolt uses Numba's `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ bindings.
+
+We note that currently a major refactor is in progress, which is why the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_ is outdated. Tutorial cases will be made available once the current refactor attempt is complete. We apologize for the inconvenience.
 
 
 .. |Documentation status| image:: https://readthedocs.org/projects/pylabolt/badge/?version=latest
@@ -20,41 +22,6 @@ Installation and Usage
 PyLaBolt can be installed via ``pip`` via the command::
 
     $ pip install pylabolt
-
-More details on the dependencies and their configuration can be found
-in the PyLaBolt documentation `here <https://PyLaBolt.readthedocs.io/en/latest/>`_.
-
-Tutorial cases are provided in the ``tutorials`` folder. For example, consider the lid driven cavity
-problem in ``tutorials/cavity/Re_100/``. The configuration file that defines the simulation is 
-called ``simulation.py``. After installation just run the following command from the ``tutorials/cavity/Re_100/``
-folder::
-
-    $ pylabolt --solver fluidLB
-
-The output data is written in the ``output`` folder. By default the data is written into binary files with 
-``.dat`` extension. To visualize the data in `Paraview <https://www.paraview.org/>`_ / 
-`Mayavi <https://docs.enthought.com/mayavi/mayavi/>`_, the `VTK <https://vtk.org/>`_ library is used.
-For example, to convert the last time-step data to a ``.vtk`` file, run the following command from
-the working directory::
-
-    $ pylabolt --toVTK last
-
-The ``output_<time-step>.vtk`` files are stored in ``output/VTK`` directory which can be opened in
-Paraview/Mayavi. Sample results for lid driven cavity, plane Poiseuille flow, and flow past a cylinder are shown below.
-
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/cavity_Vcontour.png
-   :width: 550px
-   :alt: `lid driven cavity (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/cavity/cavity_Vcontour.png>`_
-
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/gravity_driven/U_contour.png
-   :width: 550px
-   :alt: `Gravity driven plane Poiseuille flow (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/poiseuille_flow/gravity_driven/U_contour.png>`_
-
-.. figure:: https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png
-   :width: 550px
-   :alt: `Flow past a cylinder (Re = 100) <https://github.com/Malyadeep/pylabolt/blob/main/tutorials/flow_past_cylinder/flowpastcylinder_Vcontour.png>`_
-
-More details on setting up and running simulations can be found in the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
 
 
 =======================
@@ -98,7 +65,8 @@ GPUs to run large simulations. Currently the parallel computing features support
 - To run on multiple machines/clusters, PyLaBolt uses `OpenMPI <https://www.open-mpi.org/>`_ via the `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_
   library.
 - PyLaBolt can also run simulations on NVIDIA GPUs through Numba's `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ bindings.
-- PyLaBolt provides support to convert output to `VTK <https://vtk.org/>`_ format, which can post-processed in Paraview/Mayavi.
+- PyLaBolt provides support to convert output to `VTK <https://vtk.org/>`_ format, which can post-processed in `Paraview <https://www.paraview.org/>`_ / 
+`Mayavi <https://docs.enthought.com/mayavi/mayavi/>`_.
 
 For more details, refer to the `documentation <https://PyLaBolt.readthedocs.io/en/latest/>`_.
 
